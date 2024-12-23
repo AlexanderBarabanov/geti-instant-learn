@@ -1,0 +1,7 @@
+matplotlib
+tqdm
+numpy
+opencv-python
+torch
+datumaro
+gradio

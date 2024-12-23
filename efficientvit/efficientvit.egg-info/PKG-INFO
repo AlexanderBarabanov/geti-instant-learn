@@ -1,0 +1,30 @@
+Metadata-Version: 2.1
+Name: efficientvit
+Version: 0.0.0
+License-File: LICENSE
+Requires-Dist: torch
+Requires-Dist: torchvision
+Requires-Dist: torchmetrics
+Requires-Dist: numpy
+Requires-Dist: timm
+Requires-Dist: einops
+Requires-Dist: opencv-python
+Requires-Dist: tqdm
+Requires-Dist: torchprofile
+Requires-Dist: scipy
+Requires-Dist: torch-fidelity
+Requires-Dist: diffusers
+Requires-Dist: omegaconf
+Requires-Dist: ipdb
+Requires-Dist: wandb
+Requires-Dist: matplotlib
+Requires-Dist: huggingface-hub
+Requires-Dist: transformers
+Requires-Dist: onnx
+Requires-Dist: onnxsim
+Requires-Dist: onnxruntime
+Requires-Dist: pycocotools
+Requires-Dist: lvis
+Requires-Dist: scikit-image
+Requires-Dist: tinyneuralnetwork@ git+https://github.com/alibaba/TinyNeuralNetwork.git
+Requires-Dist: segment_anything@ git+https://github.com/facebookresearch/segment-anything.git
