@@ -26,3 +26,35 @@ data/
 │   │   │   ├── 2017/
 ```
 
+Copy the pre-trained weights of mobileSAM from PersonalizeSAM/weights/mobile_sam.pt to data/mobile_sam.pt
+
+
+## Installation
+
+Create a new conda/mamba/venv environment and install the dependencies.
+
+```
+conda create -n visualprompting python=3.11
+conda activate visualprompting
+conda install pytorch torchvision torchaudio pytorch-cuda=12.4 -c pytorch -c nvidia
+
+pip install -r requirements.txt
+```
+
+
+## Run
+
+Either use the main.py to run the code or use the gradio interface. 
+
+```
+python main.py
+# or
+python ui.py
+```
+
+When using the gradio interface make sure to tunnel the port to your local machine when your are running the code on a remote server.
+
+```
+ssh -L 8888:localhost:8888 username@server_ip
+```
+
