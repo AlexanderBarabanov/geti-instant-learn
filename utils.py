@@ -2,6 +2,7 @@ import colorsys
 import os
 from typing import List, Dict
 
+import numpy as np
 import pandas as pd
 
 from model_api.models import Prompt
@@ -14,7 +15,6 @@ def load_dataset(dataset_name: str) -> pd.DataFrame:
         return load_perseg_data()
     elif dataset_name == "DAVIS":
         return load_davis_data()
-
 
 
 def load_perseg_data() -> pd.DataFrame:
@@ -83,12 +83,19 @@ def load_davis_data() -> pd.DataFrame:
     return data
 
 
+def mask_image_to_polygon_prompts(mask_image: np.array) -> List[Prompt]:
+    mask = mask_image.astype(np.uint8)
+    mask = np.stack((mask, np.zeros_like(mask), np.zeros_like(mask)), axis=-1)
+
+
+
+
 def get_colors(n: int):
     HSV_tuples = [(x / n, 0.5, 0.5) for x in range(n)]
     RGB_tuples = map(lambda x: colorsys.hsv_to_rgb(*x), HSV_tuples)
     return (np.array(list(RGB_tuples)) * 255).astype(np.uint8)
 
-def transform_prompts_to_dict(prompts: List[Prompt]) -> Dict[int, List[List[int]]]:
+def transform_point_prompts_to_dict(prompts: List[Prompt]) -> Dict[int, List[List[int]]]:
     result = {}
     for prompt in prompts:
         label = prompt.label
@@ -97,3 +104,27 @@ def transform_prompts_to_dict(prompts: List[Prompt]) -> Dict[int, List[List[int]
             result[label] = []
         result[label].append(coords)
     return result
+
+def transform_mask_prompts_to_dict(prompts: List[Prompt]) -> Dict[int, np.array]:
+    """
+    Transform masks into a dictionary of masks per class.
+    
+    Args:
+        prompts: List[Prompt]
+    Returns:
+        Dict[int, np.array]  where the key is the class index and the value is the mask 
+    """
+    result = {}
+    for prompt in prompts:
+        label = prompt.label
+        mask = prompt.data
+        if label not in result:
+            result[label] = []
+        result[label].append(mask)
+    return result
+
+def compute_metrics(mask: np.array, gt_mask: np.array) -> tuple[float, float]:
+    mask = np.uint8(mask > 0)
+    gt_mask = np.uint8(gt_mask > 0)
+    intersection, union, target_area = intersectionAndUnion(mask, gt_mask)
+    return 

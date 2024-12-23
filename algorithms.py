@@ -3,7 +3,7 @@ from collections import defaultdict
 
 from pandas import Series
 
-from constants import MODEL_MAP
+from constants import MAPI_DECODER_PATH, MAPI_ENCODER_PATH, MODEL_MAP
 from efficientvit.models.efficientvit import EfficientViTSamPredictor, SamResize, SamPad
 from efficientvit.sam_model_zoo import create_efficientvit_sam_model
 from P2SAM.eval_utils import intersectionAndUnion
@@ -18,11 +18,12 @@ import numpy as np
 
 from PersonalizeSAM.per_segment_anything import sam_model_registry
 from model_api.models import Prompt, PredictedMask, ZSLVisualPromptingResult
-from model_api.models.visual_prompting import VisualPromptingFeatures, _point_selection
-from utils import transform_prompts_to_dict
+from model_api.models.model import Model
+from model_api.models.visual_prompting import SAMLearnableVisualPrompter, VisualPromptingFeatures, _point_selection
+from utils import transform_point_prompts_to_dict, transform_mask_prompts_to_dict
 
 
-def load_model(sam_name="SAM") -> SamPredictor | EfficientViTSamPredictor:
+def load_model(sam_name="SAM") -> SamPredictor | EfficientViTSamPredictor | SAMLearnableVisualPrompter:
     if sam_name not in MODEL_MAP:
         raise ValueError(f"Invalid model type: {sam_name}")
 
@@ -35,6 +36,10 @@ def load_model(sam_name="SAM") -> SamPredictor | EfficientViTSamPredictor:
         model = create_efficientvit_sam_model(name=name, weight_url=checkpoint_path).cuda()
         model.eval()
         return EfficientViTSamPredictor(model)
+    elif sam_name == "MobileSAM-MAPI":
+        encoder = Model.create_model(MAPI_ENCODER_PATH)
+        decoder = Model.create_model(MAPI_DECODER_PATH)
+        return SAMLearnableVisualPrompter(encoder, decoder)
     else:
         raise NotImplementedError(f"Model {sam_name} not implemented yet")
 
@@ -55,35 +60,47 @@ class PerSamPredictor:
 
     def learn(self, image: np.array, boxes: list[Prompt] | None = None,
               points: list[Prompt] | None = None,
-              polygons: list[Prompt] | None = None, show: bool = False) -> tuple[VisualPromptingFeatures, np.array]:
-        if points is None:
-            raise ValueError("Points are required for learning")
+              polygons: list[Prompt] | None = None, masks: list[Prompt] | None = None, show: bool = False) -> tuple[VisualPromptingFeatures, np.array]:
 
         # get masks by points
-        points_per_class = transform_prompts_to_dict(points)
+        if points is not None:
+            mask_per_class = {}
+            points_per_class = transform_point_prompts_to_dict(points)
+            for class_idx, points in points_per_class.items():
+                self.model.set_image(image)
+                masks, scores, logits, *_ = self.model.predict(
+                    point_coords=np.array(points),
+                    point_labels=np.array([class_idx] * len(points)),
+                    multimask_output=False)
+                best_idx = np.argmax(scores)
+                if not masks[best_idx].any():
+                    print(f"No mask found for reference class {class_idx}")
+                    continue
+                best_mask = masks[best_idx].astype(np.uint8) * 128
+                best_mask = np.stack((best_mask, np.zeros_like(best_mask), np.zeros_like(best_mask)), axis=-1)
+                if class_idx not in mask_per_class:    
+                    mask_per_class[class_idx] = []
+                mask_per_class[class_idx].append(best_mask)
+            if len(mask_per_class) == 0:
+                print("No masks found for any class given the input points")
+                return None, None
+        elif masks is not None:
+            mask_per_class = transform_mask_prompts_to_dict(masks)
+        else:
+            raise ValueError("Either points or masks are required for learning")
+        
+    
         self.model.set_image(image)
-        for class_idx, points in points_per_class.items():
-            masks, scores, logits, *_ = self.model.predict(
-                point_coords=np.array(points),
-                point_labels=np.array([class_idx] * len(points)),
-                multimask_output=False)
-            # todo only single object is supported
-            best_idx = np.argmax(scores)
-            if not masks[best_idx].any():
-                print(f"No mask found for reference class {class_idx}")
-                continue
-            best_mask = masks[best_idx].astype(np.uint8) * 128
-            best_mask = np.stack((best_mask, np.zeros_like(best_mask), np.zeros_like(best_mask)), axis=-1)
-
+        for class_idx, mask in mask_per_class.items():
             if show:
                 fig = plt.figure(figsize=(10, 10))
-                plt.imshow(best_mask)
+                plt.imshow(mask)
                 plt.show()
-                cv2.imwrite(f"reference_mask_{class_idx}.jpg", best_mask)
+                cv2.imwrite(f"reference_mask_{class_idx}.jpg", mask)
 
             if isinstance(self.model, SamPredictor):
                 # set_image resizes and pads to square input
-                reference_mask = self.model.set_image(image, best_mask)  # 1, 3 ,1024, 1024
+                reference_mask = self.model.set_image(image, mask)  # 1, 3 ,1024, 1024
                 image_embedding = self.model.features.squeeze().permute(1, 2, 0)  # image embedding is 64, 64, 256
                 # transform reference mask to a 64 64 mask
                 reference_mask = F.interpolate(reference_mask, size=image_embedding.shape[0: 2], mode="bilinear")
@@ -91,7 +108,7 @@ class PerSamPredictor:
             elif isinstance(self.model, EfficientViTSamPredictor):
                 image_embedding = self.model.features.squeeze().permute(1, 2, 0)  # image embedding is 64, 64, 256
                 # resize relative to longest size
-                reference_mask = SamResize(self.model.model.image_size[0])(best_mask)  # 576 1024 3
+                reference_mask = SamResize(self.model.model.image_size[0])(mask)  # 576 1024 3
                 reference_mask = torch.as_tensor(reference_mask, device=self.model.device)
                 reference_mask = reference_mask.permute(2, 0, 1).contiguous()[None, :, :, :]  # 1, 3, 576, 1024
                 reference_mask = SamPad(self.model.model.image_size[0])(reference_mask) # 1, 3, 1024, 1024
@@ -106,14 +123,14 @@ class PerSamPredictor:
 
             ### NOTE: this averages the local features into one vector (same as in ModelAPI)
             ### For P2-SAM we want to keep each feature separately
-            ### For a Vision-RAG implementation we probably want to store the features in a vector DB, while keeping a
+            ### For a Vision-RAG implementation we probably want to store the features (or its average) in a vector DB, while keeping a
             ### maximum num of items and removing outliers to keep a good representation of the target class
             reference_embedding = reference_features.mean(0).unsqueeze(0)
             reference_features = reference_embedding / reference_embedding.norm(dim=-1, keepdim=True)
             self.reference_embedding = reference_embedding.unsqueeze(0)
             print(f"Using {reference_features.shape} reference features for class {class_idx}")
             self.reference_features[class_idx] = reference_features  # note: this is still in CUDA
-            self.reference_masks[class_idx] = best_mask[:,:,0]
+            self.reference_masks[class_idx] = mask[:,:,0]
 
         if not self.reference_features:
             print("No reference features found. Please provide a larger reference mask")
