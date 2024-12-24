@@ -4,6 +4,7 @@ from typing import List, Dict
 
 import numpy as np
 import pandas as pd
+import cv2
 
 from model_api.models import Prompt
 
@@ -118,13 +119,52 @@ def transform_mask_prompts_to_dict(prompts: List[Prompt]) -> Dict[int, np.array]
     for prompt in prompts:
         label = prompt.label
         mask = prompt.data
-        if label not in result:
-            result[label] = []
-        result[label].append(mask)
+        result[label] = mask
     return result
 
-def compute_metrics(mask: np.array, gt_mask: np.array) -> tuple[float, float]:
-    mask = np.uint8(mask > 0)
-    gt_mask = np.uint8(gt_mask > 0)
-    intersection, union, target_area = intersectionAndUnion(mask, gt_mask)
-    return 
+def save_visualization(image: np.ndarray, mask, output_path: str, points=None, scores=None) -> None:
+    """
+    Save a visualization of the segmentation mask overlaid on the image.
+    
+    Args:
+        image: RGB image as numpy array
+        mask: Segmentation mask object with mask.mask containing instance masks
+        output_path: Path where to save the visualization
+        points: Optional points to visualize
+        scores: Optional confidence scores for the points
+    """
+    # create output path dirs if they don't exist
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    # Get unique colors for each instance mask
+    mask_colors = get_colors(len(mask.mask))
+    image_vis = image.copy()
+    
+    # Draw each instance mask with a different color
+    for i, instance in enumerate(mask.mask):
+        masked_img = np.where(instance[..., None], mask_colors[i], image_vis)
+        image_vis = cv2.addWeighted(image_vis, 0.2, masked_img, 0.8, 0)
+    
+    # Draw points and confidence scores if provided
+    if points is not None and scores is not None:
+        for i, point in enumerate(points):
+            # Draw star marker
+            x, y = int(point[0]), int(point[1])
+            size = int(image.shape[0] / 50)  # Scale marker size with image
+            cv2.drawMarker(image_vis, (x, y), (255, 255, 255), cv2.MARKER_STAR, size)
+            
+            # Add confidence score text
+            confidence = float(scores[i])
+            cv2.putText(image_vis, 
+                      f"{confidence:.2f}", 
+                      (x + 5, y - 5),  # Offset text slightly from point
+                      cv2.FONT_HERSHEY_SIMPLEX,
+                      image.shape[0] / 1500,  # Font scale relative to image height
+                      (255, 255, 255),  # White text
+                      1)  # Line thickness
+
+    # Ensure output directory exists
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    # Save visualization
+    cv2.imwrite(output_path, cv2.cvtColor(image_vis, cv2.COLOR_RGB2BGR)) 

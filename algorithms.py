@@ -23,19 +23,21 @@ from model_api.models.visual_prompting import SAMLearnableVisualPrompter, Visual
 from utils import transform_point_prompts_to_dict, transform_mask_prompts_to_dict
 
 
-def load_model(sam_name="SAM") -> SamPredictor | EfficientViTSamPredictor | SAMLearnableVisualPrompter:
+def load_model(sam_name="SAM", algo_name="Personalized SAM") -> SamPredictor | EfficientViTSamPredictor | SAMLearnableVisualPrompter:
     if sam_name not in MODEL_MAP:
         raise ValueError(f"Invalid model type: {sam_name}")
 
     name, checkpoint_path = MODEL_MAP[sam_name]
     if sam_name in ["SAM", "MobileSAM"]:
-        model = sam_model_registry[name](checkpoint=checkpoint_path).cuda()
-        model.eval()
-        return SamPredictor(model)
+        backbone = sam_model_registry[name](checkpoint=checkpoint_path).cuda()
+        backbone.eval()
+        backbone =  SamPredictor(backbone)
+        return PerSamPredictor(backbone, algo_name)
     elif sam_name == "EfficientViT-SAM":
-        model = create_efficientvit_sam_model(name=name, weight_url=checkpoint_path).cuda()
-        model.eval()
-        return EfficientViTSamPredictor(model)
+        backbone = create_efficientvit_sam_model(name=name, weight_url=checkpoint_path).cuda()
+        backbone.eval()
+        backbone = EfficientViTSamPredictor(backbone)
+        return PerSamPredictor(backbone, algo_name)
     elif sam_name == "MobileSAM-MAPI":
         encoder = Model.create_model(MAPI_ENCODER_PATH)
         decoder = Model.create_model(MAPI_DECODER_PATH)

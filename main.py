@@ -1,5 +1,6 @@
 import argparse
 import os
+import cv2
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -9,8 +10,8 @@ from constants import *
 from P2SAM.eval_utils import AverageMeter, intersectionAndUnion
 from efficientvit.models.efficientvit.sam import EfficientViTSamPredictor
 from model_api.models.result_types.visual_prompting import ZSLVisualPromptingResult
-from model_api.models.visual_prompting import SAMLearnableVisualPrompter
-from utils import load_dataset
+from model_api.models.visual_prompting import Prompt, SAMLearnableVisualPrompter
+from utils import get_colors, load_dataset, save_visualization
 
 import datumaro as dm
 
@@ -24,9 +25,9 @@ def get_arguments():
     parser.add_argument('--algo',type=str, default='persam', choices=['persam', 'p2sam'])
     parser.add_argument("--num_priors", type=int, default=1, help="Number of prior images to use as references")
     parser.add_argument("--dataset_name", type=str, default="PerSeg", choices=DATASETS)
-    parser.add_argument("--save", type=bool, default=False)
-    parser.add_argument("--show", type=bool, default=False)
-    parser.add_argument("--post_refinement", type=bool, default=True)
+    parser.add_argument("--save", action="store_true", help="Save results to disk")
+    parser.add_argument("--show", action="store_true", help="Show results during processing")
+    parser.add_argument("--post_refinement", action="store_true", help="Apply post refinement")
     parser.add_argument("--class_name", type=str, default=None)
 
     args = parser.parse_args()
@@ -44,23 +45,61 @@ def predict_on_dataset(args: argparse.Namespace, predictor: PerSamPredictor, dat
         target_meter = AverageMeter()
 
         class_samples = dataframe[dataframe.class_name == class_name]
-        priors = class_samples.sample(n=args.num_priors, replace=False) 
-        # select remaining images as target images
+        priors = class_samples.head(args.num_priors)
+        # select remaining images as target images but do not change the order of the dataframe 
         targets = class_samples[~class_samples.index.isin(priors.index)]
 
         # learn on prior images
-        # TODO modelAPI implementation does not accept masks directly. Either convert to polygons or change the implementation
         if isinstance(predictor, SAMLearnableVisualPrompter):
             raise NotImplementedError("MAPI implementation does not accept masks directly. Either convert to polygons or change the implementation")    
-        predictor.learn(image = priors.image.to_numpy(), masks = priors.mask_image.tolist(), show=args.show)
+        
+        # Load all prior images and masks
+        prior_images = []
+        prior_masks = []
+        for _, prior in priors.iterrows():
+            # load image from disk and convert to numpy array
+            image = cv2.cvtColor(cv2.imread(prior.image), cv2.COLOR_BGR2RGB)
+            mask_image = cv2.cvtColor(cv2.imread(prior.mask_image), cv2.COLOR_BGR2RGB)
+            mask_prompt = Prompt(label=0, data=mask_image)  # TODO only single class per image is supported for now
+            prior_images.append(image)
+            prior_masks.append(mask_prompt)
+
+        if args.save:
+            # save prior images and masks to disk, on top of each other
+            for i, (image, mask) in enumerate(zip(prior_images, prior_masks)):
+                cv2.imwrite(f"outputs/{args.dataset_name}/{class_name}/prior_{i}.png", np.hstack([image, mask]))
+
+        # TODO currently multiple priors is not yet implemented
+        predictor.learn(image=prior_images[0], masks=prior_masks, show=args.show)
 
         # predict on target images
         for row_idx, target in tqdm(targets.iterrows(), desc="Processing samples", total=len(targets), position=1, leave=False):
-            result: ZSLVisualPromptingResult = predictor.predict(image = target.image.to_numpy(), show=args.show, apply_masks_refinement=args.post_refinement)
+            # load image from disk and convert to numpy array
+            target_image = cv2.cvtColor(cv2.imread(target.image), cv2.COLOR_BGR2RGB)
+            gt_mask = cv2.cvtColor(cv2.imread(target.mask_image), cv2.COLOR_BGR2RGB)
+            
+            result: ZSLVisualPromptingResult = predictor.infer(target_image=target_image, apply_masks_refinement=args.post_refinement)
+
             mask = result.get_mask(0)
-            mask = np.uint8(mask > 0)
-            gt_mask = target.mask_image.to_numpy()
+            # Merge all instance masks into one mask using logical OR
+            merged_mask = np.zeros_like(mask.mask[0], dtype=bool)
+            for instance in mask.mask:
+                merged_mask = np.logical_or(merged_mask, instance)
+
+            if args.save:
+                output_path = os.path.join('outputs', args.dataset_name, class_name, os.path.basename(target.image))
+                save_visualization(
+                    image=target_image,
+                    mask=mask,
+                    output_path=output_path,
+                    points=mask.points if hasattr(mask, 'points') else None,
+                    scores=mask.scores if hasattr(mask, 'scores') else None
+                )
+            
+            # Convert to uint8 for comparison with gt
+            mask = np.uint8(merged_mask)
             gt_mask = np.uint8(gt_mask > 0)
+            
             intersection, union, target_area = intersectionAndUnion(mask, gt_mask)
             intersection_meter.update(intersection)
             union_meter.update(union)
