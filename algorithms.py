@@ -267,7 +267,7 @@ class PerSamPredictor:
                         point_labels=point_labels,
                         multimask_output=False,
                         attn_sim=attn_sim,  # Target-guided Attention (not in model api)
-                        target_embedding=self.reference_embedding[
+                        target_embedding=self.reference_features[
                             class_idx
                         ],  # Target-semantic Prompting (not in model api)
                     )
@@ -278,7 +278,7 @@ class PerSamPredictor:
                         multimask_output=False,
                     )
                 else:
-                    raise NotImplementedError(f"Model not supported")
+                    raise NotImplementedError("Model not supported")
 
                 # Cascaded post refinement of the masks (disabled by default in Geti VPS)
                 if not apply_masks_refinement:

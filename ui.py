@@ -85,7 +85,7 @@ def init_algo(selected_algo: str):
 
 def init_model(selected_model: str):
     global zsl_sam_prompter, algo_name, model_name
-    print(f"Loading model {model_name}")
+    print(f"Loading model {selected_model}")
     zsl_sam_prompter = load_model(sam_name=selected_model, algo_name=algo_name)
     print("Model loaded.")
 
