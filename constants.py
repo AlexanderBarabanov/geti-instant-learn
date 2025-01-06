@@ -11,5 +11,6 @@ MODEL_MAP = {
 }
 
 DATASETS = ["all", "DAVIS", "PerSeg",]
+ALGORITHMS = ["all", "persam", "p2sam"]
 MAPI_ENCODER_PATH = "data/otx_models/sam_vit_b_zsl_encoder.xml"
 MAPI_DECODER_PATH = "data/otx_models/sam_vit_b_zsl_decoder.xml"

@@ -155,7 +155,6 @@ def get_sam_output(
 
     colors = get_colors(len(masks))
     for idx, mask in enumerate(masks):
-        # FIXME: ValueError: operands could not be broadcast together with shapes (720,1280,3,1) (3,) (720,1280,3)
         masked_img = np.where(mask[..., None], colors[idx], input_image)
         input_image = cv2.addWeighted(input_image, 0.5, masked_img, 0.5, 0)
     for i, prompt in enumerate(point_prompts):

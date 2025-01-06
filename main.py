@@ -1,28 +1,26 @@
 import argparse
 import os
+import shutil
 import cv2
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from PersonalizeSAM.per_segment_anything import SamPredictor, sam_model_registry
-from algorithms import PerSamPredictor, run_per_segment_anything, run_p2sam, load_model
+from algorithms import PerSamPredictor, load_model
 from constants import *
 from P2SAM.eval_utils import AverageMeter, intersectionAndUnion
-from efficientvit.models.efficientvit.sam import EfficientViTSamPredictor
 from model_api.models.result_types.visual_prompting import ZSLVisualPromptingResult
 from model_api.models.visual_prompting import Prompt, SAMLearnableVisualPrompter
-from utils import get_colors, load_dataset, save_visualization
+from utils import load_dataset, save_visualization
 
-import datumaro as dm
 
 
 def get_arguments():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--sam_name', type=str, default="SAM", choices=MODEL_MAP.keys())
+    parser.add_argument('--sam_name', type=str, default="MobileSAM", choices=MODEL_MAP.keys())
     parser.add_argument('--max-num-pos', type=int, default=1)
     parser.add_argument('--min-num-pos', type=int, default=1)
-    parser.add_argument('--algo',type=str, default='persam', choices=['persam', 'p2sam'])
+    parser.add_argument('--algo',type=str, default='persam', choices=ALGORITHMS)
     parser.add_argument("--num_priors", type=int, default=1, help="Number of prior images to use as references")
     parser.add_argument("--dataset_name", type=str, default="PerSeg", choices=DATASETS)
     parser.add_argument("--save", action="store_true", help="Save results to disk")
@@ -33,8 +31,20 @@ def get_arguments():
     args = parser.parse_args()
     return args
 
-def predict_on_dataset(args: argparse.Namespace, predictor: PerSamPredictor, dataframe: pd.DataFrame, model_name: str, algo_name: str) -> tuple[pd.DataFrame, float, float]:
+def predict_on_dataset(args: argparse.Namespace, predictor: PerSamPredictor, dataframe: pd.DataFrame, model_name: str, algo_name: str, output_path: str) -> tuple[float, float]:
     result_dataframe = pd.DataFrame(columns=['class_name', 'IoU', 'Accuracy'])
+    
+    if os.path.exists(output_path):
+        choice = input(f"Output path {output_path} already exists. Do you want to overwrite it? (y/n)\n")
+        if choice == "y":
+            print("Removing existing output data")
+            shutil.rmtree(output_path)
+        else:
+            output_path += "_1"
+            print(f"Output path set to {output_path}")
+
+    if not os.path.exists(output_path):
+        os.mkdir(output_path)
 
     if args.class_name:  # filter on class_name
         dataframe = dataframe[dataframe.class_name == args.class_name]  
@@ -66,8 +76,9 @@ def predict_on_dataset(args: argparse.Namespace, predictor: PerSamPredictor, dat
 
         if args.save:
             # save prior images and masks to disk, on top of each other
+            os.makedirs(os.path.join(output_path, 'predictions', class_name), exist_ok=True)
             for i, (image, mask) in enumerate(zip(prior_images, prior_masks)):
-                cv2.imwrite(f"outputs/{args.dataset_name}/{class_name}/prior_{i}.png", np.hstack([image, mask]))
+                cv2.imwrite(f"{output_path}/predictions/{class_name}/prior_{i}.png", np.hstack([image, mask.data]))
 
         # TODO currently multiple priors is not yet implemented
         predictor.learn(image=prior_images[0], masks=prior_masks, show=args.show)
@@ -87,19 +98,16 @@ def predict_on_dataset(args: argparse.Namespace, predictor: PerSamPredictor, dat
                 merged_mask = np.logical_or(merged_mask, instance)
 
             if args.save:
-                output_path = os.path.join('outputs', args.dataset_name, class_name, os.path.basename(target.image))
                 save_visualization(
                     image=target_image,
                     mask=mask,
-                    output_path=output_path,
+                    output_path=os.path.join(output_path, 'predictions', class_name, os.path.basename(target.image)),
                     points=mask.points if hasattr(mask, 'points') else None,
                     scores=mask.scores if hasattr(mask, 'scores') else None
                 )
-            
-            # Convert to uint8 for comparison with gt
+            # Metrics
             mask = np.uint8(merged_mask)
-            gt_mask = np.uint8(gt_mask > 0)
-            
+            gt_mask = np.uint8(gt_mask[:,:,0] > 0)
             intersection, union, target_area = intersectionAndUnion(mask, gt_mask)
             intersection_meter.update(intersection)
             union_meter.update(union)
@@ -119,58 +127,47 @@ def predict_on_dataset(args: argparse.Namespace, predictor: PerSamPredictor, dat
     print(f"\nDataset: {args.dataset_name}, Model: {model_name}, Algorithm: {algo_name}")
     print("nmIoU: %.2f" % (100 * mIoU))
     print("mAcc: %.2f\n" % (100 * mAcc))
-    return result_dataframe, mIoU, mAcc
+    if args.save:
+        result_dataframe.to_csv(f"{output_path}/results_per_class.csv", index=False)
+    return mIoU, mAcc
 
 
 
 
 def main():
     args = get_arguments()
-    result_dataframe = pd.DataFrame(columns=['obj_name', 'IoU', 'Accuracy'])
-
+    result_dataframe = pd.DataFrame(columns=['model','algo', 'dataset', 'mIoU', 'mAcc'])
 
     if not os.path.exists('outputs/'):
         os.mkdir('./outputs/')
     if not os.path.exists(f'outputs/{args.dataset_name}'):
         os.mkdir(f'outputs/{args.dataset_name}')
 
+    # Determine which models, datasets and algorithms to process
+    models_to_run = MODEL_MAP.keys() if args.sam_name == "all" else [args.sam_name]
+    datasets_to_run = DATASETS if args.dataset_name == "all" else [args.dataset_name]
+    algorithms_to_run = ALGORITHMS if args.algo == "all" else [args.algo]
 
-    if args.sam_name == "all":
-        for sam_name in MODEL_MAP.keys():
-            model = load_model(sam_name)
-            if args.dataset_name == "all":
-                for dataset_name in DATASETS:
-                    dataframe = load_dataset(dataset_name)
-                    result, mIoU, mAcc = predict_on_dataset(args, model, dataframe, sam_name, args.algo)
-                    result_dataframe = pd.concat([result_dataframe, pd.DataFrame([{
-                        'model': sam_name, 
-                        'dataset': dataset_name, 
-                        'mIoU': mIoU, 
-                        'mAcc': mAcc, 
-                        'algo': args.algo
-                    }])], ignore_index=True)
-            else:
-                dataframe = load_dataset(args.dataset_name)
-                result, mIoU, mAcc = predict_on_dataset(args, model, dataframe, sam_name, args.algo)
+    # Process each combination
+    for sam_name in models_to_run:
+        for dataset_name in datasets_to_run:
+            dataframe = load_dataset(dataset_name)
+            for algo in algorithms_to_run:
+                predictor = load_model(sam_name, algo)
+                mIoU, mAcc = predict_on_dataset(args, predictor, dataframe, sam_name, algo, f"outputs/{dataset_name}_{sam_name}_{algo}")
+
                 result_dataframe = pd.concat([result_dataframe, pd.DataFrame([{
-                    'model': sam_name, 
-                    'dataset': args.dataset_name, 
-                    'mIoU': mIoU, 
-                    'mAcc': mAcc, 
-                    'algo': args.algo
+                    'model': sam_name,
+                    'algo': algo,
+                    'dataset': dataset_name,
+                    'mIoU': mIoU,
+                    'mAcc': mAcc
                 }])], ignore_index=True)
-    else:
-        model = load_model(args.sam_name)
-        dataframe = load_dataset(args.dataset_name)
-        result, mIoU, mAcc = predict_on_dataset(args, model, dataframe, args.sam_name, args.algo)
-        result_dataframe = pd.concat([result_dataframe, pd.DataFrame([{
-            'model': args.sam_name, 
-            'dataset': args.dataset_name, 
-            'mIoU': mIoU, 
-            'mAcc': mAcc, 
-            'algo': args.algo
-        }])], ignore_index=True)
+
     print(f"\n\n{result_dataframe}")
+
+    # save as csv
+    result_dataframe.to_csv(f"outputs/{args.dataset_name}_dataset_{args.sam_name}_model_{args.algo}_results.csv", index=False)    
 
 if __name__ == "__main__":
     main()

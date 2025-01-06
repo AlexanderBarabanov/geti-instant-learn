@@ -5,3 +5,4 @@ __pycache__/
 outputs/
 model_api/
 sam2/
+.gradio/

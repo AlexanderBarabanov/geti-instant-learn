@@ -133,7 +133,6 @@ def save_visualization(image: np.ndarray, mask, output_path: str, points=None, s
         points: Optional points to visualize
         scores: Optional confidence scores for the points
     """
-    # create output path dirs if they don't exist
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     # Get unique colors for each instance mask
@@ -163,8 +162,5 @@ def save_visualization(image: np.ndarray, mask, output_path: str, points=None, s
                       (255, 255, 255),  # White text
                       1)  # Line thickness
 
-    # Ensure output directory exists
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    
     # Save visualization
     cv2.imwrite(output_path, cv2.cvtColor(image_vis, cv2.COLOR_RGB2BGR)) 

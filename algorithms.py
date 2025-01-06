@@ -163,9 +163,6 @@ class PerSamPredictor:
                 dim=-1, keepdim=True
             )
             self.reference_embedding = reference_embedding.unsqueeze(0)
-            print(
-                f"Using {reference_features.shape} reference features for class {class_idx}"
-            )
             self.reference_features[class_idx] = (
                 reference_features  # note: this is still in CUDA
             )
@@ -231,6 +228,14 @@ class PerSamPredictor:
         for class_idx in self.reference_features.keys():
             point_prompt_candidates = all_point_prompt_candidates[class_idx]
             bg_points = all_bg_prompts[class_idx]
+
+            # if no points are found, we do not return points and return one empty mask
+            if len(point_prompt_candidates) == 0:
+                final_point_prompts[class_idx] = []
+                all_masks[class_idx] = [np.zeros_like(sim_masks_per_class[class_idx])]
+                all_scores[class_idx] = [0.0]
+                continue
+            
 
             # Obtain the target guidance for cross-attention layers
             sim = sim_masks_per_class[class_idx]
