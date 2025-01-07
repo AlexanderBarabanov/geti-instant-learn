@@ -1,0 +1,17 @@
+certifi==2024.8.30
+charset-normalizer==3.4.0
+defusedxml==0.7.1
+idna==3.10
+networkx==3.1
+numpy==1.26.4
+omz_tools @ git+https://github.com/openvinotoolkit/open_model_zoo.git@b5517bc7932b7243ad45eedac906dcbce501073f#subdirectory=tools/model_tools
+opencv-python==4.10.0.84
+openvino==2024.5.0
+openvino-dev==2024.5.0
+openvino-telemetry==2024.5.0
+-e git+https://github.com/openvinotoolkit/model_api.git@16818b02f3e92a426b436cf20b1d462884e75855#egg=openvino_model_api&subdirectory=model_api/python
+packaging==24.2
+PyYAML==6.0.2
+requests==2.32.3
+scipy==1.14.1
+urllib3==2.2.3
