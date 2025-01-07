@@ -6,3 +6,4 @@ outputs/
 model_api/
 sam2/
 .gradio/
+model_api/data/
