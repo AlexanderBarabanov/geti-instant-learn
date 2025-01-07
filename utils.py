@@ -10,7 +10,6 @@ from model_api.models import Prompt
 
 DATAFRAME_COLUMNS = ['class_name', 'file_name', 'image', 'mask_image', 'frame']
 
-
 def load_dataset(dataset_name: str) -> pd.DataFrame:
     if dataset_name == "PerSeg":
         return load_perseg_data()
@@ -19,8 +18,8 @@ def load_dataset(dataset_name: str) -> pd.DataFrame:
 
 
 def load_perseg_data() -> pd.DataFrame:
-    images_path = 'data/PerSeg/Images/'
-    annotations_path =  'data/PerSeg/Annotations/'
+    images_path = os.path.join(DATA_PATH, 'PerSeg', 'Images')
+    annotations_path = os.path.join(DATA_PATH, 'PerSeg', 'Annotations')
 
     data = pd.DataFrame(columns=DATAFRAME_COLUMNS)
 
@@ -52,9 +51,9 @@ def load_davis_data() -> pd.DataFrame:
     """Load DAVIS dataset into a pandas DataFrame.
     Returns DataFrame with columns: class_name, file_name, image, mask_image, frame
     """
-    images_path = 'data/DAVIS/JPEGImages/480p/'
-    annotations_path = 'data/DAVIS/Annotations/480p/'
-    imagesets_path = 'data/DAVIS/ImageSets/2017/val.txt'
+    images_path = os.path.join(DATA_PATH, 'DAVIS' 'JPEGImages', '480p')
+    annotations_path = os.path.join(DATA_PATH, 'DAVIS', 'Annotations', '480p')
+    imagesets_path = os.path.join(DATA_PATH, 'DAVIS', 'ImageSets', '2017','val.txt')
 
     data = pd.DataFrame(columns=DATAFRAME_COLUMNS)
 
