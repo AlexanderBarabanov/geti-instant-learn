@@ -2,7 +2,7 @@ import os.path
 DATA_PATH = os.path.expanduser(os.path.join("~", "data"))
 
 SAM_MODEL_WEIGHTS = os.path.join(DATA_PATH, "sam_vit_h_4b8939.pth")
-MOBILE_SAM_WEIGHTS = os.path.join(DATA_PATH, "data/mobile_sam.pt")
+MOBILE_SAM_WEIGHTS = os.path.join(DATA_PATH, "mobile_sam.pt")
 # SAM2_1_MODEL_WEIGHTS = "TODO"
 DEFAULT_MODEL = "SAM"
 MODEL_MAP = {
@@ -15,5 +15,5 @@ MODEL_MAP = {
 
 DATASETS = ["all", "DAVIS", "PerSeg",]
 ALGORITHMS = ["all", "persam", "p2sam"]
-MAPI_ENCODER_PATH = os.path.join(DATA_PATH, "otx_models", "sam_vit_b_zsl_encoder", "openvino.xml")
-MAPI_DECODER_PATH = os.path.join(DATA_PATH, "otx_models", "sam_vit_b_zsl_decoder", "openvino.xml")
+MAPI_ENCODER_PATH = os.path.join(DATA_PATH, "otx_models", "sam_vit_b_zsl_encoder.xml")
+MAPI_DECODER_PATH = os.path.join(DATA_PATH, "otx_models", "sam_vit_b_zsl_decoder.xml")
