@@ -3,7 +3,8 @@ data/*
 .DS_Store
 __pycache__/
 outputs/
-model_api/
 sam2/
 .gradio/
 model_api/data/
+__MACOSX/
+.idea

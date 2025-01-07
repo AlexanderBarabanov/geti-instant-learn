@@ -32,6 +32,9 @@ Unzip the file, and put the "data" directory in your user home folder:
 ...
 ```
 
+Download the Efficient-ViT-SAM model checkpoint from this [sharepoint link](https://intel.sharepoint.com/:u:/r/sites/WorkflowPlatform/Shared%20Documents/VisualPrompting/data/efficientvit_sam_l0.pt?csf=1&web=1&e=WzoHyN) and place the file in `/efficientvit/assets/checkpoints/efficientvit_sam_l0.pt`. 
+
+
 ## Installation
 
 Create a new conda/mamba/venv environment and install the dependencies.
