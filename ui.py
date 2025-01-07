@@ -14,7 +14,8 @@ from model_api.models import (
     SAMLearnableVisualPrompter,
     ZSLVisualPromptingResult,
 )
-from model_api.models.visual_prompting import SAMPartAwareLearnableVisualPrompter
+# from model_api.models.visual_prompting import SAMPartAwareLearnableVisualPrompter
+from constants import DATA_PATH
 
 
 def get_colors(n: int):
@@ -26,39 +27,45 @@ def get_colors(n: int):
 example_pairs = [
     {
         "label": "Bag Example",
-        "reference": "data/PerSeg/Images/backpack/00.jpg",
-        "target": "data/PerSeg/Images/backpack/01.jpg",
+        "reference": os.path.join(DATA_PATH, "PerSeg", "Images", "backpack", "00.jpg"),
+        "target": os.path.join(DATA_PATH, "PerSeg", "Images", "backpack", "01.jpg"),
     },
     {
         "label": "Peanuts Example",
-        "reference": "data/peanuts_coco/train/WIN_20220423_18_13_48_Pro_jpg.rf.2f7f31f6c6e102cab343008ab4f45b6f.jpg",
-        "target": "data/peanuts_coco/train/WIN_20220502_18_31_01_Pro_jpg.rf.ef0644a70513801a980796f92d6046b1.jpg",
+        "reference": os.path.join(DATA_PATH, "data", "peanuts_coco", "train", "WIN_20220423_18_13_48_Pro_jpg.rf.2f7f31f6c6e102cab343008ab4f45b6f.jpg"),
+        "target": os.path.join(DATA_PATH, "peanuts_coco", "train", "WIN_20220502_18_31_01_Pro_jpg.rf.ef0644a70513801a980796f92d6046b1.jpg"),
     },
     {
         "label": "Potatoes1",
-        "reference": "data/Potatoes/1 1.bmp",
-        "target": "data/Potatoes/2 1.bmp",
+        "reference": os.path.join(DATA_PATH, "Potatoes", "1 1.bmp"),
+        "target": os.path.join(DATA_PATH, "Potatoes", "2 1.bmp"),
     },
     {
         "label": "Potatoes2",
-        "reference": "data/Potatoes/1 1.bmp",
-        "target": "data/Potatoes/8 1.bmp",
+        "reference": os.path.join(DATA_PATH, "Potatoes", "1 1.bmp"),
+        "target": os.path.join(DATA_PATH, "Potatoes", "8 1.bmp"),
     },
     {
         "label": "Potatoes Large Scene",
-        "reference": "data/Potatoes/scene00001.jpg",
-        "target": "data/Potatoes/scene00121.jpg",
+        "reference": os.path.join(DATA_PATH, "data", "Potatoes", "scene00001.jpg"),
+        "target": os.path.join(DATA_PATH, "data", "Potatoes", "scene00121.jpg"),
     },
+    {
+        "label": "Potato crops",
+        "reference": os.path.join(DATA_PATH, "potato_crops", "training", "PotatoPlant417.png"),
+        "target": os.path.join(DATA_PATH, "potato_crops", "training", "PotatoPlant1024.png"),
+    },
+
 ]
 
-os.makedirs("data", exist_ok=True)
+os.makedirs(DATA_PATH, exist_ok=True)
 
-encoder_path = "data/otx_models/sam_vit_b_zsl_encoder.xml"
-decoder_path = "data/otx_models/sam_vit_b_zsl_decoder.xml"
+encoder_path = os.path.join(DATA_PATH, "otx_models", "sam_vit_b_zsl_encoder.xml")
+decoder_path = os.path.join(DATA_PATH, "otx_models", "sam_vit_b_zsl_decoder.xml")
 
 zsl_sam_prompter: (
     SAMLearnableVisualPrompter
-    | SAMPartAwareLearnableVisualPrompter
+#    | SAMPartAwareLearnableVisualPrompter
     | PerSamPredictor
     | None
 ) = None
@@ -137,14 +144,14 @@ def get_sam_output(
     target_img: np.array,
     apply_refinement: bool,
 ) -> tuple[np.array, tuple[np.array, str], List]:
-    input_image = cv2.imread("data/input_img.jpg")
+    input_image = cv2.imread(os.path.join(DATA_PATH, "input_img.jpg"))
     reference_features, masks = zsl_sam_prompter.learn(
         reference_img, points=point_prompts
     )
     if reference_features is None or masks is None:
         return input_image, (target_img, "no reference mask"), []
-    result, all_predictions = zsl_sam_prompter.infer(
-        target_img, dev=True, apply_masks_refinement=apply_refinement
+    result = zsl_sam_prompter.infer(
+        target_img, apply_masks_refinement=apply_refinement
     )
 
     print(
@@ -173,7 +180,7 @@ def on_select(evt: gr.SelectData):
     global clicks, label_mode
     x, y = int(evt.index[0]), int(evt.index[1])
     print(f"Selected point at ({x}, {y})")
-    original_img = cv2.imread("data/input_img.jpg")
+    original_img = cv2.imread(os.path.join(DATA_PATH, "input_img.jpg"))
     clicks.append(Prompt(np.array([x, y]), label_mode))
     img_with_inputs = original_img.copy()
     for prompt in clicks:
@@ -189,21 +196,21 @@ def on_select(evt: gr.SelectData):
 
 def process_predictions(apply_refinement):
     global clicks
-    original_img = cv2.imread("data/input_img.jpg")
-    target_image = cv2.imread("data/target_img.jpg")
+    original_img = cv2.imread(os.path.join(DATA_PATH, "input_img.jpg"))
+    target_image = cv2.imread(os.path.join(DATA_PATH, "target_img.jpg"))
 
     if clicks:
         input_img_with_mask, (result_img, caption), gallery_list = get_sam_output(
             clicks, original_img, target_image, apply_refinement
         )
-        cv2.imwrite("data/result_img.jpg", result_img)
+        cv2.imwrite(os.path.join(DATA_PATH, "result_img.jpg"), result_img)
         clicks = []
         return input_img_with_mask, result_img, gallery_list
     return original_img, None, []
 
 
 def save_on_disk(img, name="input_img.jpg"):
-    cv2.imwrite(f"data/{name}", img)
+    cv2.imwrite(os.path.join(DATA_PATH, name), img)
     return img
 
 
