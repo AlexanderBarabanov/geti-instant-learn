@@ -202,8 +202,10 @@ class SAMLearnableVisualPrompter:
         boxes: list[Prompt] | None = None,
         points: list[Prompt] | None = None,
         polygons: list[Prompt] | None = None,
+        masks: list[Prompt] | None = None,
         reset_features: bool = False,
         perform_averaging: bool = True,
+        show: bool = False,
     ) -> tuple[VisualPromptingFeatures, np.ndarray]:
         """Executes `learn` stage of SAM ZSL pipeline.
 
@@ -220,6 +222,9 @@ class SAMLearnableVisualPrompter:
             polygons: (list[Prompt] | None): Prompts containing polygons (a sequence of points in XY format)
               and their labels (ints, one per polygon).
               Polygon prompts are used to mask out the source features without implying decoder usage. Defaults to None.
+            masks: (list[Prompt] | None): Prompts containing masks (grid like masks)
+              and their labels (ints, one per mask).
+              Polygon prompts are used to mask out the source features without implying decoder usage. Defaults to None.
             reset_features (bool, optional): Forces learning from scratch. Defaults to False.
             perform_averaging (bool, optional): If True, the reference features are averaged, reducing dimensions.
 
@@ -228,7 +233,7 @@ class SAMLearnableVisualPrompter:
                 reference masks.
             The shape of the reference mask is N_labels x H x W, where H and W are the same as in the input image.
         """
-        if boxes is None and points is None and polygons is None:
+        if boxes is None and points is None and polygons is None and masks is None:
             msg = "boxes, polygons or points prompts are required for learning"
             raise RuntimeError(msg)
 
@@ -251,6 +256,10 @@ class SAMLearnableVisualPrompter:
             for poly in polygons:
                 processed_prompts.append({"polygon": poly.data, "label": poly.label})
 
+        if masks is not None:
+            for mask in masks:
+                processed_prompts.append({"masks": mask.data, "label": mask.label})
+
         processed_prompts_w_labels = self._gather_prompts_with_labels(processed_prompts)
         largest_label: int = max([int(p) for p in processed_prompts_w_labels] + [0])
 
@@ -271,7 +280,9 @@ class SAMLearnableVisualPrompter:
             ref_mask: np.ndarray = np.zeros(original_shape, dtype=np.uint8)
             for inputs_decoder in input_prompts:
                 inputs_decoder.pop("label")
-                if "point_coords" in inputs_decoder:
+                if "masks" in inputs_decoder:
+                    masks = inputs_decoder["masks"]
+                elif "point_coords" in inputs_decoder:
                     # bboxes and points
                     inputs_decoder["image_embeddings"] = image_embeddings
                     prediction = self._predict_masks(
@@ -285,6 +296,9 @@ class SAMLearnableVisualPrompter:
                 else:
                     msg = "Unsupported type of prompt"
                     raise RuntimeError(msg)
+
+                # direct input masks have shape w, h, 3
+                # computed from polygons have shape: w, h
                 ref_mask = np.where(masks, 1, ref_mask)
 
             ref_feat: np.ndarray | None = None

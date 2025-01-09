@@ -7,6 +7,7 @@ import pandas as pd
 import cv2
 
 from model_api.models import Prompt
+from constants import DATA_PATH
 
 DATAFRAME_COLUMNS = ['class_name', 'file_name', 'image', 'mask_image', 'frame']
 

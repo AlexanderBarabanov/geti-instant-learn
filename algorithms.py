@@ -181,7 +181,7 @@ class PerSamPredictor:
 
     def infer(
         self,
-        target_image,
+        image: np.array,
         reference_features=None,
         apply_masks_refinement: bool = True,
         dev: bool = False,
@@ -194,7 +194,7 @@ class PerSamPredictor:
         all_bg_prompts: dict[int, list] = defaultdict(list)
         sim_masks_per_class = {}
         # Image feature encoding
-        self.model.set_image(target_image)
+        self.model.set_image(image)
         test_feat = self.model.features.squeeze()
 
         # Cosine similarity

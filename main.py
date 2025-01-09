@@ -1,6 +1,7 @@
 import argparse
 import os
 import shutil
+import time
 import cv2
 import numpy as np
 import pandas as pd
@@ -26,7 +27,8 @@ def get_arguments():
     parser.add_argument("--save", action="store_true", help="Save results to disk")
     parser.add_argument("--show", action="store_true", help="Show results during processing")
     parser.add_argument("--post_refinement", action="store_true", help="Apply post refinement")
-    parser.add_argument("--class_name", type=str, default=None)
+    parser.add_argument("--class_name", type=str, default=None, help="Filter on class name")
+    parser.add_argument("--overwrite", action="store_true", help="Overwrite existing output data")
 
     args = parser.parse_args()
     return args
@@ -34,7 +36,7 @@ def get_arguments():
 def predict_on_dataset(args: argparse.Namespace, predictor: PerSamPredictor, dataframe: pd.DataFrame, model_name: str, algo_name: str, output_path: str) -> tuple[float, float]:
     result_dataframe = pd.DataFrame(columns=['class_name', 'IoU', 'Accuracy'])
     
-    if os.path.exists(output_path):
+    if os.path.exists(output_path) and not args.overwrite:
         choice = input(f"Output path {output_path} already exists. Do you want to overwrite it? (y/n)\n")
         if choice == "y":
             print("Removing existing output data")
@@ -53,16 +55,13 @@ def predict_on_dataset(args: argparse.Namespace, predictor: PerSamPredictor, dat
         intersection_meter = AverageMeter()
         union_meter = AverageMeter()
         target_meter = AverageMeter()
+        inference_time_meter = AverageMeter()
 
         class_samples = dataframe[dataframe.class_name == class_name]
         priors = class_samples.head(args.num_priors)
         # select remaining images as target images but do not change the order of the dataframe 
         targets = class_samples[~class_samples.index.isin(priors.index)]
 
-        # learn on prior images
-        if isinstance(predictor, SAMLearnableVisualPrompter):
-            raise NotImplementedError("MAPI implementation does not accept masks directly. Either convert to polygons or change the implementation")    
-        
         # Load all prior images and masks
         prior_images = []
         prior_masks = []
@@ -70,7 +69,8 @@ def predict_on_dataset(args: argparse.Namespace, predictor: PerSamPredictor, dat
             # load image from disk and convert to numpy array
             image = cv2.cvtColor(cv2.imread(prior.image), cv2.COLOR_BGR2RGB)
             mask_image = cv2.cvtColor(cv2.imread(prior.mask_image), cv2.COLOR_BGR2RGB)
-            mask_prompt = Prompt(label=0, data=mask_image)  # TODO only single class per image is supported for now
+            mask = mask_image[:,:,0]  # only need a grid, not a 3d color img. 
+            mask_prompt = Prompt(label=0, data=mask)  # TODO only single class per image is supported for now
             prior_images.append(image)
             prior_masks.append(mask_prompt)
 
@@ -78,7 +78,11 @@ def predict_on_dataset(args: argparse.Namespace, predictor: PerSamPredictor, dat
             # save prior images and masks to disk, on top of each other
             os.makedirs(os.path.join(output_path, 'predictions', class_name), exist_ok=True)
             for i, (image, mask) in enumerate(zip(prior_images, prior_masks)):
-                cv2.imwrite(f"{output_path}/predictions/{class_name}/prior_{i}.png", np.hstack([image, mask.data]))
+                mask = np.stack([mask.data, np.zeros_like(mask.data), np.zeros_like(mask.data)], axis=-1)
+                mask = np.where(mask > 0, 255, mask)  # for better visualization
+                overlay = cv2.addWeighted(image, 0.7, mask, 0.3, 0)
+                overlay = cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR)
+                cv2.imwrite(f"{output_path}/predictions/{class_name}/prior_{i}.png", overlay)
 
         # TODO currently multiple priors is not yet implemented
         predictor.learn(image=prior_images[0], masks=prior_masks, show=args.show)
@@ -89,7 +93,9 @@ def predict_on_dataset(args: argparse.Namespace, predictor: PerSamPredictor, dat
             target_image = cv2.cvtColor(cv2.imread(target.image), cv2.COLOR_BGR2RGB)
             gt_mask = cv2.cvtColor(cv2.imread(target.mask_image), cv2.COLOR_BGR2RGB)
             
-            result: ZSLVisualPromptingResult = predictor.infer(target_image=target_image, apply_masks_refinement=args.post_refinement)
+            start_time = time.time()
+            result: ZSLVisualPromptingResult = predictor.infer(image=target_image, apply_masks_refinement=args.post_refinement)
+            inference_time_meter.update(time.time() - start_time)
 
             mask = result.get_mask(0)
             # Merge all instance masks into one mask using logical OR
@@ -115,21 +121,25 @@ def predict_on_dataset(args: argparse.Namespace, predictor: PerSamPredictor, dat
 
         iou_class = intersection_meter.sum / (union_meter.sum + 1e-10)
         accuracy_class = intersection_meter.sum / (target_meter.sum + 1e-10)
+        inference_time = inference_time_meter.sum / len(targets)
         result_dataframe = pd.concat([result_dataframe, pd.DataFrame([{
             'class_name': class_name, 
             'IoU': iou_class, 
             'Accuracy': accuracy_class, 
             'algo': algo_name, 
-            'model': model_name
+            'model': model_name,
+            'inference_time': inference_time
         }])], ignore_index=True)
     mIoU = result_dataframe.IoU.mean()
     mAcc = result_dataframe.Accuracy.mean()
+    inference_time = result_dataframe.inference_time.mean() 
     print(f"\nDataset: {args.dataset_name}, Model: {model_name}, Algorithm: {algo_name}")
     print("nmIoU: %.2f" % (100 * mIoU))
-    print("mAcc: %.2f\n" % (100 * mAcc))
+    print("mAcc: %.2f" % (100 * mAcc))
+    print("Inference time: %.2f seconds/target image (mean per sample)" % inference_time)
     if args.save:
         result_dataframe.to_csv(f"{output_path}/results_per_class.csv", index=False)
-    return mIoU, mAcc
+    return mIoU, mAcc, inference_time
 
 
 
@@ -154,14 +164,15 @@ def main():
             dataframe = load_dataset(dataset_name)
             for algo in algorithms_to_run:
                 predictor = load_model(sam_name, algo)
-                mIoU, mAcc = predict_on_dataset(args, predictor, dataframe, sam_name, algo, f"outputs/{dataset_name}_{sam_name}_{algo}")
+                mIoU, mAcc, inference_time = predict_on_dataset(args, predictor, dataframe, sam_name, algo, f"outputs/{dataset_name}_{sam_name}_{algo}")
 
                 result_dataframe = pd.concat([result_dataframe, pd.DataFrame([{
                     'model': sam_name,
                     'algo': algo,
                     'dataset': dataset_name,
                     'mIoU': mIoU,
-                    'mAcc': mAcc
+                    'mAcc': mAcc,
+                    'inference_time': inference_time
                 }])], ignore_index=True)
 
     print(f"\n\n{result_dataframe}")
