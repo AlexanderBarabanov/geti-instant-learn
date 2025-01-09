@@ -258,7 +258,7 @@ class SAMLearnableVisualPrompter:
 
         if masks is not None:
             for mask in masks:
-                processed_prompts.append({"masks": mask.data, "label": mask.label})
+                processed_prompts.append({"masks": mask.data[:, :, 0], "label": mask.label})
 
         processed_prompts_w_labels = self._gather_prompts_with_labels(processed_prompts)
         largest_label: int = max([int(p) for p in processed_prompts_w_labels] + [0])

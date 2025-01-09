@@ -70,7 +70,7 @@ def predict_on_dataset(args: argparse.Namespace, predictor: PerSamPredictor, dat
             image = cv2.cvtColor(cv2.imread(prior.image), cv2.COLOR_BGR2RGB)
             mask_image = cv2.cvtColor(cv2.imread(prior.mask_image), cv2.COLOR_BGR2RGB)
             mask = mask_image[:,:,0]  # only need a grid, not a 3d color img. 
-            mask_prompt = Prompt(label=0, data=mask)  # TODO only single class per image is supported for now
+            mask_prompt = Prompt(label=0, data=mask_image)  # TODO only single class per image is supported for now
             prior_images.append(image)
             prior_masks.append(mask_prompt)
 
@@ -78,8 +78,8 @@ def predict_on_dataset(args: argparse.Namespace, predictor: PerSamPredictor, dat
             # save prior images and masks to disk, on top of each other
             os.makedirs(os.path.join(output_path, 'predictions', class_name), exist_ok=True)
             for i, (image, mask) in enumerate(zip(prior_images, prior_masks)):
-                mask = np.stack([mask.data, np.zeros_like(mask.data), np.zeros_like(mask.data)], axis=-1)
-                mask = np.where(mask > 0, 255, mask)  # for better visualization
+                # mask = np.stack([mask.data, np.zeros_like(mask.data), np.zeros_like(mask.data)], axis=-1)
+                mask = np.where(mask.data > 0, 255, mask.data)  # for better visualization
                 overlay = cv2.addWeighted(image, 0.7, mask, 0.3, 0)
                 overlay = cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR)
                 cv2.imwrite(f"{output_path}/predictions/{class_name}/prior_{i}.png", overlay)
