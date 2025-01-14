@@ -22,36 +22,12 @@ from model_api.models.model import Model
 from model_api.models.visual_prompting import (
     SAMLearnableVisualPrompter,
     VisualPromptingFeatures,
+    _inspect_overlapping_areas,
     _point_selection,
 )
 from utils import transform_point_prompts_to_dict, transform_mask_prompts_to_dict
 
 
-def load_model(
-    sam_name="SAM", algo_name="Personalized SAM"
-) -> SamPredictor | EfficientViTSamPredictor | SAMLearnableVisualPrompter:
-    if sam_name not in MODEL_MAP:
-        raise ValueError(f"Invalid model type: {sam_name}")
-
-    name, checkpoint_path = MODEL_MAP[sam_name]
-    if sam_name in ["SAM", "MobileSAM"]:
-        backbone = sam_model_registry[name](checkpoint=checkpoint_path).cuda()
-        backbone.eval()
-        backbone = SamPredictor(backbone)
-        return PerSamPredictor(backbone, algo_name)
-    elif sam_name == "EfficientViT-SAM":
-        backbone = create_efficientvit_sam_model(
-            name=name, weight_url=checkpoint_path
-        ).cuda()
-        backbone.eval()
-        backbone = EfficientViTSamPredictor(backbone)
-        return PerSamPredictor(backbone, algo_name)
-    elif sam_name == "MobileSAM-MAPI":
-        encoder = Model.create_model(MAPI_ENCODER_PATH)
-        decoder = Model.create_model(MAPI_DECODER_PATH)
-        return SAMLearnableVisualPrompter(encoder, decoder)
-    else:
-        raise NotImplementedError(f"Model {sam_name} not implemented yet")
 
 
 class PerSamPredictor:
@@ -112,6 +88,7 @@ class PerSamPredictor:
                 plt.imshow(mask)
                 plt.show()
                 cv2.imwrite(f"reference_mask_{class_idx}.jpg", mask)
+            
 
             if isinstance(self.model, SamPredictor):
                 # set_image resizes and pads to square input
@@ -296,15 +273,17 @@ class PerSamPredictor:
 
                 all_masks[class_idx].append(final_mask)
                 all_scores[class_idx].append(scores)
-                final_point_prompts[class_idx].append([x, y])
+                final_point_prompts[class_idx].append([x, y, score])
 
         # TODO check overlapping areas of label masks ( see model_api ._inspect_overlapping_areas)
+        _inspect_overlapping_areas(all_masks, final_point_prompts)
 
         for label in final_point_prompts:
+            final_point_prompts[label] = np.array(final_point_prompts[label])
             prediction[label] = PredictedMask(
                 mask=all_masks[label],
-                points=final_point_prompts[label],
-                scores=all_scores[label],
+                points=final_point_prompts[label][:, :2],
+                scores=final_point_prompts[label][:, 2],
             )
 
         if dev:
@@ -473,19 +452,28 @@ def run_per_segment_anything(
     else:
         return None, intersection, union, area_target
 
+def load_model(
+    sam_name="SAM", algo_name="Personalized SAM"
+) -> PerSamPredictor | SAMLearnableVisualPrompter:
+    if sam_name not in MODEL_MAP:
+        raise ValueError(f"Invalid model type: {sam_name}")
 
-def run_p2sam(
-    model: SamPredictor,
-    sample: Series,
-    output_root: str,
-    post_refinement=True,
-    show=False,
-    save=False,
-) -> tuple[plt.Figure, float, float, float]:
-    pass
-
-
-def finetune_persam_F(
-    predictor: SamPredictor, images_path, annotations_path, output_path
-) -> SamPredictor:
-    pass
+    name, checkpoint_path = MODEL_MAP[sam_name]
+    if sam_name in ["SAM", "MobileSAM"]:
+        backbone = sam_model_registry[name](checkpoint=checkpoint_path).cuda()
+        backbone.eval()
+        backbone = SamPredictor(backbone)
+        return PerSamPredictor(backbone, algo_name)
+    elif sam_name == "EfficientViT-SAM":
+        backbone = create_efficientvit_sam_model(
+            name=name, weight_url=checkpoint_path
+        ).cuda()
+        backbone.eval()
+        backbone = EfficientViTSamPredictor(backbone)
+        return PerSamPredictor(backbone, algo_name)
+    elif sam_name == "MobileSAM-MAPI":
+        encoder = Model.create_model(MAPI_ENCODER_PATH)
+        decoder = Model.create_model(MAPI_DECODER_PATH)
+        return SAMLearnableVisualPrompter(encoder, decoder)
+    else:
+        raise NotImplementedError(f"Model {sam_name} not implemented yet")

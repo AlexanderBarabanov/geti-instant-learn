@@ -78,7 +78,6 @@ def predict_on_dataset(args: argparse.Namespace, predictor: PerSamPredictor, dat
             # save prior images and masks to disk, on top of each other
             os.makedirs(os.path.join(output_path, 'predictions', class_name), exist_ok=True)
             for i, (image, mask) in enumerate(zip(prior_images, prior_masks)):
-                # mask = np.stack([mask.data, np.zeros_like(mask.data), np.zeros_like(mask.data)], axis=-1)
                 mask = np.where(mask.data > 0, 255, mask.data)  # for better visualization
                 overlay = cv2.addWeighted(image, 0.7, mask, 0.3, 0)
                 overlay = cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR)
