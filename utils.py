@@ -3,6 +3,7 @@ import os
 from typing import List, Dict
 
 import numpy as np
+import ot
 import pandas as pd
 import cv2
 
@@ -164,3 +165,25 @@ def save_visualization(image: np.ndarray, mask, output_path: str, points=None, s
 
     # Save visualization
     cv2.imwrite(output_path, cv2.cvtColor(image_vis, cv2.COLOR_RGB2BGR)) 
+
+
+def _compute_wasserstein_distance(a, b, weights=None) -> float:
+    """
+    Computes the Wasserstein distance between two distributions a and b.
+    Lower distance is better match.
+    :param a:
+    :param b:
+    :param weights:
+    :return:
+    """
+    n_a = a.shape[0]
+    a_hist = ot.unif(n_a)
+    if weights is not None:
+        b_hist = weights / np.sum(weights)
+    else:
+        n_b = b.shape[0]
+        b_hist = ot.unif(n_b)
+
+    M = ot.dist(a, b)
+    wasserstein_distance = ot.emd2(a_hist, b_hist, M, numItermax=10000000)
+    return wasserstein_distance

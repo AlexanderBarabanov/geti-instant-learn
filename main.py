@@ -33,7 +33,7 @@ def get_arguments():
     args = parser.parse_args()
     return args
 
-def predict_on_dataset(args: argparse.Namespace, predictor: PerSamPredictor, dataframe: pd.DataFrame, model_name: str, algo_name: str, output_path: str) -> tuple[float, float]:
+def predict_on_dataset(args: argparse.Namespace, predictor: PerSamPredictor | SAMLearnableVisualPrompter, dataframe: pd.DataFrame, model_name: str, algo_name: str, output_path: str) -> tuple[float, float]:
     result_dataframe = pd.DataFrame(columns=['class_name', 'IoU', 'Accuracy'])
     
     if os.path.exists(output_path) and not args.overwrite:

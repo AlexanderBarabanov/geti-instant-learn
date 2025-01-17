@@ -2,6 +2,7 @@ import os
 from collections import defaultdict
 
 from pandas import Series
+from sklearn.cluster import KMeans
 
 from constants import MAPI_DECODER_PATH, MAPI_ENCODER_PATH, MODEL_MAP
 from efficientvit.models.efficientvit import EfficientViTSamPredictor, SamResize, SamPad
@@ -26,8 +27,6 @@ from model_api.models.visual_prompting import (
     _point_selection,
 )
 from utils import transform_point_prompts_to_dict, transform_mask_prompts_to_dict
-
-
 
 
 class PerSamPredictor:
@@ -88,7 +87,6 @@ class PerSamPredictor:
                 plt.imshow(mask)
                 plt.show()
                 cv2.imwrite(f"reference_mask_{class_idx}.jpg", mask)
-            
 
             if isinstance(self.model, SamPredictor):
                 # set_image resizes and pads to square input
@@ -212,15 +210,10 @@ class PerSamPredictor:
                 all_masks[class_idx] = [np.zeros_like(sim_masks_per_class[class_idx])]
                 all_scores[class_idx] = [0.0]
                 continue
-            
 
             # Obtain the target guidance for cross-attention layers
             sim = sim_masks_per_class[class_idx]
-            sim = (sim - sim.mean()) / torch.std(sim)
-            sim = F.interpolate(
-                sim.unsqueeze(0).unsqueeze(0), size=(64, 64), mode="bilinear"
-            )
-            attn_sim = sim.sigmoid_().unsqueeze(0).flatten(3)
+            attn_sim = self._prepare_attention_similarity(sim)
 
             for i, (x, y, score) in enumerate(point_prompt_candidates):
                 # remove points with very low confidence
@@ -275,7 +268,6 @@ class PerSamPredictor:
                 all_scores[class_idx].append(scores)
                 final_point_prompts[class_idx].append([x, y, score])
 
-        # TODO check overlapping areas of label masks ( see model_api ._inspect_overlapping_areas)
         _inspect_overlapping_areas(all_masks, final_point_prompts)
 
         for label in final_point_prompts:
@@ -290,7 +282,9 @@ class PerSamPredictor:
             return ZSLVisualPromptingResult(prediction), None
         return ZSLVisualPromptingResult(prediction)
 
-    def post_refinement(self, logits, topk_xy, topk_label):
+    def post_refinement(
+        self, logits, topk_xy, topk_label
+    ) -> tuple[np.ndarray, np.ndarray, float]:
         best_idx = 0
         # Cascaded Post-refinement-1
         masks, scores, logits, *_ = self.model.predict(
@@ -319,6 +313,59 @@ class PerSamPredictor:
         final_mask = masks[best_idx]
         final_score = scores[best_idx]
         return final_mask, masks, final_score
+
+    def _prepare_attention_similarity(self, sim: torch.Tensor) -> torch.Tensor:
+        """Prepare similarity tensor for cross-attention layers.
+
+        Args:
+            sim: Input similarity tensor
+
+        Returns:
+            Processed similarity tensor ready for attention
+        """
+        sim = (sim - sim.mean()) / torch.std(sim)
+        sim = F.interpolate(
+            sim.unsqueeze(0).unsqueeze(0), size=(64, 64), mode="bilinear"
+        )
+        return sim.sigmoid_().unsqueeze(0).flatten(3)
+
+    def _cluster_features(
+        self, reference_features: torch.Tensor, n_clusters: int = 8
+    ) -> torch.Tensor:
+        """Create part-level features from reference features.
+        This performs a k-means++ clustering on the reference features and takes the centroid as prototype.
+        Resulting part-level features are normalized to unit length.
+        If n_clusters is 1, the mean of the reference features is taken as prototype.
+
+        Args:
+            reference_features: Reference features tensor [X, 256]
+            n_clusters: Number of clusters to create (e.g. number of part-level-features)
+
+        Returns:
+            Part-level features tensor [n_clusters, 256]
+        """
+        if n_clusters == 1:
+            part_level_features = reference_features.mean(dim=0)
+            part_level_features = part_level_features / part_level_features.norm(
+                dim=-1, keepdim=True
+            )
+            return part_level_features.unsqueeze(0)
+
+        features_np = reference_features.cpu().numpy()
+        kmeans = KMeans(n_clusters=n_clusters, init="k-means++", random_state=0)
+        cluster = kmeans.fit_predict(features_np)
+        part_level_features = []
+        for c in range(n_clusters):
+            # use centroid of cluster as prototype
+            part_level_feature = features_np[cluster == c].mean(axis=0)
+            part_level_feature = part_level_feature / np.linalg.norm(
+                part_level_feature, axis=-1, keepdims=True
+            )
+            part_level_features.append(part_level_feature)
+        part_level_features = torch.stack(
+            part_level_features, dim=0
+        ).cuda()  # [n_clusters, 256]
+        return part_level_features
 
 
 def run_per_segment_anything(
@@ -451,6 +498,7 @@ def run_per_segment_anything(
         return fig, intersection, union, area_target
     else:
         return None, intersection, union, area_target
+
 
 def load_model(
     sam_name="SAM", algo_name="Personalized SAM"
