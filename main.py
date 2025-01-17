@@ -35,15 +35,19 @@ def get_arguments():
 
 def predict_on_dataset(args: argparse.Namespace, predictor: PerSamPredictor | SAMLearnableVisualPrompter, dataframe: pd.DataFrame, model_name: str, algo_name: str, output_path: str) -> tuple[float, float]:
     result_dataframe = pd.DataFrame(columns=['class_name', 'IoU', 'Accuracy'])
+    print(f"Output path: {output_path}")
     
-    if os.path.exists(output_path) and not args.overwrite:
-        choice = input(f"Output path {output_path} already exists. Do you want to overwrite it? (y/n)\n")
-        if choice == "y":
-            print("Removing existing output data")
+    if os.path.exists(output_path):
+        if args.overwrite:
             shutil.rmtree(output_path)
         else:
-            output_path += "_1"
-            print(f"Output path set to {output_path}")
+            choice = input(f"Output path {output_path} already exists. Do you want to overwrite it? (y/n)\n")
+            if choice == "y":
+                print("Removing existing output data")
+                shutil.rmtree(output_path)
+            else:
+                output_path += "_1"
+                print(f"Output path set to {output_path}")
 
     if not os.path.exists(output_path):
         os.mkdir(output_path)

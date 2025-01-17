@@ -41,7 +41,6 @@ class PerSamPredictor:
         self.reference_features = {}
         self.reference_masks = {}
         self.highest_class_idx = 0  # num_classes  - 1
-        self.reference_embedding = None
 
     def learn(
         self,
@@ -51,98 +50,29 @@ class PerSamPredictor:
         polygons: list[Prompt] | None = None,
         masks: list[Prompt] | None = None,
         show: bool = False,
+        num_clusters: int = 1,
     ) -> tuple[VisualPromptingFeatures, np.array]:
-        # get masks by points
-        if points is not None:
-            mask_per_class = {}
-            points_per_class = transform_point_prompts_to_dict(points)
-            for class_idx, points in points_per_class.items():
-                self.model.set_image(image)
-                masks, scores, logits, *_ = self.model.predict(
-                    point_coords=np.array(points),
-                    point_labels=np.array([class_idx] * len(points)),
-                    multimask_output=False,
-                )
-                best_idx = np.argmax(scores)
-                if not masks[best_idx].any():
-                    print(f"No mask found for reference class {class_idx}")
-                    continue
-                best_mask = masks[best_idx].astype(np.uint8) * 128
-                mask_per_class[class_idx] = np.stack(
-                    (best_mask, np.zeros_like(best_mask), np.zeros_like(best_mask)),
-                    axis=-1,
-                )
-            if len(mask_per_class) == 0:
-                print("No masks found for any class given the input points")
-                return None, None
-        elif masks is not None:
-            mask_per_class = transform_mask_prompts_to_dict(masks)
-        else:
-            raise ValueError("Either points or masks are required for learning")
+        
+        mask_per_class = self.prepare_input(image, masks, points, boxes, polygons)
 
-        self.model.set_image(image)
+        self.model.set_image(image)   # TODO move to new function and let extract_reference_features use image embedding directly.
         for class_idx, mask in mask_per_class.items():
             if show:
                 fig = plt.figure(figsize=(10, 10))
                 plt.imshow(mask)
                 plt.show()
                 cv2.imwrite(f"reference_mask_{class_idx}.jpg", mask)
-
-            if isinstance(self.model, SamPredictor):
-                # set_image resizes and pads to square input
-                reference_mask = self.model.set_image(image, mask)  # 1, 3 ,1024, 1024
-                image_embedding = self.model.features.squeeze().permute(
-                    1, 2, 0
-                )  # image embedding is 64, 64, 256
-                # transform reference mask to a 64 64 mask
-                reference_mask = F.interpolate(
-                    reference_mask, size=image_embedding.shape[0:2], mode="bilinear"
-                )
-                reference_mask = reference_mask.squeeze()[0]  # 64, 64
-            elif isinstance(self.model, EfficientViTSamPredictor):
-                image_embedding = self.model.features.squeeze().permute(
-                    1, 2, 0
-                )  # image embedding is 64, 64, 256
-                # resize relative to longest size
-                reference_mask = SamResize(self.model.model.image_size[0])(
-                    mask
-                )  # 576 1024 3
-                reference_mask = torch.as_tensor(
-                    reference_mask, device=self.model.device
-                )
-                reference_mask = reference_mask.permute(2, 0, 1).contiguous()[
-                    None, :, :, :
-                ]  # 1, 3, 576, 1024
-                reference_mask = SamPad(self.model.model.image_size[0])(
-                    reference_mask
-                )  # 1, 3, 1024, 1024
-                reference_mask = F.interpolate(
-                    reference_mask.float(),
-                    size=image_embedding.shape[0:2],
-                    mode="bilinear",
-                )
-                reference_mask = reference_mask.squeeze()[0]  # 64 64
-
-            # local reference feature extraction
-            reference_features = image_embedding[reference_mask > 0]
-            if reference_features.shape[0] == 0:
-                print(f"The reference mask is too small to detect any features")
+            
+            image_embedding, reference_features = self.extract_reference_features(mask, image)
+            if reference_features is None:
                 continue
 
-            ### NOTE: this averages the local features into one vector (same as in ModelAPI)
-            ### For P2-SAM we want to keep each feature separately
-            ### For a Vision-RAG implementation we probably want to store the features (or its average) in a vector DB, while keeping a
-            ### maximum num of items and removing outliers to keep a good representation of the target class
-            reference_embedding = reference_features.mean(0).unsqueeze(0)
-            reference_features = reference_embedding / reference_embedding.norm(
-                dim=-1, keepdim=True
-            )
-            self.reference_embedding = reference_embedding.unsqueeze(0)
-            self.reference_features[class_idx] = (
-                reference_features  # note: this is still in CUDA
-            )
-            self.reference_masks[class_idx] = mask[:, :, 0]
-
+            # PerSAM: use average of all features. 
+            # P2SAM/PartAware: use k-means++ clustering to create num_clusters part-level features
+            reference_features = cluster_features(reference_features, num_clusters)
+            self.reference_features[class_idx] = reference_features
+            self.reference_masks[class_idx] = mask[:, :, 0]  # save this for visualization
+            
         if not self.reference_features:
             print("No reference features found. Please provide a larger reference mask")
             return None, None
@@ -213,7 +143,7 @@ class PerSamPredictor:
 
             # Obtain the target guidance for cross-attention layers
             sim = sim_masks_per_class[class_idx]
-            attn_sim = self._prepare_attention_similarity(sim)
+            attn_sim = prepare_attention_similarity(sim)
 
             for i, (x, y, score) in enumerate(point_prompt_candidates):
                 # remove points with very low confidence
@@ -281,6 +211,92 @@ class PerSamPredictor:
         if dev:
             return ZSLVisualPromptingResult(prediction), None
         return ZSLVisualPromptingResult(prediction)
+    
+    def prepare_input(self, image: np.array, masks: list[Prompt] = None, points: list[Prompt] = None, boxes: list[Prompt] = None, polygons: list[Prompt] = None) -> dict[int, np.array]:
+        """
+        Create mask per class based on the input masks or points
+        """
+        if points is not None:
+            mask_per_class = {}
+            points_per_class = transform_point_prompts_to_dict(points)
+            for class_idx, points in points_per_class.items():
+                self.model.set_image(image)
+                masks, scores, logits, *_ = self.model.predict(
+                    point_coords=np.array(points),
+                    point_labels=np.array([class_idx] * len(points)),
+                    multimask_output=False,
+                )
+                best_idx = np.argmax(scores)
+                if not masks[best_idx].any():
+                    print(f"No mask found for reference class {class_idx}")
+                    continue
+                best_mask = masks[best_idx].astype(np.uint8) * 128
+                mask_per_class[class_idx] = np.stack(
+                    (best_mask, np.zeros_like(best_mask), np.zeros_like(best_mask)),
+                    axis=-1,
+                )
+            if len(mask_per_class) == 0:
+                print("No masks found for any class given the input points")
+                return None, None
+        elif masks is not None:
+            mask_per_class = transform_mask_prompts_to_dict(masks)
+        else:
+            raise ValueError("Either points or masks are required for learning")
+        
+        return mask_per_class
+
+    def extract_reference_features(self, mask: np.array, image: np.array) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Extract reference features using the provided mask.
+
+        Returns:
+            image_embedding: 64, 64, 256
+            reference_features: X, 256
+        """
+        if isinstance(self.model, SamPredictor):
+            # set_image resizes and pads to square input
+            # TODO set_image also computes image embedding which is now performed for every mask and not just once
+            # TODO this is not efficient and should only resize the mask.
+            reference_mask = self.model.set_image(image, mask)  # 1, 3 ,1024, 1024 
+            image_embedding = self.model.features.squeeze().permute(
+                1, 2, 0
+            )  # 64, 64, 256
+            # transform reference mask to a 64 64 mask
+            reference_mask = F.interpolate(
+                reference_mask, size=image_embedding.shape[0:2], mode="bilinear"
+            )
+            reference_mask = reference_mask.squeeze()[0]  # 64, 64
+        elif isinstance(self.model, EfficientViTSamPredictor):
+            image_embedding = self.model.features.squeeze().permute(
+                1, 2, 0
+            )  # 64, 64, 256
+            # resize relative to longest size
+            reference_mask = SamResize(self.model.model.image_size[0])(
+                mask
+            )  # 576 1024 3
+            reference_mask = torch.as_tensor(
+                reference_mask, device=self.model.device
+            )
+            reference_mask = reference_mask.permute(2, 0, 1).contiguous()[
+                None, :, :, :
+            ]  # 1, 3, 576, 1024
+            reference_mask = SamPad(self.model.model.image_size[0])(
+                reference_mask
+            )  # 1, 3, 1024, 1024
+            reference_mask = F.interpolate(
+                reference_mask.float(),
+                size=image_embedding.shape[0:2],
+                mode="bilinear",
+            )
+            reference_mask = reference_mask.squeeze()[0]  # 64 64
+        
+        # local reference feature extraction
+        reference_features = image_embedding[reference_mask > 0]
+        if reference_features.shape[0] == 0:
+            print(f"The reference mask is too small to detect any features")
+            return None, None
+        return image_embedding, reference_features
+        
 
     def post_refinement(
         self, logits, topk_xy, topk_label
@@ -313,59 +329,61 @@ class PerSamPredictor:
         final_mask = masks[best_idx]
         final_score = scores[best_idx]
         return final_mask, masks, final_score
+    
+        
 
-    def _prepare_attention_similarity(self, sim: torch.Tensor) -> torch.Tensor:
-        """Prepare similarity tensor for cross-attention layers.
+def prepare_attention_similarity(sim: torch.Tensor) -> torch.Tensor:
+    """Prepare similarity tensor for cross-attention layers.
 
-        Args:
-            sim: Input similarity tensor
+    Args:
+        sim: Input similarity tensor
 
-        Returns:
-            Processed similarity tensor ready for attention
-        """
-        sim = (sim - sim.mean()) / torch.std(sim)
-        sim = F.interpolate(
-            sim.unsqueeze(0).unsqueeze(0), size=(64, 64), mode="bilinear"
+    Returns:
+        Processed similarity tensor ready for attention
+    """
+    sim = (sim - sim.mean()) / torch.std(sim)
+    sim = F.interpolate(
+        sim.unsqueeze(0).unsqueeze(0), size=(64, 64), mode="bilinear"
+    )
+    return sim.sigmoid_().unsqueeze(0).flatten(3)
+
+def cluster_features(
+    reference_features: torch.Tensor, n_clusters: int = 8
+) -> torch.Tensor:
+    """Create part-level features from reference features.
+    This performs a k-means++ clustering on the reference features and takes the centroid as prototype.
+    Resulting part-level features are normalized to unit length.
+    If n_clusters is 1, the mean of the reference features is taken as prototype.
+
+    Args:
+        reference_features: Reference features tensor [X, 256]
+        n_clusters: Number of clusters to create (e.g. number of part-level-features)
+
+    Returns:
+        Part-level features tensor [n_clusters, 256]
+    """
+    if n_clusters == 1:
+        part_level_features = reference_features.mean(0).unsqueeze(0)
+        part_level_features = part_level_features / part_level_features.norm(
+            dim=-1, keepdim=True
         )
-        return sim.sigmoid_().unsqueeze(0).flatten(3)
+        return part_level_features.unsqueeze(0)  # 1, 256
 
-    def _cluster_features(
-        self, reference_features: torch.Tensor, n_clusters: int = 8
-    ) -> torch.Tensor:
-        """Create part-level features from reference features.
-        This performs a k-means++ clustering on the reference features and takes the centroid as prototype.
-        Resulting part-level features are normalized to unit length.
-        If n_clusters is 1, the mean of the reference features is taken as prototype.
-
-        Args:
-            reference_features: Reference features tensor [X, 256]
-            n_clusters: Number of clusters to create (e.g. number of part-level-features)
-
-        Returns:
-            Part-level features tensor [n_clusters, 256]
-        """
-        if n_clusters == 1:
-            part_level_features = reference_features.mean(dim=0)
-            part_level_features = part_level_features / part_level_features.norm(
-                dim=-1, keepdim=True
-            )
-            return part_level_features.unsqueeze(0)
-
-        features_np = reference_features.cpu().numpy()
-        kmeans = KMeans(n_clusters=n_clusters, init="k-means++", random_state=0)
-        cluster = kmeans.fit_predict(features_np)
-        part_level_features = []
-        for c in range(n_clusters):
-            # use centroid of cluster as prototype
-            part_level_feature = features_np[cluster == c].mean(axis=0)
-            part_level_feature = part_level_feature / np.linalg.norm(
-                part_level_feature, axis=-1, keepdims=True
-            )
-            part_level_features.append(part_level_feature)
-        part_level_features = torch.stack(
-            part_level_features, dim=0
-        ).cuda()  # [n_clusters, 256]
-        return part_level_features
+    features_np = reference_features.cpu().numpy()
+    kmeans = KMeans(n_clusters=n_clusters, init="k-means++", random_state=0)
+    cluster = kmeans.fit_predict(features_np)
+    part_level_features = []
+    for c in range(n_clusters):
+        # use centroid of cluster as prototype
+        part_level_feature = features_np[cluster == c].mean(axis=0)
+        part_level_feature = part_level_feature / np.linalg.norm(
+            part_level_feature, axis=-1, keepdims=True
+        )
+        part_level_features.append(part_level_feature)
+    part_level_features = torch.stack(
+        part_level_features, dim=0
+    ).cuda()  # [n_clusters, 256]
+    return part_level_features
 
 
 def run_per_segment_anything(

@@ -167,6 +167,8 @@ def save_visualization(image: np.ndarray, mask, output_path: str, points=None, s
     cv2.imwrite(output_path, cv2.cvtColor(image_vis, cv2.COLOR_RGB2BGR)) 
 
 
+
+
 def _compute_wasserstein_distance(a, b, weights=None) -> float:
     """
     Computes the Wasserstein distance between two distributions a and b.
