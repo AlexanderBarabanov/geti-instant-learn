@@ -93,7 +93,7 @@ class PerSamPredictor:
     ) -> ZSLVisualPromptingResult:
         prediction: dict[int, PredictedMask] = {}
         final_point_prompts: dict[int, list] = defaultdict(list)
-        all_point_prompt_candidates: dict[int, np.ndarray] = {}
+        all_point_prompt_candidates: dict[int, np.ndarray] = defaultdict(list)
         all_masks: dict[int, list] = defaultdict(list)
         all_scores: dict[int, list] = defaultdict(list)
         all_bg_prompts: dict[int, list] = defaultdict(list)
@@ -108,7 +108,8 @@ class PerSamPredictor:
         test_feat = test_feat.reshape(c, h * w)
         for class_idx, reference_features in self.reference_features.items():
             sim = reference_features @ test_feat
-            sim = sim.reshape(1, 1, h, w)
+            sim = sim.reshape(reference_features.shape[0], 1, h, w)
+
             sim = F.interpolate(sim, scale_factor=4, mode="bilinear")
             sim = self.model.model.postprocess_masks(
                 sim,
@@ -117,17 +118,16 @@ class PerSamPredictor:
             ).squeeze()
             sim_masks_per_class[class_idx] = sim
 
-            # model_api based point selection (multi object and using grid approach)
-            point_prompt_candidates, bg_points = _point_selection(
-                mask_sim=sim.cpu().numpy(),  # numpy  H W  720 1280
-                original_shape=np.array(self.model.original_size),  # [ 720  1280]
-                threshold=self.threshold,
-                num_bg_points=self.num_bg_points,
-                image_size=self.model.input_size[1],  # 1024
-                downsizing=self.grid_size,
-            )
-            all_point_prompt_candidates[class_idx] = point_prompt_candidates
-            all_bg_prompts[class_idx] = bg_points
+            # there can be multiple similarity maps for a single class, perform point selection for each similarity map
+            for sim in sim_masks_per_class[class_idx]:
+                point_prompt_candidates, bg_points = _point_selection(
+                    mask_sim=sim.cpu().numpy(),  # numpy  H W  720 1280
+                    original_shape=np.array(self.model.original_size),  # [ 720  1280]
+                    threshold=self.threshold,
+                )
+                all_point_prompt_candidates[class_idx].extend(point_prompt_candidates)
+                all_bg_prompts[class_idx].extend(bg_points)
+
 
         # filter points
         for class_idx in self.reference_features.keys():
@@ -144,6 +144,10 @@ class PerSamPredictor:
             # Obtain the target guidance for cross-attention layers
             sim = sim_masks_per_class[class_idx]
             attn_sim = prepare_attention_similarity(sim)
+
+
+            # TODO: We are passing one point each time in the decoder, don't we want to pass multiple points at once? 
+            #   This could increase the performance of SAM. However, need to think about multi object
 
             for i, (x, y, score) in enumerate(point_prompt_candidates):
                 # remove points with very low confidence
@@ -341,6 +345,10 @@ def prepare_attention_similarity(sim: torch.Tensor) -> torch.Tensor:
     Returns:
         Processed similarity tensor ready for attention
     """
+    # If multiple similarity masks are stacked, we 
+    if len(sim.shape) == 3:
+        sim = sim.mean(dim=0)
+    
     sim = (sim - sim.mean()) / torch.std(sim)
     sim = F.interpolate(
         sim.unsqueeze(0).unsqueeze(0), size=(64, 64), mode="bilinear"
