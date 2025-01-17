@@ -206,6 +206,7 @@ class SAMLearnableVisualPrompter:
         reset_features: bool = False,
         perform_averaging: bool = True,
         show: bool = False,
+        **kwargs,
     ) -> tuple[VisualPromptingFeatures, np.ndarray]:
         """Executes `learn` stage of SAM ZSL pipeline.
 

@@ -29,7 +29,7 @@ def get_arguments():
     parser.add_argument("--post_refinement", action="store_true", help="Apply post refinement")
     parser.add_argument("--class_name", type=str, default=None, help="Filter on class name")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing output data")
-
+    parser.add_argument("--num_clusters", type=int, default=1, help="Number of clusters for PartAwareSAM, if 1 use mean of all features")
     args = parser.parse_args()
     return args
 
@@ -88,7 +88,7 @@ def predict_on_dataset(args: argparse.Namespace, predictor: PerSamPredictor | SA
                 cv2.imwrite(f"{output_path}/predictions/{class_name}/prior_{i}.png", overlay)
 
         # TODO currently multiple priors is not yet implemented
-        predictor.learn(image=prior_images[0], masks=prior_masks, show=args.show)
+        predictor.learn(image=prior_images[0], masks=prior_masks, show=args.show, num_clusters=args.num_clusters)
 
         # predict on target images
         for row_idx, target in tqdm(targets.iterrows(), desc="Processing samples", total=len(targets), position=1, leave=False):
