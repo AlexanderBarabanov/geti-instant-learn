@@ -379,7 +379,7 @@ def cluster_features(
         part_level_feature = part_level_feature / np.linalg.norm(
             part_level_feature, axis=-1, keepdims=True
         )
-        part_level_features.append(part_level_feature)
+        part_level_features.append(torch.from_numpy(part_level_feature))
     part_level_features = torch.stack(
         part_level_features, dim=0
     ).cuda()  # [n_clusters, 256]
