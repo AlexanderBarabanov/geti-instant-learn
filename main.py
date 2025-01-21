@@ -93,7 +93,7 @@ def predict_on_dataset(args: argparse.Namespace, predictor: PerSamPredictor, dat
             gt_mask = cv2.cvtColor(cv2.imread(target.mask_image), cv2.COLOR_BGR2RGB)
             
             start_time = time.time()
-            result: ZSLVisualPromptingResult = predictor.infer(image=target_image, apply_masks_refinement=args.post_refinement)
+            result, visual_output = predictor.infer(image=target_image, apply_masks_refinement=args.post_refinement)
             inference_time_meter.update(time.time() - start_time)
 
             mask = result.get_mask(0)
@@ -106,6 +106,7 @@ def predict_on_dataset(args: argparse.Namespace, predictor: PerSamPredictor, dat
                 save_visualization(
                     image=target_image,
                     mask=mask,
+                    visual_output=visual_output,
                     output_path=os.path.join(output_path, 'predictions', class_name, os.path.basename(target.image)),
                     points=mask.points if hasattr(mask, 'points') else None,
                     scores=mask.scores if hasattr(mask, 'scores') else None

@@ -381,7 +381,7 @@ class SAMLearnableVisualPrompter:
         original_shape = np.array(image.shape[:2])
         image_embeddings = self.encoder(image)
 
-        total_points_scores, total_bg_coords = _get_prompt_candidates(
+        total_points_scores, total_bg_coords, visual_outputs = _get_prompt_candidates(
             image_embeddings=image_embeddings,
             reference_feats=reference_feats,
             used_indices=used_idx,
@@ -451,7 +451,7 @@ class SAMLearnableVisualPrompter:
             prediction[k] = PredictedMask(predicted_masks[k], processed_points, scores)
         if dev:
             return ZSLVisualPromptingResult(prediction), {}
-        return ZSLVisualPromptingResult(prediction)
+        return ZSLVisualPromptingResult(prediction), visual_outputs
 
     def reset_reference_info(self) -> None:
         """Initialize reference information."""
@@ -1119,6 +1119,14 @@ def _decide_masks(
         best_idx = np.argmax(scores[0])
     return (logits[:, [best_idx]], masks[0, best_idx], float(np.clip(scores[0][best_idx], 0, 1)), best_idx)
 
+def _draw_points(img, x, y, size=1, color=(255, 255, 255)):
+    if size == 1:  # faster
+        img[y.astype(int), x.astype(int)] = color
+    else: # slower
+        for x, y in zip(x, y):
+            cv2.drawMarker(img, (int(x), int(y)), color, cv2.MARKER_STAR, size)
+    return img
+
 
 def _get_prompt_candidates(
     image_embeddings: np.ndarray,
@@ -1130,7 +1138,7 @@ def _get_prompt_candidates(
     default_threshold_target: float = 0.65,
     image_size: int = 1024,
     downsizing: int = 64,
-) -> tuple[dict[int, np.ndarray], dict[int, np.ndarray]]:
+) -> tuple[dict[int, np.ndarray], dict[int, np.ndarray], dict[str, dict[int, np.ndarray]]]:
     """Get prompt candidates."""
     target_feat = image_embeddings.squeeze()
     c_feat, h_feat, w_feat = target_feat.shape
@@ -1139,6 +1147,8 @@ def _get_prompt_candidates(
 
     total_points_scores: dict[int, np.ndarray] = {}
     total_bg_coords: dict[int, np.ndarray] = {}
+    visual_output: dict[str, dict[int, np.ndarray]] = {}
+    visual_output["similarity"] = {}
     for label in used_indices:
         sim = reference_feats[label] @ target_feat
         sim = sim.reshape(h_feat, w_feat)
@@ -1157,7 +1167,16 @@ def _get_prompt_candidates(
         if points_scores is not None:
             total_points_scores[label] = points_scores
             total_bg_coords[label] = bg_coords
-    return total_points_scores, total_bg_coords
+
+            # Create similarity image
+            similarity = np.zeros((*sim.shape, 3))
+            similarity[:, :] = np.expand_dims(sim * 255, axis=2)
+            _draw_points(similarity, points_scores[:, 0], points_scores[:, 1], size=15, color=(255, 255, 255))
+            _draw_points(similarity, bg_coords[:, 0], bg_coords[:, 1], size=15, color=(0, 0, 255))
+            visual_output["similarity"][label] = similarity
+
+
+    return total_points_scores, total_bg_coords, visual_output
 
 
 def _point_selection(

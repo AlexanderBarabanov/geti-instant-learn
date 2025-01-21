@@ -122,13 +122,14 @@ def transform_mask_prompts_to_dict(prompts: List[Prompt]) -> Dict[int, np.array]
         result[label] = mask
     return result
 
-def save_visualization(image: np.ndarray, mask, output_path: str, points=None, scores=None) -> None:
+def save_visualization(image: np.ndarray, mask, visual_output, output_path: str, points=None, scores=None) -> None:
     """
     Save a visualization of the segmentation mask overlaid on the image.
     
     Args:
         image: RGB image as numpy array
         mask: Segmentation mask object with mask.mask containing instance masks
+        visual_output: Extra images representing the intermediate results of the algorithm
         output_path: Path where to save the visualization
         points: Optional points to visualize
         scores: Optional confidence scores for the points
@@ -138,7 +139,13 @@ def save_visualization(image: np.ndarray, mask, output_path: str, points=None, s
     # Get unique colors for each instance mask
     mask_colors = get_colors(len(mask.mask))
     image_vis = image.copy()
-    
+
+    # Create visualization output
+    base = os.path.splitext(output_path)[0]
+    for name, data in visual_output.items():
+        fn = f"{base}_{name}.png"
+        cv2.imwrite(fn, data[0])
+
     # Draw each instance mask with a different color
     for i, instance in enumerate(mask.mask):
         masked_img = np.where(instance[..., None], mask_colors[i], image_vis)
