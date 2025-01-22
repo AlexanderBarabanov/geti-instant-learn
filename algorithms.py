@@ -55,7 +55,6 @@ class PerSamPredictor:
         
         mask_per_class = self.prepare_input(image, masks, points, boxes, polygons)
 
-        self.model.set_image(image)   # TODO move to new function and let extract_reference_features use image embedding directly.
         for class_idx, mask in mask_per_class.items():
             if show:
                 fig = plt.figure(figsize=(10, 10))
@@ -104,8 +103,7 @@ class PerSamPredictor:
 
 
         # Image feature encoding
-        self.model.set_image(image)
-        test_feat = self.model.features.squeeze()
+        test_feat = self.get_image_embedding_sam(image)
 
         # Cosine similarity
         c, h, w = test_feat.shape
@@ -124,6 +122,8 @@ class PerSamPredictor:
             sim_masks_per_class[class_idx] = sim
 
             # there can be multiple similarity maps for a single class, perform point selection for each similarity map
+            if len(sim_masks_per_class[class_idx].shape) == 2:
+                sim_masks_per_class[class_idx] = sim_masks_per_class[class_idx].unsqueeze(0)
             for sim in sim_masks_per_class[class_idx]:
                 point_prompt_candidates, bg_points = _point_selection(
                     mask_sim=sim.cpu().numpy(),  # numpy  H W  720 1280
@@ -253,6 +253,16 @@ class PerSamPredictor:
             raise ValueError("Either points or masks are required for learning")
         
         return mask_per_class
+    
+    def get_image_embedding_sam(self, image: np.array) -> torch.Tensor:
+        """
+        Get the image embedding for the current image.
+
+        Returns:
+            image_embedding: 256, 64, 64
+        """
+        self.model.set_image(image)
+        return self.model.features.squeeze()
 
     def extract_reference_features(self, mask: np.array, image: np.array) -> tuple[torch.Tensor, torch.Tensor]:
         """
@@ -265,7 +275,7 @@ class PerSamPredictor:
         if isinstance(self.model, SamPredictor):
             # set_image resizes and pads to square input
             # TODO set_image also computes image embedding which is now performed for every mask and not just once
-            # TODO this is not efficient and should only resize the mask.
+            # TODO this is not efficient and should only resize the mask. However, in practice we have only mask per class
             reference_mask = self.model.set_image(image, mask)  # 1, 3 ,1024, 1024 
             image_embedding = self.model.features.squeeze().permute(
                 1, 2, 0
