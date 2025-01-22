@@ -338,6 +338,7 @@ class SAMLearnableVisualPrompter:
         image: np.ndarray,
         reference_features: VisualPromptingFeatures | None = None,
         apply_masks_refinement: bool = True,
+        **kwargs,
     ) -> ZSLVisualPromptingResult | tuple[ZSLVisualPromptingResult, dict]:
         """Obtains masks by already prepared reference features.
 
@@ -798,12 +799,10 @@ class SAMPartAwareLearnableVisualPrompter(SAMLearnableVisualPrompter):
                 # similarity matching of part-level features to target features
                 # TODO use vectorDB to store part level features of multiple prior objects and then query for similarity
                 sim_map_of_part_level_features = part_level_features @ target_features  # [n_clusters, h, w]
-                sim_map_of_part_level_features = np.array(
-                    [
-                        _resize_to_original_shape(sim_map, self._image_size, target_img_original_shape)
-                        for sim_map in sim_map_of_part_level_features
-                    ]
-                )  # [n_clusters, h, w]
+                sim_map_of_part_level_features = np.array([
+                    _resize_to_original_shape(sim_map, self._image_size, target_img_original_shape)
+                    for sim_map in sim_map_of_part_level_features
+                ])  # [n_clusters, h, w]
 
                 # Find point prompt candidates for each part level feature
                 all_point_prompt_candidates = []
@@ -997,28 +996,6 @@ def _create_part_level_features(reference_features: np.ndarray, n_clusters: int)
     return part_level_features
 
 
-def _compute_wasserstein_distance(a, b, weights=None) -> float:
-    """
-    Computes the Wasserstein distance between two distributions a and b.
-    Lower distance is better match.
-    :param a:
-    :param b:
-    :param weights:
-    :return:
-    """
-    n_a = a.shape[0]
-    a_hist = ot.unif(n_a)
-    if weights is not None:
-        b_hist = weights / np.sum(weights)
-    else:
-        n_b = b.shape[0]
-        b_hist = ot.unif(n_b)
-
-    M = ot.dist(a, b)
-    wasserstein_distance = ot.emd2(a_hist, b_hist, M, numItermax=10000000)
-    return wasserstein_distance
-
-
 def _polygon_to_mask(
     polygon: np.ndarray | list[np.ndarray],
     height: int,
@@ -1182,14 +1159,14 @@ def _point_selection(
     fg_coords_scores = np.stack(
         point_coords[::-1] + (mask_sim[point_coords],),
         axis=0,
-    ).T   # (107313, 3)
+    ).T  # (107313, 3)
 
     # skip if there are no prompt candidates
     if len(fg_coords_scores) == 0:
         return None, None
 
     # Create a grid of the original image size. This is used to filter out points that are in the same grid cell.
-    ratio = image_size / original_shape.max()   # ratio = 0.8
+    ratio = image_size / original_shape.max()  # ratio = 0.8
     width = (original_shape[1] * ratio).astype(np.int64)  # width= 1024
     number_of_grid_cells = width // downsizing
 
