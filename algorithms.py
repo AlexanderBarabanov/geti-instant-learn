@@ -89,6 +89,7 @@ class PerSamPredictor:
         image: np.array,
         reference_features=None,
         apply_masks_refinement: bool = True,
+        target_guided_attention: bool = False,
         dev: bool = False,
     ) -> ZSLVisualPromptingResult:
         prediction: dict[int, PredictedMask] = {}
@@ -98,6 +99,10 @@ class PerSamPredictor:
         all_scores: dict[int, list] = defaultdict(list)
         all_bg_prompts: dict[int, list] = defaultdict(list)
         sim_masks_per_class = {}
+        attn_sim = None
+        target_guided_embedding = None
+
+
         # Image feature encoding
         self.model.set_image(image)
         test_feat = self.model.features.squeeze()
@@ -125,6 +130,8 @@ class PerSamPredictor:
                     original_shape=np.array(self.model.original_size),  # [ 720  1280]
                     threshold=self.threshold,
                 )
+                if point_prompt_candidates is None:
+                    continue
                 all_point_prompt_candidates[class_idx].extend(point_prompt_candidates)
                 all_bg_prompts[class_idx].extend(bg_points)
 
@@ -142,12 +149,12 @@ class PerSamPredictor:
                 continue
 
             # Obtain the target guidance for cross-attention layers
-            sim = sim_masks_per_class[class_idx]
-            attn_sim = prepare_attention_similarity(sim)
+            if target_guided_attention:
+                attn_sim, target_guided_embedding = prepare_target_guided_prompting(sim_masks_per_class[class_idx], self.reference_features[class_idx])
 
 
-            # TODO: We are passing one point each time in the decoder, don't we want to pass multiple points at once? 
-            #   This could increase the performance of SAM. However, need to think about multi object
+            # TODO: We are passing one point each time in the decoder, we should pass multiple points at once to increase performance
+            #   This requires some filtering before hand. See the Matcher AutomaticMaskGenerator for reference of good postprocessing
 
             for i, (x, y, score) in enumerate(point_prompt_candidates):
                 # remove points with very low confidence
@@ -176,9 +183,7 @@ class PerSamPredictor:
                         point_labels=point_labels,
                         multimask_output=False,
                         attn_sim=attn_sim,  # Target-guided Attention (not in model api)
-                        target_embedding=self.reference_features[
-                            class_idx
-                        ],  # Target-semantic Prompting (not in model api)
+                        target_embedding=target_guided_embedding,  # Target-semantic Prompting (not in model api)
                     )
                 elif isinstance(self.model, EfficientViTSamPredictor):
                     masks, scores, low_res_logits = self.model.predict(
@@ -334,7 +339,15 @@ class PerSamPredictor:
         final_score = scores[best_idx]
         return final_mask, masks, final_score
     
-        
+def prepare_target_guided_prompting(sim: torch.Tensor, reference_features: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Prepare target guided prompting for the decoder.
+    """
+    sim = prepare_attention_similarity(sim)
+    if len(reference_features.shape) == 2:
+        reference_features = reference_features.mean(0).unsqueeze(0)
+    return sim, reference_features
+
 
 def prepare_attention_similarity(sim: torch.Tensor) -> torch.Tensor:
     """Prepare similarity tensor for cross-attention layers.
@@ -345,7 +358,7 @@ def prepare_attention_similarity(sim: torch.Tensor) -> torch.Tensor:
     Returns:
         Processed similarity tensor ready for attention
     """
-    # If multiple similarity masks are stacked, we 
+    # For multiple similarity masks (e.g. Part-level features), we take the mean of the similarity maps
     if len(sim.shape) == 3:
         sim = sim.mean(dim=0)
     

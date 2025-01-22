@@ -27,6 +27,7 @@ def get_arguments():
     parser.add_argument("--save", action="store_true", help="Save results to disk")
     parser.add_argument("--show", action="store_true", help="Show results during processing")
     parser.add_argument("--post_refinement", action="store_true", help="Apply post refinement")
+    parser.add_argument("--target_guided_attention", action="store_true", help="Use target guided attention for the SAM model. This passes the target similarity matrix and reference features to the decoder")
     parser.add_argument("--class_name", type=str, default=None, help="Filter on class name")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing output data")
     parser.add_argument("--num_clusters", type=int, default=1, help="Number of clusters for PartAwareSAM, if 1 use mean of all features")
@@ -97,7 +98,7 @@ def predict_on_dataset(args: argparse.Namespace, predictor: PerSamPredictor | SA
             gt_mask = cv2.cvtColor(cv2.imread(target.mask_image), cv2.COLOR_BGR2RGB)
             
             start_time = time.time()
-            result: ZSLVisualPromptingResult = predictor.infer(image=target_image, apply_masks_refinement=args.post_refinement)
+            result: ZSLVisualPromptingResult = predictor.infer(image=target_image, apply_masks_refinement=args.post_refinement, target_guided_attention=args.target_guided_attention)
             inference_time_meter.update(time.time() - start_time)
 
             mask = result.get_mask(0)
