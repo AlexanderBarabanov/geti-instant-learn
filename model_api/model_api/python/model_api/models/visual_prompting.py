@@ -205,7 +205,7 @@ class SAMLearnableVisualPrompter:
         masks: list[Prompt] | None = None,
         reset_features: bool = False,
         perform_averaging: bool = True,
-        show: bool = False,
+        **kwargs,
     ) -> tuple[VisualPromptingFeatures, np.ndarray]:
         """Executes `learn` stage of SAM ZSL pipeline.
 
@@ -338,7 +338,6 @@ class SAMLearnableVisualPrompter:
         image: np.ndarray,
         reference_features: VisualPromptingFeatures | None = None,
         apply_masks_refinement: bool = True,
-        dev: bool = False,
     ) -> ZSLVisualPromptingResult | tuple[ZSLVisualPromptingResult, dict]:
         """Obtains masks by already prepared reference features.
 
@@ -449,8 +448,7 @@ class SAMLearnableVisualPrompter:
                 processed_points.append(pt[:2])
                 scores.append(float(pt[2]))
             prediction[k] = PredictedMask(predicted_masks[k], processed_points, scores)
-        if dev:
-            return ZSLVisualPromptingResult(prediction), {}
+
         return ZSLVisualPromptingResult(prediction)
 
     def reset_reference_info(self) -> None:

@@ -2,6 +2,7 @@ import os
 from collections import defaultdict
 
 from pandas import Series
+from sklearn.cluster import KMeans
 
 from constants import MAPI_DECODER_PATH, MAPI_ENCODER_PATH, MODEL_MAP
 from efficientvit.models.efficientvit import EfficientViTSamPredictor, SamResize, SamPad
@@ -28,8 +29,6 @@ from model_api.models.visual_prompting import (
 from utils import transform_point_prompts_to_dict, transform_mask_prompts_to_dict
 
 
-
-
 class PerSamPredictor:
     """Wrapper on top of the SAM model to make it inline with ModelAPI SAM Interface"""
 
@@ -42,7 +41,6 @@ class PerSamPredictor:
         self.reference_features = {}
         self.reference_masks = {}
         self.highest_class_idx = 0  # num_classes  - 1
-        self.reference_embedding = None
 
     def learn(
         self,
@@ -52,8 +50,140 @@ class PerSamPredictor:
         polygons: list[Prompt] | None = None,
         masks: list[Prompt] | None = None,
         show: bool = False,
+        num_clusters: int = 1,
     ) -> tuple[VisualPromptingFeatures, np.array]:
-        # get masks by points
+        
+        mask_per_class = self.prepare_input(image, masks, points, boxes, polygons)
+
+        for class_idx, mask in mask_per_class.items():
+            if show:
+                fig = plt.figure(figsize=(10, 10))
+                plt.imshow(mask)
+                plt.show()
+                cv2.imwrite(f"reference_mask_{class_idx}.jpg", mask)
+            
+            image_embedding, reference_features = self.extract_reference_features(mask, image)
+            if reference_features is None:
+                continue
+
+            # PerSAM: use average of all features. 
+            # P2SAM/PartAware: use k-means++ clustering to create num_clusters part-level features
+            reference_features = cluster_features(reference_features, num_clusters)
+            self.reference_features[class_idx] = reference_features
+            self.reference_masks[class_idx] = mask[:, :, 0]  # save this for visualization
+            
+        if not self.reference_features:
+            print("No reference features found. Please provide a larger reference mask")
+            return None, None
+
+        return VisualPromptingFeatures(
+            feature_vectors=np.stack(
+                [v.cpu().numpy() for v in self.reference_features.values()]
+            ),
+            used_indices=np.array(self.reference_features.keys()),
+        ), np.stack(list(self.reference_masks.values()))
+
+    def infer(
+        self,
+        image: np.array,
+        reference_features=None,
+        apply_masks_refinement: bool = True,
+        target_guided_attention: bool = False,
+        dev: bool = False,
+    ) -> ZSLVisualPromptingResult:
+        
+        prediction: dict[int, PredictedMask] = {}
+        final_point_prompts: dict[int, list] = defaultdict(list)
+        all_point_prompt_candidates: dict[int, np.ndarray] = defaultdict(list)
+        all_masks: dict[int, list] = defaultdict(list)
+        all_scores: dict[int, list] = defaultdict(list)
+        all_bg_prompts: dict[int, list] = defaultdict(list)
+        sim_masks_per_class = {}
+        attn_sim = None
+        target_guided_embedding = None
+
+        # Image feature encoding
+        test_feat = self.get_image_embedding_sam(image)
+        c, h, w = test_feat.shape
+        test_feat = test_feat / test_feat.norm(dim=0, keepdim=True)
+        test_feat = test_feat.reshape(c, h * w)
+
+        for class_idx, reference_features in self.reference_features.items():
+            # Cosine similarity
+            sim = reference_features @ test_feat
+            sim = sim.reshape(reference_features.shape[0], 1, h, w)
+
+            sim = F.interpolate(sim, scale_factor=4, mode="bilinear")
+            sim = self.model.model.postprocess_masks(
+                sim,
+                input_size=self.model.input_size,
+                original_size=self.model.original_size,
+            ).squeeze()
+            sim_masks_per_class[class_idx] = sim
+
+            # Point selection
+            if len(sim_masks_per_class[class_idx].shape) == 2:
+                # allow single and multiple similarity maps
+                sim_masks_per_class[class_idx] = sim_masks_per_class[class_idx].unsqueeze(0)
+            for sim in sim_masks_per_class[class_idx]:
+                point_prompt_candidates, bg_points = _point_selection(
+                    mask_sim=sim.cpu().numpy(),  # numpy  H W  720 1280
+                    original_shape=np.array(self.model.original_size),  # [ 720  1280]
+                    threshold=self.threshold,
+                )
+                if point_prompt_candidates is None:
+                    continue
+                all_point_prompt_candidates[class_idx].extend(point_prompt_candidates)
+                all_bg_prompts[class_idx].extend(bg_points)
+
+
+        # Predict masks
+        for class_idx in self.reference_features.keys():
+            point_prompt_candidates = all_point_prompt_candidates[class_idx]
+            bg_points = all_bg_prompts[class_idx]
+
+            # if no points are found, we do not return points and return one empty mask
+            if len(point_prompt_candidates) == 0:
+                final_point_prompts[class_idx] = []
+                all_masks[class_idx] = [np.zeros_like(sim_masks_per_class[class_idx])]
+                all_scores[class_idx] = [0.0]
+                continue
+
+            # Obtain the target guidance for cross-attention layers
+            if target_guided_attention:
+                attn_sim, target_guided_embedding = prepare_target_guided_prompting(sim_masks_per_class[class_idx], self.reference_features[class_idx])
+            
+            # Predict masks based on the points
+            all_masks[class_idx], final_point_prompts[class_idx] = self.predict_masks_point_by_point(point_prompt_candidates, bg_points, apply_masks_refinement=apply_masks_refinement, attn_sim=attn_sim, target_guided_embedding=target_guided_embedding)
+
+        # Refine overlapping class masks
+        _inspect_overlapping_areas(all_masks, final_point_prompts)
+
+        # Create result object
+        for label in final_point_prompts:
+            final_point_prompts[label] = np.array(final_point_prompts[label])
+            prediction[label] = PredictedMask(
+                mask=all_masks[label],
+                points=final_point_prompts[label][:, :2],
+                scores=final_point_prompts[label][:, 2],
+            )
+
+        return ZSLVisualPromptingResult(prediction)
+    
+    def prepare_input(self, image: np.array, masks: list[Prompt] = None, points: list[Prompt] = None, boxes: list[Prompt] = None, polygons: list[Prompt] = None) -> dict[int, np.array]:
+        """
+        Create mask per class based on the input masks or points
+
+        Args:
+            image: input image
+            masks: input masks
+            points: input points
+            boxes: input boxes
+            polygons: input polygons
+
+        Returns:
+            mask_per_class: dictionary of masks per class
+        """
         if points is not None:
             mask_per_class = {}
             points_per_class = transform_point_prompts_to_dict(points)
@@ -80,222 +210,99 @@ class PerSamPredictor:
             mask_per_class = transform_mask_prompts_to_dict(masks)
         else:
             raise ValueError("Either points or masks are required for learning")
+        
+        return mask_per_class
+    
+    def get_image_embedding_sam(self, image: np.array) -> torch.Tensor:
+        """
+        Get the image embedding for the current image.
 
+        :param image: input image
+
+        Returns:
+            image_embedding: 256, 64, 64
+        """
         self.model.set_image(image)
-        for class_idx, mask in mask_per_class.items():
-            if show:
-                fig = plt.figure(figsize=(10, 10))
-                plt.imshow(mask)
-                plt.show()
-                cv2.imwrite(f"reference_mask_{class_idx}.jpg", mask)
-            
+        return self.model.features.squeeze()
 
-            if isinstance(self.model, SamPredictor):
-                # set_image resizes and pads to square input
-                reference_mask = self.model.set_image(image, mask)  # 1, 3 ,1024, 1024
-                image_embedding = self.model.features.squeeze().permute(
-                    1, 2, 0
-                )  # image embedding is 64, 64, 256
-                # transform reference mask to a 64 64 mask
-                reference_mask = F.interpolate(
-                    reference_mask, size=image_embedding.shape[0:2], mode="bilinear"
-                )
-                reference_mask = reference_mask.squeeze()[0]  # 64, 64
-            elif isinstance(self.model, EfficientViTSamPredictor):
-                image_embedding = self.model.features.squeeze().permute(
-                    1, 2, 0
-                )  # image embedding is 64, 64, 256
-                # resize relative to longest size
-                reference_mask = SamResize(self.model.model.image_size[0])(
-                    mask
-                )  # 576 1024 3
-                reference_mask = torch.as_tensor(
-                    reference_mask, device=self.model.device
-                )
-                reference_mask = reference_mask.permute(2, 0, 1).contiguous()[
-                    None, :, :, :
-                ]  # 1, 3, 576, 1024
-                reference_mask = SamPad(self.model.model.image_size[0])(
-                    reference_mask
-                )  # 1, 3, 1024, 1024
-                reference_mask = F.interpolate(
-                    reference_mask.float(),
-                    size=image_embedding.shape[0:2],
-                    mode="bilinear",
-                )
-                reference_mask = reference_mask.squeeze()[0]  # 64 64
+    def extract_reference_features(self, mask: np.array, image: np.array) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Extract reference features using the provided mask.
 
-            # local reference feature extraction
-            reference_features = image_embedding[reference_mask > 0]
-            if reference_features.shape[0] == 0:
-                print(f"The reference mask is too small to detect any features")
-                continue
+        Args:
+            mask: input mask
+            image: input image
 
-            ### NOTE: this averages the local features into one vector (same as in ModelAPI)
-            ### For P2-SAM we want to keep each feature separately
-            ### For a Vision-RAG implementation we probably want to store the features (or its average) in a vector DB, while keeping a
-            ### maximum num of items and removing outliers to keep a good representation of the target class
-            reference_embedding = reference_features.mean(0).unsqueeze(0)
-            reference_features = reference_embedding / reference_embedding.norm(
-                dim=-1, keepdim=True
+        Returns:
+            image_embedding: 64, 64, 256
+            reference_features: X, 256
+        """
+        if isinstance(self.model, SamPredictor):
+            # set_image resizes and pads to square input
+            # TODO set_image also computes image embedding which is now performed for every mask and not just once
+            # TODO this is not efficient and should only resize the mask. However, in practice we have only mask per class
+            reference_mask = self.model.set_image(image, mask)  # 1, 3 ,1024, 1024 
+            image_embedding = self.model.features.squeeze().permute(
+                1, 2, 0
+            )  # 64, 64, 256
+            # transform reference mask to a 64 64 mask
+            reference_mask = F.interpolate(
+                reference_mask, size=image_embedding.shape[0:2], mode="bilinear"
             )
-            self.reference_embedding = reference_embedding.unsqueeze(0)
-            self.reference_features[class_idx] = (
-                reference_features  # note: this is still in CUDA
+            reference_mask = reference_mask.squeeze()[0]  # 64, 64
+        elif isinstance(self.model, EfficientViTSamPredictor):
+            image_embedding = self.model.features.squeeze().permute(
+                1, 2, 0
+            )  # 64, 64, 256
+            # resize relative to longest size
+            reference_mask = SamResize(self.model.model.image_size[0])(
+                mask
+            )  # 576 1024 3
+            reference_mask = torch.as_tensor(
+                reference_mask, device=self.model.device
             )
-            self.reference_masks[class_idx] = mask[:, :, 0]
-
-        if not self.reference_features:
-            print("No reference features found. Please provide a larger reference mask")
+            reference_mask = reference_mask.permute(2, 0, 1).contiguous()[
+                None, :, :, :
+            ]  # 1, 3, 576, 1024
+            reference_mask = SamPad(self.model.model.image_size[0])(
+                reference_mask
+            )  # 1, 3, 1024, 1024
+            reference_mask = F.interpolate(
+                reference_mask.float(),
+                size=image_embedding.shape[0:2],
+                mode="bilinear",
+            )
+            reference_mask = reference_mask.squeeze()[0]  # 64 64
+        
+        # local reference feature extraction
+        reference_features = image_embedding[reference_mask > 0]
+        if reference_features.shape[0] == 0:
+            print(f"The reference mask is too small to detect any features")
             return None, None
+        return image_embedding, reference_features
+        
 
-        return VisualPromptingFeatures(
-            feature_vectors=np.stack(
-                [v.cpu().numpy() for v in self.reference_features.values()]
-            ),
-            used_indices=np.array(self.reference_features.keys()),
-        ), np.stack(list(self.reference_masks.values()))
+    def post_refinement(
+        self, logits: torch.Tensor, point_coordinates: np.ndarray, point_labels: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, float]:
+        """
+        Refines the prediced mask by reapplying the decoder on step wise increase of input information.
 
-    def infer(
-        self,
-        image: np.array,
-        reference_features=None,
-        apply_masks_refinement: bool = True,
-        dev: bool = False,
-    ) -> ZSLVisualPromptingResult:
-        prediction: dict[int, PredictedMask] = {}
-        final_point_prompts: dict[int, list] = defaultdict(list)
-        all_point_prompt_candidates: dict[int, np.ndarray] = {}
-        all_masks: dict[int, list] = defaultdict(list)
-        all_scores: dict[int, list] = defaultdict(list)
-        all_bg_prompts: dict[int, list] = defaultdict(list)
-        sim_masks_per_class = {}
-        # Image feature encoding
-        self.model.set_image(image)
-        test_feat = self.model.features.squeeze()
+        Args:
+            logits: logits from the decoder
+            point_coordinates: point coordinates (x, y)
+            point_labels: point labels (1 for foreground, 0 for background)
 
-        # Cosine similarity
-        c, h, w = test_feat.shape
-        test_feat = test_feat / test_feat.norm(dim=0, keepdim=True)
-        test_feat = test_feat.reshape(c, h * w)
-        for class_idx, reference_features in self.reference_features.items():
-            sim = reference_features @ test_feat
-            sim = sim.reshape(1, 1, h, w)
-            sim = F.interpolate(sim, scale_factor=4, mode="bilinear")
-            sim = self.model.model.postprocess_masks(
-                sim,
-                input_size=self.model.input_size,
-                original_size=self.model.original_size,
-            ).squeeze()
-            sim_masks_per_class[class_idx] = sim
-
-            # model_api based point selection (multi object and using grid approach)
-            point_prompt_candidates, bg_points = _point_selection(
-                mask_sim=sim.cpu().numpy(),  # numpy  H W  720 1280
-                original_shape=np.array(self.model.original_size),  # [ 720  1280]
-                threshold=self.threshold,
-                num_bg_points=self.num_bg_points,
-                image_size=self.model.input_size[1],  # 1024
-                downsizing=self.grid_size,
-            )
-            all_point_prompt_candidates[class_idx] = point_prompt_candidates
-            all_bg_prompts[class_idx] = bg_points
-
-        # filter points
-        for class_idx in self.reference_features.keys():
-            point_prompt_candidates = all_point_prompt_candidates[class_idx]
-            bg_points = all_bg_prompts[class_idx]
-
-            # if no points are found, we do not return points and return one empty mask
-            if len(point_prompt_candidates) == 0:
-                final_point_prompts[class_idx] = []
-                all_masks[class_idx] = [np.zeros_like(sim_masks_per_class[class_idx])]
-                all_scores[class_idx] = [0.0]
-                continue
-            
-
-            # Obtain the target guidance for cross-attention layers
-            sim = sim_masks_per_class[class_idx]
-            sim = (sim - sim.mean()) / torch.std(sim)
-            sim = F.interpolate(
-                sim.unsqueeze(0).unsqueeze(0), size=(64, 64), mode="bilinear"
-            )
-            attn_sim = sim.sigmoid_().unsqueeze(0).flatten(3)
-
-            for i, (x, y, score) in enumerate(point_prompt_candidates):
-                # remove points with very low confidence
-                if score in [-1.0, 0.0]:
-                    continue
-                # filter out points that lie inside a previously found mask
-                is_done = False
-                for predicted_mask in all_masks.get(class_idx, []):
-                    if predicted_mask[int(y), int(x)] > 0:
-                        is_done = True
-                        break
-                if is_done:
-                    continue
-
-                point_coords = np.concatenate(
-                    (np.array([[x, y]]), bg_points),
-                    axis=0,
-                    dtype=np.float32,
-                )
-                point_labels = np.array([1] + [0] * len(bg_points), dtype=np.float32)
-
-                # predict the masks based on the points
-                if isinstance(self.model, SamPredictor):
-                    masks, scores, low_res_logits, *_ = self.model.predict(
-                        point_coords=point_coords,
-                        point_labels=point_labels,
-                        multimask_output=False,
-                        attn_sim=attn_sim,  # Target-guided Attention (not in model api)
-                        target_embedding=self.reference_features[
-                            class_idx
-                        ],  # Target-semantic Prompting (not in model api)
-                    )
-                elif isinstance(self.model, EfficientViTSamPredictor):
-                    masks, scores, low_res_logits = self.model.predict(
-                        point_coords=point_coords,
-                        point_labels=point_labels,
-                        multimask_output=False,
-                    )
-                else:
-                    raise NotImplementedError("Model not supported")
-
-                # Cascaded post refinement of the masks (disabled by default in Geti VPS)
-                if not apply_masks_refinement:
-                    best_idx = np.argmax(scores)
-                    final_mask = masks[best_idx]
-                else:
-                    final_mask, masks, scores = self.post_refinement(
-                        low_res_logits, point_coords, point_labels
-                    )
-
-                all_masks[class_idx].append(final_mask)
-                all_scores[class_idx].append(scores)
-                final_point_prompts[class_idx].append([x, y, score])
-
-        # TODO check overlapping areas of label masks ( see model_api ._inspect_overlapping_areas)
-        _inspect_overlapping_areas(all_masks, final_point_prompts)
-
-        for label in final_point_prompts:
-            final_point_prompts[label] = np.array(final_point_prompts[label])
-            prediction[label] = PredictedMask(
-                mask=all_masks[label],
-                points=final_point_prompts[label][:, :2],
-                scores=final_point_prompts[label][:, 2],
-            )
-
-        if dev:
-            return ZSLVisualPromptingResult(prediction), None
-        return ZSLVisualPromptingResult(prediction)
-
-    def post_refinement(self, logits, topk_xy, topk_label):
+        Returns:
+            final_mask: refined mask
+            masks: all masks
+            final_score: score of the refined mask
+        """
         best_idx = 0
         # Cascaded Post-refinement-1
         masks, scores, logits, *_ = self.model.predict(
-            point_coords=topk_xy,
-            point_labels=topk_label,
+            point_coords=point_coordinates,
+            point_labels=point_labels,
             mask_input=logits[best_idx : best_idx + 1, :, :],
             multimask_output=True,
         )
@@ -309,8 +316,8 @@ class PerSamPredictor:
         y_max = y.max()
         input_box = np.array([x_min, y_min, x_max, y_max])
         masks, scores, logits, *_ = self.model.predict(
-            point_coords=topk_xy,
-            point_labels=topk_label,
+            point_coords=point_coordinates,
+            point_labels=point_labels,
             box=input_box[None, :],
             mask_input=logits[best_idx : best_idx + 1, :, :],
             multimask_output=True,
@@ -319,138 +326,152 @@ class PerSamPredictor:
         final_mask = masks[best_idx]
         final_score = scores[best_idx]
         return final_mask, masks, final_score
+    
+    def predict_masks_point_by_point(self, point_prompt_candidates: np.array, bg_points: np.array, apply_masks_refinement: bool = True, attn_sim: torch.Tensor | None = None, target_guided_embedding: torch.Tensor | None = None): 
+        """
+        Generate masks based on the provided point prompts. This method predicts a mask for each point but filters out points that lie in a previously found mask.
+        It does not supply the decoder with multiple points at the same time. This is the implementation in ModelAPI.
+
+        Args:
+            point_prompt_candidates: list of point prompts (x, y, score) 
+            bg_points: list of background points (x, y, score)
+            apply_masks_refinement: whether to apply masks refinement
+            attn_sim: similarity tensor for target-guided attention
+            target_guided_embedding: target embedding for target-guided attention
+
+        Returns:
+            all_masks: list of masks
+            final_point_prompts: list of used point prompts (x, y, score)
+        """
+        final_point_prompts = []
+        all_masks = []
 
 
-def run_per_segment_anything(
-    model: SamPredictor,
-    sample: Series,
-    output_root: str,
-    post_refinement=True,
-    show=False,
-    save=False,
-) -> tuple[plt.Figure, float, float, float]:
-    ref_image = cv2.cvtColor(cv2.imread(sample.reference_image), cv2.COLOR_BGR2RGB)
-    ref_mask = cv2.cvtColor(cv2.imread(sample.reference_mask), cv2.COLOR_BGR2RGB)
-    test_image = cv2.cvtColor(cv2.imread(sample.target_image), cv2.COLOR_BGR2RGB)
-    gt_mask = cv2.cvtColor(cv2.imread(sample.target_mask), cv2.COLOR_BGR2RGB)
+        # TODO: We are passing one point each time in the decoder, we should pass multiple points at once to increase performance
+        #   This requires some filtering before hand. See the Matcher AutomaticMaskGenerator for reference of good postprocessing
 
-    # Image features encoding
-    ref_mask = model.set_image(ref_image, ref_mask)
-    ref_feat = model.features.squeeze().permute(1, 2, 0)
+        for i, (x, y, score) in enumerate(point_prompt_candidates):
+            # remove points with very low confidence
+            if score in [-1.0, 0.0]:
+                continue
+            # filter out points that lie inside a previously found mask
+            is_done = False
+            for predicted_mask in all_masks:
+                if predicted_mask[int(y), int(x)] > 0:
+                    is_done = True
+                    break
+            if is_done:
+                continue
 
-    ref_mask = F.interpolate(ref_mask, size=ref_feat.shape[0:2], mode="bilinear")
-    ref_mask = ref_mask.squeeze()[0]
-
-    # Target feature extraction
-    #  TODO original code mixes the terms target and test. Need to clarify
-    target_feat = ref_feat[ref_mask > 0]
-    target_embedding = target_feat.mean(0).unsqueeze(0)
-    target_feat = target_embedding / target_embedding.norm(dim=-1, keepdim=True)
-    target_embedding = target_embedding.unsqueeze(0)
-
-    # Image feature encoding
-    model.set_image(test_image)
-    test_feat = model.features.squeeze()
-
-    # Cosine similarity
-    C, h, w = test_feat.shape
-    test_feat = test_feat / test_feat.norm(dim=0, keepdim=True)
-    test_feat = test_feat.reshape(C, h * w)
-    sim = target_feat @ test_feat
-
-    sim = sim.reshape(1, 1, h, w)
-    sim = F.interpolate(sim, scale_factor=4, mode="bilinear")
-    sim = model.model.postprocess_masks(
-        sim, input_size=model.input_size, original_size=model.original_size
-    ).squeeze()
-
-    # Positive-negative location prior
-    topk_xy_i, topk_label_i, last_xy_i, last_label_i = (
-        PersonalizeSAM.persam.point_selection(sim, topk=1)
-    )
-    topk_xy = np.concatenate([topk_xy_i, last_xy_i], axis=0)
-    topk_label = np.concatenate([topk_label_i, last_label_i], axis=0)
-
-    # Obtain the target guidance for cross-attention layers
-    sim = (sim - sim.mean()) / torch.std(sim)
-    sim = F.interpolate(sim.unsqueeze(0).unsqueeze(0), size=(64, 64), mode="bilinear")
-    attn_sim = sim.sigmoid_().unsqueeze(0).flatten(3)
-
-    # First-step prediction
-    masks, scores, logits, *_ = model.predict(
-        point_coords=topk_xy,
-        point_labels=topk_label,
-        multimask_output=False,
-        attn_sim=attn_sim,  # Target-guided Attention
-        target_embedding=target_embedding,  # Target-semantic Prompting
-    )
-
-    if not post_refinement:
-        best_idx = np.argmax(scores)
-        final_mask = masks[best_idx]
-    else:
-        best_idx = 0
-
-        # Cascaded Post-refinement-1
-        masks, scores, logits, *_ = model.predict(
-            point_coords=topk_xy,
-            point_labels=topk_label,
-            mask_input=logits[best_idx : best_idx + 1, :, :],
-            multimask_output=True,
-        )
-        best_idx = np.argmax(scores)
-
-        # Cascaded Post-refinement-2
-        y, x = np.nonzero(masks[best_idx])
-        x_min = x.min()
-        x_max = x.max()
-        y_min = y.min()
-        y_max = y.max()
-        input_box = np.array([x_min, y_min, x_max, y_max])
-        masks, scores, logits, *_ = model.predict(
-            point_coords=topk_xy,
-            point_labels=topk_label,
-            box=input_box[None, :],
-            mask_input=logits[best_idx : best_idx + 1, :, :],
-            multimask_output=True,
-        )
-        best_idx = np.argmax(scores)
-        final_mask = masks[best_idx]
-
-    # compute IOU
-    final_mask = np.uint8(final_mask > 0)
-    gt_mask = np.uint8(gt_mask[:, :, 0] > 0)
-    intersection, union, area_target = intersectionAndUnion(final_mask, gt_mask)
-    sample_iou = intersection / (union + 1e-10)
-    sample_accuracy = intersection / (area_target + 1e-10)
-
-    if save:
-        # Save and show masks
-        output_path = os.path.join(output_root, sample.obj_name)
-        if not os.path.exists(output_path):
-            os.mkdir(output_path)
-        fig = plt.figure(figsize=(10, 10))
-        plt.imshow(test_image)
-        PersonalizeSAM.show.show_mask(masks[best_idx], plt.gca())
-        PersonalizeSAM.show.show_points(topk_xy, topk_label, plt.gca())
-        plt.title(
-            f"Mask {best_idx}, iou {sample_iou:.2f}, acc {sample_accuracy:.2f}",
-            fontsize=18,
-        )
-        plt.axis("off")
-        if save:
-            filename_without_ext = sample.file_name.split(".")[0]
-            vis_mask_output_path = os.path.join(
-                output_path, f"vis_mask_{filename_without_ext}.jpg"
+            point_coords = np.concatenate(
+                (np.array([[x, y]]), bg_points),
+                axis=0,
+                dtype=np.float32,
             )
-            with open(vis_mask_output_path, "wb") as outfile:
-                plt.savefig(outfile, format="jpg")
-        if show:
-            plt.show()
+            point_labels = np.array([1] + [0] * len(bg_points), dtype=np.float32)
 
-        return fig, intersection, union, area_target
-    else:
-        return None, intersection, union, area_target
+            # predict the masks based on the points
+            if isinstance(self.model, SamPredictor):
+                masks, scores, low_res_logits, *_ = self.model.predict(
+                    point_coords=point_coords,
+                    point_labels=point_labels,
+                    multimask_output=False,
+                    attn_sim=attn_sim,  # Target-guided Attention (not in model api)
+                    target_embedding=target_guided_embedding,  # Target-semantic Prompting (not in model api)
+                )
+            elif isinstance(self.model, EfficientViTSamPredictor):
+                masks, scores, low_res_logits = self.model.predict(
+                    point_coords=point_coords,
+                    point_labels=point_labels,
+                    multimask_output=False,
+                )
+            else:
+                raise NotImplementedError("Model not supported")
+
+            # Cascaded post refinement of the masks (disabled by default in Geti VPS)
+            if not apply_masks_refinement:
+                best_idx = np.argmax(scores)
+                final_mask = masks[best_idx]
+            else:
+                final_mask, masks, scores = self.post_refinement(
+                    low_res_logits, point_coords, point_labels
+                )
+
+            all_masks.append(final_mask)
+            final_point_prompts.append([x, y, score])
+
+        return all_masks, final_point_prompts
+
+
+    
+def prepare_target_guided_prompting(sim: torch.Tensor, reference_features: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Prepare target guided prompting for the decoder. Produces attention similarity and target embedding for the decoder.
+    This technique is used in Per-Segment-Anything and can improve the performance of the decoder by providing additional information.
+    Note that not all backbones support this technique.
+
+    Args:
+        sim: similarity tensor
+        reference_features: reference features tensor
+
+    Returns:
+        attention_similarity: attention similarity tensor
+        reference_features: reference features tensor
+    """
+    # For multiple similarity masks (e.g. Part-level features), we take the mean of the similarity maps
+    if len(sim.shape) == 3:
+        sim = sim.mean(dim=0)
+    
+    sim = (sim - sim.mean()) / torch.std(sim)
+    sim = F.interpolate(
+        sim.unsqueeze(0).unsqueeze(0), size=(64, 64), mode="bilinear"
+    )   
+    attention_similarity = sim.sigmoid_().unsqueeze(0).flatten(3)
+
+    # For multiple reference features (e.g. Part-level features), we take the mean of the reference features
+    if len(reference_features.shape) == 2:
+        reference_features = reference_features.mean(0).unsqueeze(0)
+    return attention_similarity, reference_features
+
+
+def cluster_features(
+    reference_features: torch.Tensor, n_clusters: int = 8
+) -> torch.Tensor:
+    """Create part-level features from reference features.
+    This performs a k-means++ clustering on the reference features and takes the centroid as prototype.
+    Resulting part-level features are normalized to unit length.
+    If n_clusters is 1, the mean of the reference features is taken as prototype.
+
+    Args:
+        reference_features: Reference features tensor [X, 256]
+        n_clusters: Number of clusters to create (e.g. number of part-level-features)
+
+    Returns:
+        Part-level features tensor [n_clusters, 256]
+    """
+    if n_clusters == 1:
+        part_level_features = reference_features.mean(0).unsqueeze(0)
+        part_level_features = part_level_features / part_level_features.norm(
+            dim=-1, keepdim=True
+        )
+        return part_level_features.unsqueeze(0)  # 1, 256
+
+    features_np = reference_features.cpu().numpy()
+    kmeans = KMeans(n_clusters=n_clusters, init="k-means++", random_state=0)
+    cluster = kmeans.fit_predict(features_np)
+    part_level_features = []
+    for c in range(n_clusters):
+        # use centroid of cluster as prototype
+        part_level_feature = features_np[cluster == c].mean(axis=0)
+        part_level_feature = part_level_feature / np.linalg.norm(
+            part_level_feature, axis=-1, keepdims=True
+        )
+        part_level_features.append(torch.from_numpy(part_level_feature))
+    part_level_features = torch.stack(
+        part_level_features, dim=0
+    ).cuda()  # [n_clusters, 256]
+    return part_level_features
+
 
 def load_model(
     sam_name="SAM", algo_name="Personalized SAM"
