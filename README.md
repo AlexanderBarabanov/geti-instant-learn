@@ -57,6 +57,12 @@ Install custom backbones:
 pip install -e efficientvit
 ```
 
+Install xFormers for efficient attention:
+Note that this depends on torch 2.5.1 and cuda 12.4
+```
+pip install -U xformers --index-url https://download.pytorch.org/whl/cu124
+```
+
 
 ## Run
 

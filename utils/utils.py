@@ -4,119 +4,18 @@ from typing import List, Dict
 
 import numpy as np
 import ot
-import pandas as pd
+from matplotlib import pyplot as plt
+from typing import Union
+from torch.nn import functional as F
+from sklearn.cluster import KMeans
 import cv2
 import torch
-import matplotlib.pyplot as plt
 import umap
 from sklearn.manifold import TSNE
 
 from model_api.models import Prompt
-from utils.constants import DATA_PATH
 from model_api.models.result_types.visual_prompting import PredictedMask
 from model_api.models.visual_prompting import VisualPromptingFeatures, _draw_points
-
-DATAFRAME_COLUMNS = ["class_name", "file_name", "image", "mask_image", "frame"]
-
-
-def load_dataset(dataset_name: str) -> pd.DataFrame:
-    if dataset_name == "PerSeg":
-        return load_perseg_data()
-    elif dataset_name == "DAVIS":
-        return load_davis_data()
-
-
-def load_perseg_data() -> pd.DataFrame:
-    images_path = os.path.join(DATA_PATH, "PerSeg", "Images")
-    annotations_path = os.path.join(DATA_PATH, "PerSeg", "Annotations")
-
-    data = pd.DataFrame(columns=DATAFRAME_COLUMNS)
-
-    for class_name in os.listdir(images_path):
-        if ".DS" in class_name:
-            continue
-
-        for file_name in os.listdir(os.path.join(images_path, class_name)):
-            if ".DS" in file_name:
-                continue
-
-            frame = int(file_name[:-4])  # Remove .jpg and convert to int
-
-            data = pd.concat(
-                [
-                    data,
-                    pd.DataFrame(
-                        [
-                            {
-                                "class_name": class_name,
-                                "file_name": file_name,
-                                "image": os.path.join(
-                                    images_path, class_name, file_name
-                                ),
-                                "mask_image": os.path.join(
-                                    annotations_path,
-                                    class_name,
-                                    file_name[:-4] + ".png",
-                                ),
-                                "frame": frame,
-                            }
-                        ]
-                    ),
-                ],
-                ignore_index=True,
-            )
-
-    # sort on class_name and frame
-    data.sort_values(by=["class_name", "frame"], inplace=True)
-    return data
-
-
-def load_davis_data() -> pd.DataFrame:
-    """Load DAVIS dataset into a pandas DataFrame.
-    Returns DataFrame with columns: class_name, file_name, image, mask_image, frame
-    """
-    images_path = os.path.join(DATA_PATH, "DAVIS" "JPEGImages", "480p")
-    annotations_path = os.path.join(DATA_PATH, "DAVIS", "Annotations", "480p")
-    imagesets_path = os.path.join(DATA_PATH, "DAVIS", "ImageSets", "2017", "val.txt")
-
-    data = pd.DataFrame(columns=DATAFRAME_COLUMNS)
-
-    with open(imagesets_path, "r") as f:
-        sequences = [x.strip() for x in f.readlines()]
-
-    for sequence in sequences:
-        frames = sorted(os.listdir(os.path.join(images_path, sequence)))
-
-        for frame in frames:
-            if frame.endswith(".jpg"):
-                frame_id = frame[:-4]  # Remove .jpg extension
-                mask_file = frame_id + ".png"
-
-                frame_number = int(frame_id)
-
-                data = pd.concat(
-                    [
-                        data,
-                        pd.DataFrame(
-                            [
-                                {
-                                    "class_name": sequence,
-                                    "file_name": frame,
-                                    "image": os.path.join(images_path, sequence, frame),
-                                    "mask_image": os.path.join(
-                                        annotations_path, sequence, mask_file
-                                    ),
-                                    "frame": frame_number,
-                                }
-                            ]
-                        ),
-                    ],
-                    ignore_index=True,
-                )
-
-    # Sort by class_name and frame
-    data.sort_values(by=["class_name", "frame"], inplace=True)
-    return data
 
 
 def mask_image_to_polygon_prompts(mask_image: np.array) -> List[Prompt]:
@@ -158,6 +57,88 @@ def transform_mask_prompts_to_dict(prompts: List[Prompt]) -> Dict[int, np.array]
         mask = prompt.data
         result[label] = mask
     return result
+
+
+def prepare_target_guided_prompting(
+    sim: torch.Tensor, reference_features: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Prepare target guided prompting for the decoder. Produces attention similarity and target embedding for the decoder.
+    This technique is used in Per-Segment-Anything and can improve the performance of the decoder by providing additional information.
+    Note that not all backbones support this technique.
+
+    Args:
+        sim: similarity tensor
+        reference_features: reference features tensor
+
+    Returns:
+        attention_similarity: attention similarity tensor
+        reference_features: reference features tensor
+    """
+    # For multiple similarity masks (e.g. Part-level features), we take the mean of the similarity maps
+    if len(sim.shape) == 3:
+        sim = sim.mean(dim=0)
+
+    sim = (sim - sim.mean()) / torch.std(sim)
+    sim = F.interpolate(sim.unsqueeze(0).unsqueeze(0), size=(64, 64), mode="bilinear")
+    attention_similarity = sim.sigmoid_().unsqueeze(0).flatten(3)
+
+    # For multiple reference features (e.g. Part-level features), we take the mean of the reference features
+    if len(reference_features.shape) == 2:
+        reference_features = reference_features.mean(0).unsqueeze(0)
+    return attention_similarity, reference_features
+
+
+def cluster_features(
+    reference_features: torch.Tensor, n_clusters: int = 8, visualize: bool = False
+) -> Union[torch.Tensor, tuple[torch.Tensor, plt.Figure]]:
+    """Create part-level features from reference features.
+    This performs a k-means++ clustering on the reference features and takes the centroid as prototype.
+    Resulting part-level features are normalized to unit length.
+    If n_clusters is 1, the mean of the reference features is taken as prototype.
+
+    Args:
+        reference_features: Reference features tensor [X, 256]
+        n_clusters: Number of clusters to create (e.g. number of part-level-features)
+        visualize: Whether to return UMAP visualization of features and clusters
+
+    Returns:
+        Part-level features tensor [n_clusters, 256] and optionally a matplotlib figure
+    """
+    if n_clusters == 1:
+        part_level_features = reference_features.mean(0).unsqueeze(0)
+        part_level_features = part_level_features / part_level_features.norm(
+            dim=-1, keepdim=True
+        )
+        return part_level_features.unsqueeze(0), None  # 1, 256
+
+    features_np = reference_features.cpu().numpy()
+    kmeans = KMeans(n_clusters=n_clusters, init="k-means++", random_state=0)
+    cluster = kmeans.fit_predict(features_np)
+    part_level_features = []
+
+    for c in range(n_clusters):
+        # use centroid of cluster as prototype
+        part_level_feature = features_np[cluster == c].mean(axis=0)
+        part_level_feature = part_level_feature / np.linalg.norm(
+            part_level_feature, axis=-1, keepdims=True
+        )
+        part_level_features.append(torch.from_numpy(part_level_feature))
+
+    part_level_features = torch.stack(
+        part_level_features, dim=0
+    ).cuda()  # [n_clusters, 256]
+
+    if visualize:
+        features_np = reference_features.cpu().numpy()
+        fig = visualize_feature_clusters(
+            features=features_np,
+            cluster_labels=cluster,
+            cluster_centers=kmeans.cluster_centers_,
+        )
+        return part_level_features, fig
+
+    return part_level_features, None
 
 
 def similarity_maps_to_visualization(

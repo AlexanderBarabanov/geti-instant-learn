@@ -1,49 +1,35 @@
-import os
 from collections import defaultdict
-from typing import Union
 
-from pandas import Series
-from sklearn.cluster import KMeans
-
-from constants import MAPI_DECODER_PATH, MAPI_ENCODER_PATH, MODEL_MAP
+from dinov2.models.vision_transformer import DinoVisionTransformer
 from efficientvit.models.efficientvit import EfficientViTSamPredictor, SamResize, SamPad
-from efficientvit.sam_model_zoo import create_efficientvit_sam_model
-from P2SAM.eval_utils import intersectionAndUnion
-import PersonalizeSAM.persam
-import PersonalizeSAM.show
 from PersonalizeSAM.per_segment_anything import SamPredictor
 import torch
-from matplotlib import pyplot as plt
 from torch.nn import functional as F
-import cv2
 import numpy as np
 
-from PersonalizeSAM.per_segment_anything import sam_model_registry
 from model_api.models import Prompt, PredictedMask, ZSLVisualPromptingResult
-from model_api.models.model import Model
 from model_api.models.visual_prompting import (
-    SAMLearnableVisualPrompter,
     VisualPromptingFeatures,
     _inspect_overlapping_areas,
     _point_selection,
 )
-from utils import (
+from utils.utils import (
+    cluster_features,
+    prepare_target_guided_prompting,
     similarity_maps_to_visualization,
     transform_point_prompts_to_dict,
     transform_mask_prompts_to_dict,
-    visualize_feature_clusters,
 )
 
 
 class PerSamPredictor:
     """Wrapper on top of the SAM model to make it inline with ModelAPI SAM Interface"""
 
-    def __init__(self, model: SamPredictor, algo_name: str = "Personalized SAM"):
+    def __init__(self, model: SamPredictor):
         self.grid_size = 64
         self.num_bg_points = 1
         self.threshold = 0.65
         self.model = model
-        self.algo_name = algo_name
         self.reference_features = {}
         self.reference_masks = {}
         self.highest_class_idx = 0  # num_classes  - 1
@@ -603,110 +589,11 @@ class PerSamPredictor:
         return all_masks, final_point_prompts
 
 
-def prepare_target_guided_prompting(
-    sim: torch.Tensor, reference_features: torch.Tensor
-) -> tuple[torch.Tensor, torch.Tensor]:
+class PerDinoPredictor(PerSamPredictor):
     """
-    Prepare target guided prompting for the decoder. Produces attention similarity and target embedding for the decoder.
-    This technique is used in Per-Segment-Anything and can improve the performance of the decoder by providing additional information.
-    Note that not all backbones support this technique.
-
-    Args:
-        sim: similarity tensor
-        reference_features: reference features tensor
-
-    Returns:
-        attention_similarity: attention similarity tensor
-        reference_features: reference features tensor
+    Use DinoV2 based patch features for matching instead of SAM features.
     """
-    # For multiple similarity masks (e.g. Part-level features), we take the mean of the similarity maps
-    if len(sim.shape) == 3:
-        sim = sim.mean(dim=0)
 
-    sim = (sim - sim.mean()) / torch.std(sim)
-    sim = F.interpolate(sim.unsqueeze(0).unsqueeze(0), size=(64, 64), mode="bilinear")
-    attention_similarity = sim.sigmoid_().unsqueeze(0).flatten(3)
-
-    # For multiple reference features (e.g. Part-level features), we take the mean of the reference features
-    if len(reference_features.shape) == 2:
-        reference_features = reference_features.mean(0).unsqueeze(0)
-    return attention_similarity, reference_features
-
-
-def cluster_features(
-    reference_features: torch.Tensor, n_clusters: int = 8, visualize: bool = False
-) -> Union[torch.Tensor, tuple[torch.Tensor, plt.Figure]]:
-    """Create part-level features from reference features.
-    This performs a k-means++ clustering on the reference features and takes the centroid as prototype.
-    Resulting part-level features are normalized to unit length.
-    If n_clusters is 1, the mean of the reference features is taken as prototype.
-
-    Args:
-        reference_features: Reference features tensor [X, 256]
-        n_clusters: Number of clusters to create (e.g. number of part-level-features)
-        visualize: Whether to return UMAP visualization of features and clusters
-
-    Returns:
-        Part-level features tensor [n_clusters, 256] and optionally a matplotlib figure
-    """
-    if n_clusters == 1:
-        part_level_features = reference_features.mean(0).unsqueeze(0)
-        part_level_features = part_level_features / part_level_features.norm(
-            dim=-1, keepdim=True
-        )
-        return part_level_features.unsqueeze(0)  # 1, 256
-
-    features_np = reference_features.cpu().numpy()
-    kmeans = KMeans(n_clusters=n_clusters, init="k-means++", random_state=0)
-    cluster = kmeans.fit_predict(features_np)
-    part_level_features = []
-
-    for c in range(n_clusters):
-        # use centroid of cluster as prototype
-        part_level_feature = features_np[cluster == c].mean(axis=0)
-        part_level_feature = part_level_feature / np.linalg.norm(
-            part_level_feature, axis=-1, keepdims=True
-        )
-        part_level_features.append(torch.from_numpy(part_level_feature))
-
-    part_level_features = torch.stack(
-        part_level_features, dim=0
-    ).cuda()  # [n_clusters, 256]
-
-    if visualize:
-        features_np = reference_features.cpu().numpy()
-        fig = visualize_feature_clusters(
-            features=features_np,
-            cluster_labels=cluster,
-            cluster_centers=kmeans.cluster_centers_,
-        )
-        return part_level_features, fig
-
-    return part_level_features, None
-
-
-def load_model(
-    sam_name="SAM", algo_name="Personalized SAM"
-) -> PerSamPredictor | SAMLearnableVisualPrompter:
-    if sam_name not in MODEL_MAP:
-        raise ValueError(f"Invalid model type: {sam_name}")
-
-    name, checkpoint_path = MODEL_MAP[sam_name]
-    if sam_name in ["SAM", "MobileSAM"]:
-        backbone = sam_model_registry[name](checkpoint=checkpoint_path).cuda()
-        backbone.eval()
-        backbone = SamPredictor(backbone)
-        return PerSamPredictor(backbone, algo_name)
-    elif sam_name == "EfficientViT-SAM":
-        backbone = create_efficientvit_sam_model(
-            name=name, weight_url=checkpoint_path
-        ).cuda()
-        backbone.eval()
-        backbone = EfficientViTSamPredictor(backbone)
-        return PerSamPredictor(backbone, algo_name)
-    elif sam_name == "MobileSAM-MAPI":
-        encoder = Model.create_model(MAPI_ENCODER_PATH)
-        decoder = Model.create_model(MAPI_DECODER_PATH)
-        return SAMLearnableVisualPrompter(encoder, decoder)
-    else:
-        raise NotImplementedError(f"Model {sam_name} not implemented yet")
+    def __init__(self, sam_model: SamPredictor, dino_model: DinoVisionTransformer):
+        super().__init__(sam_model)
+        self.dino = dino_model

@@ -7,15 +7,14 @@ import numpy as np
 import os
 
 from algorithms import load_model, PerSamPredictor
-from constants import MODEL_MAP
+from utils.constants import MODEL_MAP
 from model_api.models import (
     Prompt,
     Model,
     SAMLearnableVisualPrompter,
     ZSLVisualPromptingResult,
 )
-# from model_api.models.visual_prompting import SAMPartAwareLearnableVisualPrompter
-from constants import DATA_PATH
+from utils.constants import DATA_PATH
 
 
 def get_colors(n: int):
@@ -32,8 +31,19 @@ example_pairs = [
     },
     {
         "label": "Peanuts Example",
-        "reference": os.path.join(DATA_PATH, "data", "peanuts_coco", "train", "WIN_20220423_18_13_48_Pro_jpg.rf.2f7f31f6c6e102cab343008ab4f45b6f.jpg"),
-        "target": os.path.join(DATA_PATH, "peanuts_coco", "train", "WIN_20220502_18_31_01_Pro_jpg.rf.ef0644a70513801a980796f92d6046b1.jpg"),
+        "reference": os.path.join(
+            DATA_PATH,
+            "data",
+            "peanuts_coco",
+            "train",
+            "WIN_20220423_18_13_48_Pro_jpg.rf.2f7f31f6c6e102cab343008ab4f45b6f.jpg",
+        ),
+        "target": os.path.join(
+            DATA_PATH,
+            "peanuts_coco",
+            "train",
+            "WIN_20220502_18_31_01_Pro_jpg.rf.ef0644a70513801a980796f92d6046b1.jpg",
+        ),
     },
     {
         "label": "Potatoes1",
@@ -52,10 +62,13 @@ example_pairs = [
     },
     {
         "label": "Potato crops",
-        "reference": os.path.join(DATA_PATH, "potato_crops", "training", "PotatoPlant417.png"),
-        "target": os.path.join(DATA_PATH, "potato_crops", "training", "PotatoPlant1024.png"),
+        "reference": os.path.join(
+            DATA_PATH, "potato_crops", "training", "PotatoPlant417.png"
+        ),
+        "target": os.path.join(
+            DATA_PATH, "potato_crops", "training", "PotatoPlant1024.png"
+        ),
     },
-
 ]
 
 os.makedirs(DATA_PATH, exist_ok=True)
@@ -65,7 +78,7 @@ decoder_path = os.path.join(DATA_PATH, "otx_models", "sam_vit_b_zsl_decoder.xml"
 
 zsl_sam_prompter: (
     SAMLearnableVisualPrompter
-#    | SAMPartAwareLearnableVisualPrompter
+    #    | SAMPartAwareLearnableVisualPrompter
     | PerSamPredictor
     | None
 ) = None
@@ -150,9 +163,7 @@ def get_sam_output(
     )
     if reference_features is None or masks is None:
         return input_image, (target_img, "no reference mask"), []
-    result = zsl_sam_prompter.infer(
-        target_img, apply_masks_refinement=apply_refinement
-    )
+    result = zsl_sam_prompter.infer(target_img, apply_masks_refinement=apply_refinement)
 
     print(
         "shape of reference features after learning:",
