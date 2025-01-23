@@ -156,9 +156,8 @@ def transform_mask_prompts_to_dict(prompts: List[Prompt]) -> Dict[int, np.array]
 
 
 def save_visualization(
-    image: np.ndarray, mask, output_path: str, points=None, scores=None
+    image: np.ndarray, mask, visual_output, output_path: str, points=None, scores=None
 ) -> None:
-def save_visualization(image: np.ndarray, mask, visual_output, output_path: str, points=None, scores=None) -> None:
     """
     Save a visualization of the segmentation mask overlaid on the image.
 
