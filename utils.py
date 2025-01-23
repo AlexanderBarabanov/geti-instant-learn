@@ -207,7 +207,7 @@ def save_similarity_maps(
     sim_maps: torch.Tensor,
     class_idx: int,
     target_idx: int = 0,
-    output_dir: str = "output",
+    output_dir: str = "outputs",
     stacked: bool = False,
 ) -> None:
     """Save similarity maps to disk.
