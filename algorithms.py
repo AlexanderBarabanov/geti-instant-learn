@@ -383,6 +383,7 @@ class PerSamPredictor:
             )
             reference_mask = reference_mask.squeeze()[0]  # 64, 64
         elif isinstance(self.model, EfficientViTSamPredictor):
+            self.model.set_image(image)
             image_embedding = self.model.features.squeeze().permute(
                 1, 2, 0
             )  # 64, 64, 256
