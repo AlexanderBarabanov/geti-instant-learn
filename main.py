@@ -24,7 +24,7 @@ def get_arguments():
     parser.add_argument("--min-num-pos", type=int, default=1)
     parser.add_argument("--algo", type=str, default="persam", choices=ALGORITHMS)
     parser.add_argument(
-        "--num_priors",
+        "--n_shot",
         type=int,
         default=1,
         help="Number of prior images to use as references",
@@ -117,7 +117,7 @@ def predict_on_dataset(
         inference_time_meter = AverageMeter()
 
         class_samples = dataframe[dataframe.class_name == class_name]
-        priors = class_samples.head(args.num_priors)
+        priors = class_samples.head(args.n_shot)
         # select remaining images as target images but do not change the order of the dataframe
         targets = class_samples[~class_samples.index.isin(priors.index)]
 
@@ -150,7 +150,7 @@ def predict_on_dataset(
                     f"{output_path}/predictions/{class_name}/prior_{i}.png", overlay
                 )
 
-        if args.num_priors == 1:
+        if args.n_shot == 1:
             predictor.learn(
                 image=prior_images[0],
                 masks=prior_masks[0],
