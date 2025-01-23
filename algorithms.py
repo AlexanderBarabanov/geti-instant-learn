@@ -27,7 +27,7 @@ from model_api.models.visual_prompting import (
     _point_selection,
 )
 from utils import (
-    save_similarity_maps,
+    similarity_maps_to_visualization,
     transform_point_prompts_to_dict,
     transform_mask_prompts_to_dict,
 )
@@ -80,12 +80,12 @@ class PerSamPredictor:
                 self.reference_features[class_idx] = torch.cat(
                     [self.reference_features[class_idx], reference_features], dim=0
                 )
+                self.reference_masks[class_idx] = np.concatenate(
+                    [self.reference_masks[class_idx], mask[:, :, 0]], axis=0
+                )
             else:
                 self.reference_features[class_idx] = reference_features
-
-            self.reference_masks[class_idx] = mask[
-                :, :, 0
-            ]  # save this for visualization
+                self.reference_masks[class_idx] = mask[:, :, 0]
 
         if not self.reference_features:
             print("No reference features found. Please provide a larger reference mask")
@@ -172,6 +172,7 @@ class PerSamPredictor:
         sim_masks_per_class = {}
         attn_sim = None
         target_guided_embedding = None
+        visual_outputs: dict[str, dict[int, np.ndarray]] = defaultdict(dict)
 
         # Image feature encoding
         test_feat = self.get_image_embedding_sam(image)
@@ -199,17 +200,8 @@ class PerSamPredictor:
                     class_idx
                 ].unsqueeze(0)
 
-            # save all similarity maps on disk individually:
-            save_similarity_maps(
-                sim_masks_per_class[class_idx],
-                class_idx,
-                target_idx=0,
-                output_dir="output",
-                stacked=False,
-            )
-
             if selection_on_similarity_maps == "per-map":
-                for sim in sim_masks_per_class[class_idx]:
+                for idx, sim in enumerate(sim_masks_per_class[class_idx]):
                     point_prompt_candidates, bg_points = _point_selection(
                         mask_sim=sim.cpu().numpy(),  # numpy  H W  720 1280
                         original_shape=np.array(
@@ -223,23 +215,40 @@ class PerSamPredictor:
                         point_prompt_candidates
                     )
                     all_bg_prompts[class_idx].extend(bg_points)
+
+                    visual_outputs[f"similarity_{idx}"][class_idx] = (
+                        similarity_maps_to_visualization(
+                            sim,
+                            points=point_prompt_candidates,
+                            bg_points=bg_points,
+                        )
+                    )
             elif selection_on_similarity_maps == "stacked-maps":
+                visual_outputs["similarity"][class_idx] = (
+                    similarity_maps_to_visualization(
+                        sim_masks_per_class[class_idx],
+                    )
+                )
                 sim_masks_per_class[class_idx] = (
                     sim_masks_per_class[class_idx].mean(dim=0).squeeze().cpu().numpy()
-                )
-                save_similarity_maps(
-                    sim_masks_per_class[class_idx],
-                    class_idx,
-                    target_idx=0,
-                    stacked=True,
                 )
                 point_prompt_candidates, bg_points = _point_selection(
                     mask_sim=sim_masks_per_class[class_idx],
                     original_shape=np.array(self.model.original_size),
                     threshold=self.threshold,
                 )
-                all_point_prompt_candidates[class_idx].extend(point_prompt_candidates)
-                all_bg_prompts[class_idx].extend(bg_points)
+                if point_prompt_candidates is not None:
+                    all_point_prompt_candidates[class_idx].extend(
+                        point_prompt_candidates
+                    )
+                    all_bg_prompts[class_idx].extend(bg_points)
+                visual_outputs["similarity_stacked"][class_idx] = (
+                    similarity_maps_to_visualization(
+                        sim_masks_per_class[class_idx],
+                        points=point_prompt_candidates,
+                        bg_points=bg_points,
+                    )
+                )
 
             # Predict masks
             point_prompt_candidates = all_point_prompt_candidates[class_idx]
@@ -287,11 +296,15 @@ class PerSamPredictor:
             final_point_prompts[label] = np.array(final_point_prompts[label])
             prediction[label] = PredictedMask(
                 mask=all_masks[label],
-                points=final_point_prompts[label][:, :2],
-                scores=final_point_prompts[label][:, 2],
+                points=final_point_prompts[label][:, :2]
+                if len(final_point_prompts[label]) > 0
+                else np.array([]),
+                scores=final_point_prompts[label][:, 2]
+                if len(final_point_prompts[label]) > 0
+                else np.array([]),
             )
 
-        return ZSLVisualPromptingResult(prediction)
+        return ZSLVisualPromptingResult(prediction), visual_outputs
 
     def prepare_input(
         self,
@@ -534,9 +547,6 @@ class PerSamPredictor:
         """
         final_point_prompts = []
         all_masks = []
-
-        # TODO: We are passing one point each time in the decoder, we should pass multiple points at once to increase performance
-        #   This requires some filtering before hand. See the Matcher AutomaticMaskGenerator for reference of good postprocessing
 
         for i, (x, y, score) in enumerate(point_prompt_candidates):
             # remove points with very low confidence

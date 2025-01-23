@@ -11,7 +11,7 @@ from constants import *
 from P2SAM.eval_utils import AverageMeter, intersectionAndUnion
 from model_api.models.result_types.visual_prompting import ZSLVisualPromptingResult
 from model_api.models.visual_prompting import Prompt, SAMLearnableVisualPrompter
-from utils import load_dataset, save_visualization
+from utils import load_dataset, save_visualization, show_cosine_distance
 
 
 def get_arguments():
@@ -64,7 +64,9 @@ def get_arguments():
         "--overwrite", action="store_true", help="Overwrite existing output data"
     )
     parser.add_argument(
+        "--n_clusters",
         "--num_clusters",
+        dest="num_clusters",
         type=int,
         default=1,
         help="Number of clusters for PartAwareSAM, if 1 use mean of all features",
@@ -164,7 +166,7 @@ def predict_on_dataset(
                 show=args.show,
                 num_clusters=args.num_clusters,
             )
-
+        show_cosine_distance(predictor.reference_features)
         # predict on target images
         for row_idx, target in tqdm(
             targets.iterrows(),
@@ -178,7 +180,7 @@ def predict_on_dataset(
             gt_mask = cv2.cvtColor(cv2.imread(target.mask_image), cv2.COLOR_BGR2RGB)
 
             start_time = time.time()
-            result, visual_output = predictor.infer(
+            result, visual_outputs = predictor.infer(
                 image=target_image,
                 apply_masks_refinement=args.post_refinement,
                 target_guided_attention=args.target_guided_attention,
@@ -196,8 +198,8 @@ def predict_on_dataset(
             if args.save:
                 save_visualization(
                     image=target_image,
-                    mask=mask,
-                    visual_output=visual_output,
+                    masks_result=masks,
+                    visual_outputs=visual_outputs,
                     output_path=os.path.join(
                         output_path,
                         "predictions",

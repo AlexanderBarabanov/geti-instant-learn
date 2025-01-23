@@ -10,6 +10,8 @@ import torch
 
 from model_api.models import Prompt
 from constants import DATA_PATH
+from model_api.models.result_types.visual_prompting import PredictedMask
+from model_api.models.visual_prompting import VisualPromptingFeatures, _draw_points
 
 DATAFRAME_COLUMNS = ["class_name", "file_name", "image", "mask_image", "frame"]
 
@@ -155,8 +157,80 @@ def transform_mask_prompts_to_dict(prompts: List[Prompt]) -> Dict[int, np.array]
     return result
 
 
+def similarity_maps_to_visualization(
+    similarity_maps: np.ndarray | torch.Tensor,
+    points: np.ndarray | None = None,
+    bg_points: np.ndarray | None = None,
+) -> np.ndarray:
+    """
+    Convert similarity maps to visualization with optional point overlays.
+
+    Args:
+        similarity_maps: Either a 2D array (H,W) or 3D array (N,H,W) of similarity maps
+        points: Optional foreground points to visualize as white dots (N,2)
+        bg_points: Optional background points to visualize as red dots (N,2)
+    """
+    if isinstance(similarity_maps, torch.Tensor):
+        similarity_maps = similarity_maps.cpu().numpy()
+
+    if len(similarity_maps.shape) == 2:
+        # Handle single 2D similarity map
+        similarity = np.zeros((*similarity_maps.shape, 3), dtype=np.uint8)
+        similarity[:, :] = np.expand_dims(similarity_maps * 255, axis=2)
+
+        # Draw points if provided
+        if points is not None:
+            _draw_points(
+                similarity, points[:, 0], points[:, 1], size=15, color=(255, 255, 255)
+            )
+        if bg_points is not None:
+            _draw_points(
+                similarity, bg_points[:, 0], bg_points[:, 1], size=15, color=(0, 0, 255)
+            )
+    else:
+        # Handle stack of similarity maps - arrange horizontally
+        n_maps, height, width = similarity_maps.shape
+        # Create a wide image to hold all maps side by side
+        similarity = np.zeros((height, width * n_maps, 3), dtype=np.uint8)
+
+        for i in range(n_maps):
+            # Create individual map visualization
+            single_map = np.zeros((height, width, 3), dtype=np.uint8)
+            single_map[:, :] = np.expand_dims(similarity_maps[i] * 255, axis=2)
+
+            # Draw points on individual map if provided
+            if points is not None:
+                _draw_points(
+                    single_map,
+                    points[:, 0],
+                    points[:, 1],
+                    size=15,
+                    color=(255, 255, 255),
+                )
+            if bg_points is not None:
+                _draw_points(
+                    single_map,
+                    bg_points[:, 0],
+                    bg_points[:, 1],
+                    size=15,
+                    color=(0, 0, 255),
+                )
+
+            # Place the map with points in its position
+            start_x = i * width
+            end_x = (i + 1) * width
+            similarity[:, start_x:end_x] = single_map
+
+    return similarity
+
+
 def save_visualization(
-    image: np.ndarray, mask, visual_output, output_path: str, points=None, scores=None
+    image: np.ndarray,
+    masks_result: PredictedMask,
+    visual_outputs: dict[str, dict[int, np.ndarray]],
+    output_path: str,
+    points=None,
+    scores=None,
 ) -> None:
     """
     Save a visualization of the segmentation mask overlaid on the image.
@@ -172,11 +246,17 @@ def save_visualization(
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     # Get unique colors for each instance mask
-    mask_colors = get_colors(len(mask.mask))
+    mask_colors = get_colors(len(masks_result.mask))
     image_vis = image.copy()
 
+    # Create visualization output
+    base = os.path.splitext(output_path)[0]
+    for name, data in visual_outputs.items():
+        fn = f"{base}_{name}.png"
+        cv2.imwrite(fn, data[0])
+
     # Draw each instance mask with a different color
-    for i, instance in enumerate(mask.mask):
+    for i, instance in enumerate(masks_result.mask):
         masked_img = np.where(instance[..., None], mask_colors[i], image_vis)
         image_vis = cv2.addWeighted(image_vis, 0.2, masked_img, 0.8, 0)
 
@@ -204,42 +284,55 @@ def save_visualization(
     cv2.imwrite(output_path, cv2.cvtColor(image_vis, cv2.COLOR_RGB2BGR))
 
 
-def save_similarity_maps(
-    sim_maps: torch.Tensor,
-    class_idx: int,
-    target_idx: int = 0,
-    output_dir: str = "outputs",
-    stacked: bool = False,
-) -> None:
-    """Save similarity maps to disk.
+def show_cosine_distance(reference_features: dict[int, torch.Tensor]) -> None:
+    """
+    Show pair wise cosine distance between reference features for each class in a formatted table.
 
     Args:
-        sim_maps: Similarity maps tensor
-        class_idx: Class index
-        target_idx: Target image index
-        output_dir: Output directory for saving maps
-        stacked: Whether the maps are stacked (averaged) or individual
+        reference_features: Dictionary mapping class labels to their reference features tensors
     """
-    os.makedirs(output_dir, exist_ok=True)
+    if isinstance(reference_features, VisualPromptingFeatures):
+        # modelAPI does not support multiple reference features
+        return
 
-    if stacked:
-        # Handle single stacked similarity map
-        similarity = np.zeros((*sim_maps.shape, 3), dtype=np.uint8)
-        similarity[:, :] = np.expand_dims(sim_maps * 255, axis=2)
-        filename = os.path.join(
-            output_dir, f"similarity_stacked_class{class_idx}_target{target_idx}.jpg"
-        )
-        cv2.imwrite(filename, similarity)
-    else:
-        # Handle individual similarity maps
-        for idx, sim in enumerate(sim_maps):
-            similarity = np.zeros((*sim.shape, 3), dtype=np.uint8)
-            similarity[:, :] = np.expand_dims(sim.cpu().numpy() * 255, axis=2)
-            filename = os.path.join(
-                output_dir,
-                f"similarity_class{class_idx}_part{idx}_target{target_idx}.jpg",
-            )
-            cv2.imwrite(filename, similarity)
+    for label, features in reference_features.items():
+        if features.shape[0] > 1:
+            n_features = features.shape[0]
+            high_similarity_found = False
+
+            # Print header with class label
+            print(f"\nCosine Similarity Matrix for class {label} reference features:")
+            print("-" * 50)
+            header = "    " + "".join(f"  [{i}]  " for i in range(n_features))
+            print(header)
+            print("-" * 50)
+
+            # Print similarity matrix
+            for i in range(n_features):
+                row = f"[{i}]"
+                for j in range(n_features):
+                    if j < i:
+                        sim = torch.nn.functional.cosine_similarity(
+                            features[i].squeeze(),
+                            features[j].squeeze(),
+                            dim=0,
+                        ).item()
+                        if sim > 0.9:
+                            high_similarity_found = True
+                        row += f" {sim:6.3f}"
+                    elif j == i:
+                        row += "  1.000"
+                    else:
+                        row += "      -"
+                print(row)
+            print("-" * 50)
+
+            if high_similarity_found:
+                print("\nWarning: Some reference features have similarity > 0.9")
+                print(
+                    "This indicates very similar semantic information between points,"
+                )
+                print("which might not contribute to better performance.")
 
 
 def _compute_wasserstein_distance(a, b, weights=None) -> float:
