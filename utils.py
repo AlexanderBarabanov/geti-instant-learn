@@ -6,6 +6,7 @@ import numpy as np
 import ot
 import pandas as pd
 import cv2
+import torch
 
 from model_api.models import Prompt
 from constants import DATA_PATH
@@ -200,6 +201,44 @@ def save_visualization(
 
     # Save visualization
     cv2.imwrite(output_path, cv2.cvtColor(image_vis, cv2.COLOR_RGB2BGR))
+
+
+def save_similarity_maps(
+    sim_maps: torch.Tensor,
+    class_idx: int,
+    target_idx: int = 0,
+    output_dir: str = "output",
+    stacked: bool = False,
+) -> None:
+    """Save similarity maps to disk.
+
+    Args:
+        sim_maps: Similarity maps tensor
+        class_idx: Class index
+        target_idx: Target image index
+        output_dir: Output directory for saving maps
+        stacked: Whether the maps are stacked (averaged) or individual
+    """
+    os.makedirs(output_dir, exist_ok=True)
+
+    if stacked:
+        # Handle single stacked similarity map
+        similarity = np.zeros((*sim_maps.shape, 3), dtype=np.uint8)
+        similarity[:, :] = np.expand_dims(sim_maps * 255, axis=2)
+        filename = os.path.join(
+            output_dir, f"similarity_stacked_class{class_idx}_target{target_idx}.jpg"
+        )
+        cv2.imwrite(filename, similarity)
+    else:
+        # Handle individual similarity maps
+        for idx, sim in enumerate(sim_maps):
+            similarity = np.zeros((*sim.shape, 3), dtype=np.uint8)
+            similarity[:, :] = np.expand_dims(sim.cpu().numpy() * 255, axis=2)
+            filename = os.path.join(
+                output_dir,
+                f"similarity_class{class_idx}_part{idx}_target{target_idx}.jpg",
+            )
+            cv2.imwrite(filename, similarity)
 
 
 def _compute_wasserstein_distance(a, b, weights=None) -> float:

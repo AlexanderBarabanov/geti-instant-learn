@@ -46,6 +46,13 @@ def get_arguments():
         help="Mask generation method",
     )
     parser.add_argument(
+        "--selection_on_similarity_maps",
+        type=str,
+        default="per-map",
+        choices=["per-map", "stacked-maps"],
+        help="Apply point selection on each similarity map or stack and reduce maps to one first.",
+    )
+    parser.add_argument(
         "--target_guided_attention",
         action="store_true",
         help="Use target guided attention for the SAM model. This passes the target similarity matrix and reference features to the decoder",
@@ -126,7 +133,7 @@ def predict_on_dataset(
                 label=0, data=mask_image
             )  # TODO only single class per image is supported for now
             prior_images.append(image)
-            prior_masks.append(mask_prompt)
+            prior_masks.append([mask_prompt])
 
         if args.save:
             # save prior images and masks to disk, on top of each other
@@ -135,7 +142,7 @@ def predict_on_dataset(
             )
             for i, (image, mask) in enumerate(zip(prior_images, prior_masks)):
                 mask = np.where(
-                    mask.data > 0, 255, mask.data
+                    mask[0].data > 0, 255, mask[0].data
                 )  # for better visualization
                 overlay = cv2.addWeighted(image, 0.7, mask, 0.3, 0)
                 overlay = cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR)
@@ -143,13 +150,20 @@ def predict_on_dataset(
                     f"{output_path}/predictions/{class_name}/prior_{i}.png", overlay
                 )
 
-        # TODO currently multiple priors is not yet implemented
-        predictor.learn(
-            image=prior_images[0],
-            masks=prior_masks,
-            show=args.show,
-            num_clusters=args.num_clusters,
-        )
+        if args.num_priors == 1:
+            predictor.learn(
+                image=prior_images[0],
+                masks=prior_masks[0],
+                show=args.show,
+                num_clusters=args.num_clusters,
+            )
+        else:
+            predictor.few_shot_learn(
+                images=prior_images,
+                masks=prior_masks,
+                show=args.show,
+                num_clusters=args.num_clusters,
+            )
 
         # predict on target images
         for row_idx, target in tqdm(
@@ -169,6 +183,7 @@ def predict_on_dataset(
                 apply_masks_refinement=args.post_refinement,
                 target_guided_attention=args.target_guided_attention,
                 mask_generation_method=args.mask_generation_method,
+                selection_on_similarity_maps=args.selection_on_similarity_maps,
             )
             inference_time_meter.update(time.time() - start_time)
 
