@@ -1,3 +1,7 @@
+# ruff: noqa: E402
+import warnings
+
+warnings.filterwarnings("ignore", category=FutureWarning)
 import argparse
 import os
 import shutil
@@ -6,12 +10,13 @@ import cv2
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from algorithms import PerSamPredictor, load_model
-from constants import *
+from algorithms import PerDinoPredictor, PerSamPredictor
+from utils.constants import MODEL_MAP, DATASETS, ALGORITHMS
 from P2SAM.eval_utils import AverageMeter, intersectionAndUnion
-from model_api.models.result_types.visual_prompting import ZSLVisualPromptingResult
 from model_api.models.visual_prompting import Prompt, SAMLearnableVisualPrompter
-from utils import load_dataset, save_visualization, show_cosine_distance
+from utils.models import load_model
+from utils.utils import save_visualization, show_cosine_distance
+from utils.data import load_dataset
 
 
 def get_arguments():
@@ -22,7 +27,7 @@ def get_arguments():
     )
     parser.add_argument("--max-num-pos", type=int, default=1)
     parser.add_argument("--min-num-pos", type=int, default=1)
-    parser.add_argument("--algo", type=str, default="persam", choices=ALGORITHMS)
+    parser.add_argument("--algo", type=str, default="PerSAM", choices=ALGORITHMS)
     parser.add_argument(
         "--n_shot",
         type=int,
@@ -77,7 +82,7 @@ def get_arguments():
 
 def predict_on_dataset(
     args: argparse.Namespace,
-    predictor: PerSamPredictor | SAMLearnableVisualPrompter,
+    predictor: PerSamPredictor | SAMLearnableVisualPrompter | PerDinoPredictor,
     dataframe: pd.DataFrame,
     model_name: str,
     algo_name: str,
