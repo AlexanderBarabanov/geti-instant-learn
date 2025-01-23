@@ -26,7 +26,11 @@ from model_api.models.visual_prompting import (
     _inspect_overlapping_areas,
     _point_selection,
 )
-from utils import transform_point_prompts_to_dict, transform_mask_prompts_to_dict
+from utils import (
+    save_similarity_maps,
+    transform_point_prompts_to_dict,
+    transform_mask_prompts_to_dict,
+)
 
 
 class PerSamPredictor:
@@ -70,7 +74,15 @@ class PerSamPredictor:
             # PerSAM: use average of all features.
             # P2SAM/PartAware: use k-means++ clustering to create num_clusters part-level features
             reference_features = cluster_features(reference_features, num_clusters)
-            self.reference_features[class_idx] = reference_features
+
+            # Accumulate features to allow for few-shot learning
+            if class_idx in self.reference_features:
+                self.reference_features[class_idx] = torch.cat(
+                    [self.reference_features[class_idx], reference_features], dim=0
+                )
+            else:
+                self.reference_features[class_idx] = reference_features
+
             self.reference_masks[class_idx] = mask[
                 :, :, 0
             ]  # save this for visualization
@@ -86,6 +98,62 @@ class PerSamPredictor:
             used_indices=np.array(self.reference_features.keys()),
         ), np.stack(list(self.reference_masks.values()))
 
+    def reset_reference_features(self):
+        """Reset all accumulated reference features and masks."""
+        self.reference_features = {}
+        self.reference_masks = {}
+        self.highest_class_idx = 0
+
+    def few_shot_learn(
+        self,
+        images: list[np.array],
+        boxes: list[list[Prompt]] | None = None,
+        points: list[list[Prompt]] | None = None,
+        polygons: list[list[Prompt]] | None = None,
+        masks: list[list[Prompt]] | None = None,
+        show: bool = False,
+        num_clusters: int = 1,
+    ) -> tuple[VisualPromptingFeatures, np.array]:
+        """Learn from multiple support images and their corresponding prompts.
+
+        Args:
+            images: List of support images
+            boxes: List of box prompts per image
+            points: List of point prompts per image
+            polygons: List of polygon prompts per image
+            masks: List of mask prompts per image
+            show: Whether to show debug visualizations
+            num_clusters: Number of clusters for feature clustering
+
+        Returns:
+            features: Combined features from all support images
+            masks: Stack of reference masks
+        """
+        self.reset_reference_features()
+
+        for i in range(len(images)):
+            current_boxes = boxes[i] if boxes is not None else None
+            current_points = points[i] if points is not None else None
+            current_polygons = polygons[i] if polygons is not None else None
+            current_masks = masks[i] if masks is not None else None
+
+            self.learn(
+                image=images[i],
+                boxes=current_boxes,
+                points=current_points,
+                polygons=current_polygons,
+                masks=current_masks,
+                show=show,
+                num_clusters=num_clusters,
+            )
+
+        return VisualPromptingFeatures(
+            feature_vectors=np.stack(
+                [v.cpu().numpy() for v in self.reference_features.values()]
+            ),
+            used_indices=np.array(self.reference_features.keys()),
+        ), np.stack(list(self.reference_masks.values()))
+
     def infer(
         self,
         image: np.array,
@@ -93,6 +161,7 @@ class PerSamPredictor:
         apply_masks_refinement: bool = True,
         target_guided_attention: bool = False,
         mask_generation_method: str = "point-by-point",
+        selection_on_similarity_maps: str = "per-map",
     ) -> ZSLVisualPromptingResult:
         prediction: dict[int, PredictedMask] = {}
         final_point_prompts: dict[int, list] = defaultdict(list)
@@ -129,14 +198,46 @@ class PerSamPredictor:
                 sim_masks_per_class[class_idx] = sim_masks_per_class[
                     class_idx
                 ].unsqueeze(0)
-            for sim in sim_masks_per_class[class_idx]:
+
+            # save all similarity maps on disk individually:
+            save_similarity_maps(
+                sim_masks_per_class[class_idx],
+                class_idx,
+                target_idx=0,
+                output_dir="output",
+                stacked=False,
+            )
+
+            if selection_on_similarity_maps == "per-map":
+                for sim in sim_masks_per_class[class_idx]:
+                    point_prompt_candidates, bg_points = _point_selection(
+                        mask_sim=sim.cpu().numpy(),  # numpy  H W  720 1280
+                        original_shape=np.array(
+                            self.model.original_size
+                        ),  # [ 720  1280]
+                        threshold=self.threshold,
+                    )
+                    if point_prompt_candidates is None:
+                        continue
+                    all_point_prompt_candidates[class_idx].extend(
+                        point_prompt_candidates
+                    )
+                    all_bg_prompts[class_idx].extend(bg_points)
+            elif selection_on_similarity_maps == "stacked-maps":
+                sim_masks_per_class[class_idx] = (
+                    sim_masks_per_class[class_idx].mean(dim=0).squeeze().cpu().numpy()
+                )
+                save_similarity_maps(
+                    sim_masks_per_class[class_idx],
+                    class_idx,
+                    target_idx=0,
+                    stacked=True,
+                )
                 point_prompt_candidates, bg_points = _point_selection(
-                    mask_sim=sim.cpu().numpy(),  # numpy  H W  720 1280
-                    original_shape=np.array(self.model.original_size),  # [ 720  1280]
+                    mask_sim=sim_masks_per_class[class_idx],
+                    original_shape=np.array(self.model.original_size),
                     threshold=self.threshold,
                 )
-                if point_prompt_candidates is None:
-                    continue
                 all_point_prompt_candidates[class_idx].extend(point_prompt_candidates)
                 all_bg_prompts[class_idx].extend(bg_points)
 
@@ -282,6 +383,7 @@ class PerSamPredictor:
             )
             reference_mask = reference_mask.squeeze()[0]  # 64, 64
         elif isinstance(self.model, EfficientViTSamPredictor):
+            self.model.set_image(image)
             image_embedding = self.model.features.squeeze().permute(
                 1, 2, 0
             )  # 64, 64, 256

@@ -24,7 +24,7 @@ def get_arguments():
     parser.add_argument("--min-num-pos", type=int, default=1)
     parser.add_argument("--algo", type=str, default="persam", choices=ALGORITHMS)
     parser.add_argument(
-        "--num_priors",
+        "--n_shot",
         type=int,
         default=1,
         help="Number of prior images to use as references",
@@ -44,6 +44,13 @@ def get_arguments():
         default="point-by-point",
         choices=["point-by-point", "one-go"],
         help="Mask generation method",
+    )
+    parser.add_argument(
+        "--selection_on_similarity_maps",
+        type=str,
+        default="per-map",
+        choices=["per-map", "stacked-maps"],
+        help="Apply point selection on each similarity map or stack and reduce maps to one first.",
     )
     parser.add_argument(
         "--target_guided_attention",
@@ -110,7 +117,7 @@ def predict_on_dataset(
         inference_time_meter = AverageMeter()
 
         class_samples = dataframe[dataframe.class_name == class_name]
-        priors = class_samples.head(args.num_priors)
+        priors = class_samples.head(args.n_shot)
         # select remaining images as target images but do not change the order of the dataframe
         targets = class_samples[~class_samples.index.isin(priors.index)]
 
@@ -126,7 +133,7 @@ def predict_on_dataset(
                 label=0, data=mask_image
             )  # TODO only single class per image is supported for now
             prior_images.append(image)
-            prior_masks.append(mask_prompt)
+            prior_masks.append([mask_prompt])
 
         if args.save:
             # save prior images and masks to disk, on top of each other
@@ -135,7 +142,7 @@ def predict_on_dataset(
             )
             for i, (image, mask) in enumerate(zip(prior_images, prior_masks)):
                 mask = np.where(
-                    mask.data > 0, 255, mask.data
+                    mask[0].data > 0, 255, mask[0].data
                 )  # for better visualization
                 overlay = cv2.addWeighted(image, 0.7, mask, 0.3, 0)
                 overlay = cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR)
@@ -143,13 +150,20 @@ def predict_on_dataset(
                     f"{output_path}/predictions/{class_name}/prior_{i}.png", overlay
                 )
 
-        # TODO currently multiple priors is not yet implemented
-        predictor.learn(
-            image=prior_images[0],
-            masks=prior_masks,
-            show=args.show,
-            num_clusters=args.num_clusters,
-        )
+        if args.n_shot == 1:
+            predictor.learn(
+                image=prior_images[0],
+                masks=prior_masks[0],
+                show=args.show,
+                num_clusters=args.num_clusters,
+            )
+        else:
+            predictor.few_shot_learn(
+                images=prior_images,
+                masks=prior_masks,
+                show=args.show,
+                num_clusters=args.num_clusters,
+            )
 
         # predict on target images
         for row_idx, target in tqdm(
@@ -169,6 +183,7 @@ def predict_on_dataset(
                 apply_masks_refinement=args.post_refinement,
                 target_guided_attention=args.target_guided_attention,
                 mask_generation_method=args.mask_generation_method,
+                selection_on_similarity_maps=args.selection_on_similarity_maps,
             )
             inference_time_meter.update(time.time() - start_time)
 
