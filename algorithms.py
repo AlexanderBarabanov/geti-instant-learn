@@ -1,5 +1,6 @@
 import os
 from collections import defaultdict
+from typing import Union
 
 from pandas import Series
 from sklearn.cluster import KMeans
@@ -30,6 +31,7 @@ from utils import (
     similarity_maps_to_visualization,
     transform_point_prompts_to_dict,
     transform_mask_prompts_to_dict,
+    visualize_feature_clusters,
 )
 
 
@@ -59,12 +61,6 @@ class PerSamPredictor:
         mask_per_class = self.prepare_input(image, masks, points, boxes, polygons)
 
         for class_idx, mask in mask_per_class.items():
-            if show:
-                fig = plt.figure(figsize=(10, 10))
-                plt.imshow(mask)
-                plt.show()
-                cv2.imwrite(f"reference_mask_{class_idx}.jpg", mask)
-
             image_embedding, reference_features = self.extract_reference_features(
                 mask, image
             )
@@ -73,7 +69,9 @@ class PerSamPredictor:
 
             # PerSAM: use average of all features.
             # P2SAM/PartAware: use k-means++ clustering to create num_clusters part-level features
-            reference_features = cluster_features(reference_features, num_clusters)
+            reference_features, umap_fig = cluster_features(
+                reference_features, num_clusters, visualize=show
+            )
 
             # Accumulate features to allow for few-shot learning
             if class_idx in self.reference_features:
@@ -91,12 +89,16 @@ class PerSamPredictor:
             print("No reference features found. Please provide a larger reference mask")
             return None, None
 
-        return VisualPromptingFeatures(
-            feature_vectors=np.stack(
-                [v.cpu().numpy() for v in self.reference_features.values()]
+        return (
+            VisualPromptingFeatures(
+                feature_vectors=np.stack(
+                    [v.cpu().numpy() for v in self.reference_features.values()]
+                ),
+                used_indices=np.array(self.reference_features.keys()),
             ),
-            used_indices=np.array(self.reference_features.keys()),
-        ), np.stack(list(self.reference_masks.values()))
+            np.stack(list(self.reference_masks.values())),
+            umap_fig,
+        )
 
     def reset_reference_features(self):
         """Reset all accumulated reference features and masks."""
@@ -632,8 +634,8 @@ def prepare_target_guided_prompting(
 
 
 def cluster_features(
-    reference_features: torch.Tensor, n_clusters: int = 8
-) -> torch.Tensor:
+    reference_features: torch.Tensor, n_clusters: int = 8, visualize: bool = False
+) -> Union[torch.Tensor, tuple[torch.Tensor, plt.Figure]]:
     """Create part-level features from reference features.
     This performs a k-means++ clustering on the reference features and takes the centroid as prototype.
     Resulting part-level features are normalized to unit length.
@@ -642,9 +644,10 @@ def cluster_features(
     Args:
         reference_features: Reference features tensor [X, 256]
         n_clusters: Number of clusters to create (e.g. number of part-level-features)
+        visualize: Whether to return UMAP visualization of features and clusters
 
     Returns:
-        Part-level features tensor [n_clusters, 256]
+        Part-level features tensor [n_clusters, 256] and optionally a matplotlib figure
     """
     if n_clusters == 1:
         part_level_features = reference_features.mean(0).unsqueeze(0)
@@ -657,6 +660,7 @@ def cluster_features(
     kmeans = KMeans(n_clusters=n_clusters, init="k-means++", random_state=0)
     cluster = kmeans.fit_predict(features_np)
     part_level_features = []
+
     for c in range(n_clusters):
         # use centroid of cluster as prototype
         part_level_feature = features_np[cluster == c].mean(axis=0)
@@ -664,10 +668,21 @@ def cluster_features(
             part_level_feature, axis=-1, keepdims=True
         )
         part_level_features.append(torch.from_numpy(part_level_feature))
+
     part_level_features = torch.stack(
         part_level_features, dim=0
     ).cuda()  # [n_clusters, 256]
-    return part_level_features
+
+    if visualize:
+        features_np = reference_features.cpu().numpy()
+        fig = visualize_feature_clusters(
+            features=features_np,
+            cluster_labels=cluster,
+            cluster_centers=kmeans.cluster_centers_,
+        )
+        return part_level_features, fig
+
+    return part_level_features, None
 
 
 def load_model(

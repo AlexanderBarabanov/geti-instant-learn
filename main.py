@@ -153,12 +153,16 @@ def predict_on_dataset(
                 )
 
         if args.n_shot == 1:
-            predictor.learn(
+            _, _, visual_output = predictor.learn(
                 image=prior_images[0],
                 masks=prior_masks[0],
                 show=args.show,
                 num_clusters=args.num_clusters,
             )
+            if visual_output:
+                visual_output.savefig(
+                    f"{output_path}/predictions/{class_name}/feature_clusters.png"
+                )
         else:
             predictor.few_shot_learn(
                 images=prior_images,

@@ -7,6 +7,9 @@ import ot
 import pandas as pd
 import cv2
 import torch
+import matplotlib.pyplot as plt
+import umap
+from sklearn.manifold import TSNE
 
 from model_api.models import Prompt
 from constants import DATA_PATH
@@ -355,3 +358,86 @@ def _compute_wasserstein_distance(a, b, weights=None) -> float:
     M = ot.dist(a, b)
     wasserstein_distance = ot.emd2(a_hist, b_hist, M, numItermax=10000000)
     return wasserstein_distance
+
+
+def visualize_feature_clusters(
+    features: np.ndarray, cluster_labels: np.ndarray, cluster_centers: np.ndarray
+) -> plt.Figure:
+    """
+    Create UMAP and t-SNE visualizations of feature clusters side by side.
+
+    Args:
+        features: Feature vectors to visualize [N, D]
+        cluster_labels: Cluster assignment for each feature [N]
+        cluster_centers: Cluster centroids [K, D]
+
+    Returns:
+        matplotlib Figure with UMAP and t-SNE visualizations
+    """
+    # Create figure with two subplots side by side
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
+
+    # UMAP embedding
+    reducer_umap = umap.UMAP(random_state=42)
+    embedding_umap = reducer_umap.fit_transform(features)
+    centroids_embedding_umap = reducer_umap.transform(cluster_centers)
+
+    # t-SNE embedding with adjusted perplexity
+    n_centers = len(cluster_centers)
+    perplexity = min(30, n_centers - 1)  # Ensure perplexity is less than n_samples
+    reducer_tsne = TSNE(random_state=42, perplexity=perplexity)
+    embedding_tsne = reducer_tsne.fit_transform(features)
+    centroids_embedding_tsne = reducer_tsne.fit_transform(cluster_centers)
+
+    # Plot UMAP
+    scatter1 = ax1.scatter(
+        embedding_umap[:, 0],
+        embedding_umap[:, 1],
+        c=cluster_labels,
+        cmap="tab10",
+        alpha=0.6,
+        s=100,
+    )
+    ax1.scatter(
+        centroids_embedding_umap[:, 0],
+        centroids_embedding_umap[:, 1],
+        marker="*",
+        s=300,
+        c=range(len(cluster_centers)),
+        cmap="tab10",
+        edgecolor="black",
+        linewidth=1.5,
+    )
+    ax1.set_title("UMAP projection")
+
+    # Plot t-SNE
+    scatter2 = ax2.scatter(
+        embedding_tsne[:, 0],
+        embedding_tsne[:, 1],
+        c=cluster_labels,
+        cmap="tab10",
+        alpha=0.6,
+        s=100,
+    )
+    ax2.scatter(
+        centroids_embedding_tsne[:, 0],
+        centroids_embedding_tsne[:, 1],
+        marker="*",
+        s=300,
+        c=range(len(cluster_centers)),
+        cmap="tab10",
+        edgecolor="black",
+        linewidth=1.5,
+    )
+    ax2.set_title("t-SNE projection")
+
+    # Add colorbar
+    plt.colorbar(scatter1, ax=ax1, label="Cluster")
+    plt.colorbar(scatter2, ax=ax2, label="Cluster")
+
+    fig.suptitle(
+        "Dimensionality reduction projections of reference features\nPoints colored by cluster, centroids shown as stars",
+        y=1.02,
+    )
+
+    return fig

@@ -322,7 +322,7 @@ class SAMLearnableVisualPrompter:
         self._used_indices = np.unique(self._used_indices)
 
         # transform the ref masks from (720,1280,3,1)  to (720,1280)
-        return self.reference_features, ref_masks
+        return self.reference_features, ref_masks, None
 
     def __call__(
         self,
