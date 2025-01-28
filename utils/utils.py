@@ -12,6 +12,7 @@ import cv2
 import torch
 import umap
 from sklearn.manifold import TSNE
+import random
 
 from model_api.models import Prompt
 from model_api.models.result_types.visual_prompting import PredictedMask
@@ -139,6 +140,20 @@ def cluster_features(
         return part_level_features, fig
 
     return part_level_features, None
+
+
+def cluster_points(points: np.ndarray, n_clusters: int = 8) -> np.ndarray:
+    """Cluster points using k-means++."""
+    if len(points) < n_clusters:
+        return points
+    kmeans = KMeans(n_clusters=n_clusters, init="k-means++", random_state=0)
+    cluster = kmeans.fit_predict(points)
+    # use centroid of cluster as prototype
+    prototypes = []
+    for c in range(n_clusters):
+        prototype = points[cluster == c].mean(axis=0)
+        prototypes.append(prototype)
+    return np.array(prototypes)
 
 
 def similarity_maps_to_visualization(
@@ -422,3 +437,97 @@ def visualize_feature_clusters(
     )
 
     return fig
+
+
+def generate_combinations(n: int, k: int) -> list[list[int]]:
+    """
+    Generate all possible k-combinations from n elements.
+
+    This function recursively generates all possible combinations of k elements
+    chosen from a set of n elements (0 to n-1).
+
+    Args:
+        n: The total number of elements to choose from (0 to n-1)
+        k: The number of elements to include in each combination
+
+    Returns:
+        list[list[int]]: A list of all possible k-combinations, where each combination
+            is represented as a list of integers
+
+    Examples:
+        >>> combinations(3, 2)
+        [[0, 1], [0, 2], [1, 2]]
+        >>> combinations(2, 0)
+        [[]]
+        >>> combinations(2, 3)
+        []
+    """
+    if k > n:
+        return []
+    if k == 0:
+        return [[]]
+    if k == n:
+        return [[i for i in range(n)]]
+    res = []
+    for i in range(n):
+        for j in generate_combinations(i, k - 1):
+            res.append(j + [i])
+    return res
+
+
+def is_in_mask(point, mask):
+    """
+    Check if a point is in a mask.
+    """
+    h, w = mask.shape
+    point = point.astype(np.int)
+    point = point[:, ::-1]  # y,x
+    point = np.clip(point, 0, [h - 1, w - 1])
+    return mask[point[:, 0], point[:, 1]]
+
+
+def sample_points(
+    points: np.ndarray, sample_range: tuple[int, int] = (4, 6), max_iterations: int = 30
+) -> tuple[list[np.ndarray], list[np.ndarray]]:
+    """
+    Sample points by generating point sets of different sizes.
+
+    For small point sets (≤8 points), generates all possible combinations.
+    For larger sets (>8 points), uses random sampling to generate max_iterations samples.
+
+    Args:
+        points: Input points array of shape (N, 2) where N is number of points
+        sample_range: Tuple of (min_points, max_points) to sample
+        max_iterations: Maximum number of random sampling iterations for large point sets
+
+    Returns:
+        tuple containing:
+            - sample_list: List of arrays, where each array has shape:
+                - (max_iterations, i, 2) for large point sets (random sampling)
+                - (n_combinations, i, 2) for small point sets (all combinations)
+                where i ranges from sample_range[0] to sample_range[1], and 2 represents x,y coordinates
+            - label_list: List of arrays, where each array has shape:
+                - (max_iterations, i) for large point sets
+                - (n_combinations, i) for small point sets
+                containing ones for each sampled point
+    """
+    sample_list = []
+    label_list = []
+    for i in range(
+        min(sample_range[0], len(points)),
+        min(sample_range[1], len(points)) + 1,
+    ):
+        if len(points) > 8:
+            index = [
+                random.sample(range(len(points)), i) for j in range(max_iterations)
+            ]
+            sample = np.take(points, index, axis=0)  # (max_iterations * i) * 2
+        else:
+            index = generate_combinations(len(points), i)
+            sample = np.take(points, index, axis=0)  # i * n * 2
+
+        # generate label  max_iterations * i
+        label = np.ones((sample.shape[0], i))
+        sample_list.append(sample)
+        label_list.append(label)
+    return sample_list, label_list
