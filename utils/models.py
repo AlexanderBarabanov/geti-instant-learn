@@ -1,3 +1,4 @@
+import os
 from algorithms import PerDinoPredictor, PerSamPredictor
 from model_api.models.model import Model
 from model_api.models.visual_prompting import SAMLearnableVisualPrompter
@@ -55,12 +56,11 @@ def load_dino_model() -> DinoVisionTransformer:
         proj_bias=True,
         ffn_bias=True,
     )
-    dinov2: DinoVisionTransformer = vision_transformer.__dict__["dinov2_vitl14"](
+    dinov2: DinoVisionTransformer = vision_transformer.__dict__["vit_large"](
         **dinov2_kwargs
     )
-    dinov2_utils.load_pretrained_weights(
-        dinov2, "~/data/dinov2_vitl14_pretrain.pth", "teacher"
-    )
+    path = os.path.expanduser("~/data/dinov2_vitl14_pretrain.pth")
+    dinov2_utils.load_pretrained_weights(dinov2, path, "teacher")
     dinov2.eval()
     dinov2.to(device="cuda")
     return dinov2

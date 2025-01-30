@@ -2,6 +2,7 @@ from collections import defaultdict
 import random
 
 import cv2
+import ot
 
 from dinov2.data.transforms import MaybeToTensor, make_normalize_transform
 from dinov2.models.vision_transformer import DinoVisionTransformer
@@ -22,6 +23,7 @@ from model_api.models.visual_prompting import (
 from utils.utils import (
     cluster_features,
     cluster_points,
+    is_in_mask,
     prepare_target_guided_prompting,
     sample_points,
     similarity_maps_to_visualization,
@@ -722,7 +724,7 @@ class PerDinoPredictor(PerSamPredictor):
         reference_masks: torch.Tensor,
         all_points: np.array,
         cost_matrix: torch.Tensor,
-        box: np.array | None = None,
+        box: np.ndarray | None = None,
     ) -> np.array:
         image = target_img.mul(255).byte()
         image = image.squeeze(0).permute(1, 2, 0).cpu().numpy()
@@ -752,13 +754,12 @@ class PerDinoPredictor(PerSamPredictor):
 
         # compute mask scores
         for i in range(len(masks)):
-            purity_, coverage_, emd_, sample_, label_, mask_ = self.compute_mask_scores(
-                masks[i],
-                points=points,
+            purity_, coverage_, emd_ = self.compute_mask_scores(
+                masks=masks[i],
+                reference_masks=reference_masks[i],
                 all_points=all_points,
                 emd_cost=cost_matrix,
             )
-            assert np.all(mask_ == masks[i])
             purity[i] = purity_
             coverage[i] = coverage_
             emd[i] = emd_
@@ -767,15 +768,6 @@ class PerDinoPredictor(PerSamPredictor):
         mask_metrics = {"purity": purity, "coverage": coverage, "emd": emd}
         scores = self.alpha * emd + self.beta * purity * coverage**self.exp
 
-        score_filter_cfg = {
-            "emd": self.emd_filter,
-            "purity": self.purity_filter,
-            "coverage": self.coverage_filter,
-            "score_filter": self.use_score_filter,
-            "score": self.deep_score_filter,
-            "score_norm": self.deep_score_norm_filter,
-            "topk_scores_threshold": self.topk_scores_threshold,
-        }
         # Apply filtering based on metrics, to reduce false positive masks)
         scores, samples, labels, predicted_masks, mask_metrics = (
             self._apply_metric_filters(
@@ -791,7 +783,13 @@ class PerDinoPredictor(PerSamPredictor):
 
         return torch.tensor(masks, dtype=torch.float, device="cuda")
 
-    def compute_mask_scores(self, masks, points, all_points, emd_cost):
+    def compute_mask_scores(
+        self,
+        masks: torch.Tensor,
+        reference_masks: torch.Tensor,
+        all_points: np.array,
+        emd_cost: torch.Tensor,
+    ):
         original_masks = masks
         masks = cv2.resize(
             masks[0].astype(np.float32),
@@ -804,7 +802,24 @@ class PerDinoPredictor(PerSamPredictor):
             thres = masks.max()
         masks = masks > thres
 
-        # emd
+        # Earth mover distance between reference mask and predicted mask
+        emd_batch = emd_cost[reference_masks.flatten().bool(), :][:, masks.flatten()]
+        emd = 1 - ot.emd2(
+            a=[1.0 / emd_batch.shape[0] for i in range(emd_batch.shape[0])],
+            b=[1.0 / emd_batch.shape[1] for i in range(emd_batch.shape[1])],
+            M=emd_batch.cpu().numpy(),
+        )
+
+        # Purity and Coverage
+        assert all_points is not None
+        points_in_mask = is_in_mask(all_points, original_masks[0])
+        points_in_mask = all_points[points_in_mask]
+        mask_area = max(float(masks.sum()), 1.0)
+        purity = torch.tensor([float(points_in_mask.shape[0]) / mask_area]) + 1e-6
+        coverage = (
+            torch.tensor([float(points_in_mask.shape[0]) / all_points.shape[0]]) + 1e-6
+        )
+        return purity, coverage, emd
 
     def patch_level_matching(
         self,
@@ -918,8 +933,8 @@ class PerDinoPredictor(PerSamPredictor):
             image_embedding: 64, 64, 256
             reference_features: X, 256
         """
-        # resize image to dino_model
-        image = F.resize(image, self.image_size)
+        # resize image to dino_model using torch transforms, F.resize does not exist
+        image = transforms.Resize(self.image_size)(image)
         image = self.encoder_transform(image)
 
         features = self.dino.forward_features(image.cuda())["x_prenorm"][:, 1:]
@@ -936,6 +951,7 @@ class PerDinoPredictor(PerSamPredictor):
             # apply mask threshold after pooling, since pooling changes the mask values
             mask_pooled = (mask_pooled > self.threshold).float()
             return features, mask_pooled
+
         return features, None
 
     def _apply_metric_filters(
@@ -947,19 +963,22 @@ class PerDinoPredictor(PerSamPredictor):
         predicted_masks: torch.Tensor,
     ) -> tuple[torch.Tensor, ...]:
         """Apply filtering based on metrics to reduce false positive masks."""
-        for metric in ["purity", "coverage", "emd"]:
-            if self.score_filter_cfg[metric] > 0:
-                threshold = min(
-                    mask_metrics[metric].max(), self.score_filter_cfg[metric]
-                )
+
+        def _apply_filter(metric: str, filter_value: float):
+            if filter_value > 0:
+                threshold = min(mask_metrics[metric].max(), filter_value)
                 index = torch.where(mask_metrics[metric] > threshold)
+                nonlocal scores, samples, labels, predicted_masks
                 scores = scores[index]
                 samples = samples[index]
                 labels = labels[index]
                 predicted_masks = self._check_pred_mask(predicted_masks[index])
-
-                for key in mask_metrics.keys():
+                for key in mask_metrics:
                     mask_metrics[key] = mask_metrics[key][index]
+
+        _apply_filter("purity", self.purity_filter)
+        _apply_filter("coverage", self.coverage_filter)
+        _apply_filter("emd", self.emd_filter)
 
         return scores, samples, labels, predicted_masks, mask_metrics
 
