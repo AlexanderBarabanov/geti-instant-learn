@@ -63,7 +63,10 @@ def get_arguments():
         help="Use target guided attention for the SAM model. This passes the target similarity matrix and reference features to the decoder",
     )
     parser.add_argument(
-        "--class_name", type=str, default=None, help="Filter on class name"
+        "--class_name",
+        type=str,
+        default=None,
+        help="Filter on class names, comma-separated (e.g., 'can,boot,car')",
     )
     parser.add_argument(
         "--overwrite", action="store_true", help="Overwrite existing output data"
@@ -108,8 +111,9 @@ def predict_on_dataset(
     if not os.path.exists(output_path):
         os.mkdir(output_path)
 
-    if args.class_name:  # filter on class_name
-        dataframe = dataframe[dataframe.class_name == args.class_name]
+    if args.class_name:  # filter on class_name(s)
+        class_names = [name.strip() for name in args.class_name.split(",")]
+        dataframe = dataframe[dataframe.class_name.isin(class_names)]
 
     for class_name in tqdm(
         dataframe.class_name.unique(),
