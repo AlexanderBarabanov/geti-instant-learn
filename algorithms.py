@@ -1,9 +1,15 @@
 from collections import defaultdict
 import random
+from typing import Optional
 
 import cv2
+from matplotlib import pyplot as plt
+from matplotlib.figure import Figure
 import ot
 
+from Matcher.segment_anything.automatic_mask_generator import (
+    SamAutomaticMaskGenerator as MatcherSamAutomaticMaskGenerator,
+)
 from dinov2.data.transforms import MaybeToTensor, make_normalize_transform
 from dinov2.models.vision_transformer import DinoVisionTransformer
 from efficientvit.models.efficientvit import EfficientViTSamPredictor, SamResize, SamPad
@@ -53,7 +59,7 @@ class PerSamPredictor:
         masks: list[Prompt] | None = None,
         show: bool = False,
         num_clusters: int = 1,
-    ) -> tuple[VisualPromptingFeatures, np.array]:
+    ) -> tuple[VisualPromptingFeatures, np.array, Optional[Figure]]:
         mask_per_class = self.prepare_input(image, masks, points, boxes, polygons)
 
         for class_idx, mask in mask_per_class.items():
@@ -520,6 +526,9 @@ class PerSamPredictor:
             best_idx = np.argmax(scores)
             final_mask = masks[best_idx]
 
+        final_mask = np.where(final_mask, 255, 0).astype(np.uint8)
+        final_mask = np.squeeze(final_mask)  # Remove extra dimension
+
         return [final_mask], point_prompt_candidates
 
     def predict_masks_point_by_point(
@@ -627,12 +636,7 @@ class PerDinoPredictor(PerSamPredictor):
     ):
         super().__init__(sam_model)
         self.dino = dino_model
-        self.encoder_transform = transforms.Compose(
-            [
-                MaybeToTensor(),
-                make_normalize_transform(),
-            ]
-        )
+
         self.use_box = use_box
         self.sample_range = sample_range
         self.max_sample_iterations = max_sample_iterations
@@ -649,6 +653,36 @@ class PerDinoPredictor(PerSamPredictor):
         self.deep_score_norm_filter = deep_score_norm_filter
         self.image_size = self.dino.patch_embed.img_size[0]
         self.feature_size = self.image_size // self.dino.patch_size
+        self.patch_size = self.dino.patch_size
+
+        self.encoder_transform = transforms.Compose(
+            [
+                MaybeToTensor(),
+                transforms.Resize((self.image_size, self.image_size)),
+                make_normalize_transform(),
+            ]
+        )
+        self.encoder_mask_transform = transforms.Compose(
+            [
+                MaybeToTensor(),
+                transforms.Resize(self.image_size),
+            ]
+        )
+        # Default values of Matcher
+        self.generator = MatcherSamAutomaticMaskGenerator(
+            self.sam_model.model,
+            points_per_side=64,
+            points_per_batch=64,
+            pred_iou_thresh=0.88,
+            stability_score_thresh=0.95,
+            stability_score_offset=1.0,
+            box_nms_thresh=1.0,
+            sel_output_layer=3,
+            output_layer=0,
+            dense_pred=0,
+            multimask_output=False,
+            sel_multimask_output=False,
+        )
 
     def learn(
         self,
@@ -659,14 +693,15 @@ class PerDinoPredictor(PerSamPredictor):
         masks: list[Prompt] | None = None,
         show: bool = False,
         num_clusters: int = 1,
-    ) -> tuple[VisualPromptingFeatures, np.array]:
+    ) -> tuple[VisualPromptingFeatures, np.array, Optional[Figure]]:
         mask_per_class = self.prepare_input(image, masks, points, boxes, polygons)
 
         for class_idx, mask in mask_per_class.items():
             # transform mask and image from np to torch tensors
-            mask = torch.from_numpy(mask).cuda()
-            image = torch.from_numpy(image).cuda()
-            features, mask_pooled = self.extract_features(mask, image)
+            features, mask_pooled = self.extract_features(image, mask)
+            features = features.detach().cpu()
+            mask_pooled = mask_pooled.detach().cpu()
+
             # Accumulate features to allow for few-shot learning
             # TODO: for production we want to be able to just pass all reference images in one go/batch
             if class_idx in self.reference_features:
@@ -688,6 +723,7 @@ class PerDinoPredictor(PerSamPredictor):
                 used_indices=np.array(self.reference_features.keys()),
             ),
             np.stack(list(self.reference_masks.values())),
+            None,  # visual output not implemented for DinoPredictor
         )
 
     def infer(
@@ -698,50 +734,105 @@ class PerDinoPredictor(PerSamPredictor):
         target_guided_attention: bool = False,
         mask_generation_method: str = "point-by-point",
         selection_on_similarity_maps: str = "per-map",
-        n_clusters: int = 8,
+        n_clusters: int = 1,
     ):
         # target features extraction
         target_features, _ = self.extract_features(image)
+        all_masks: dict[int, list] = defaultdict(list)
+        # self.sam_model.set_image(image)
 
-        for class_idx, reference_features in reference_features.items():
+        # image preprocessing
+        original_image_size = (image.shape[0], image.shape[1])
+        image = self.encoder_transform(image)
+        # prepare for SAM
+        image_np = image.mul(255).byte().permute(1, 2, 0).cpu().numpy()
+
+        for class_idx, reference_features in self.reference_features.items():
             # Patch level matching
             reference_masks = self.reference_masks[class_idx]
-            points, box, sim, cost_matrix, reduced_num_of_points = (
+            all_points, box, sim, cost_matrix, reduced_num_of_points = (
                 self.patch_level_matching(
-                    reference_features, target_features, reference_masks
+                    reference_features.cuda(),
+                    target_features,
+                    reference_masks.cuda(),
                 )
             )
-            if self.n_clusters > 1:
-                points = cluster_points(points, self.n_clusters)
+            # point (subset) selection
+            points = (
+                cluster_points(all_points, n_clusters) if n_clusters > 1 else all_points
+            )
 
             # Mask generation
-            masks = self.generate_masks(image, points, reference_masks)
+            masks = self.generate_masks(
+                image_np,
+                original_image_size=original_image_size,
+                points=points,
+                reference_masks=reference_masks,
+                all_points=all_points,
+                cost_matrix=cost_matrix,
+                box=box,
+            )
+            all_masks[class_idx] = masks
+
+        return ZSLVisualPromptingResult(
+            data={
+                class_idx: PredictedMask(
+                    mask=masks,
+                    points=np.array(
+                        []
+                    ),  # TODO add sampled points and scores found in matching algo
+                    scores=np.array([]),
+                )
+                for class_idx, masks in all_masks.items()
+            },
+        ), None
 
     def generate_masks(
         self,
-        target_img: np.array,
+        image: np.array,
+        original_image_size: tuple[int, int],
         points: np.array,
         reference_masks: torch.Tensor,
         all_points: np.array,
         cost_matrix: torch.Tensor,
         box: np.ndarray | None = None,
     ) -> np.array:
-        image = target_img.mul(255).byte()
-        image = image.squeeze(0).permute(1, 2, 0).cpu().numpy()
+        # TODO Matcher does not seem to make use of background points
 
         # (subset) point sampling
-        # TODO Matcher does not seem to make use of background points
         sampled_points, label_list = sample_points(
             points, self.sample_range, self.max_sample_iterations
         )
-        # TODO: Matcher uses a different mask generator with integrated filtering and merging.
+
+        # TODO: Matcher uses the original SAM mask generator with integrated filtering and merging.
         # TODO: Do we want to apply mask refinement for each mask?
-        masks, scores, low_res_logits, *_ = self.sam_model.predict(
-            point_coords=sampled_points,
-            point_labels=label_list,
-            box=[box] if self.use_box else None,
+
+        tar_masks_ori = self.generator.generate(
+            image,
+            select_point_coords=sampled_points,
+            select_point_labels=label_list,
+            select_box=[box] if self.use_box else None,
         )
-        masks = masks > 0
+        # can happen that we have no masks
+        if len(tar_masks_ori) == 0:
+            return np.zeros(
+                (1, original_image_size[0], original_image_size[1]), dtype=np.uint8
+            )
+
+        masks = (
+            torch.cat(
+                [
+                    torch.from_numpy(qmask["segmentation"])
+                    .float()[None, None, ...]
+                    .cuda()
+                    for qmask in tar_masks_ori
+                ],
+                dim=0,
+            )
+            .cpu()
+            .numpy()
+            > 0
+        )
 
         # metrics based filtering
         purity = torch.zeros(masks.shape[0])
@@ -756,7 +847,7 @@ class PerDinoPredictor(PerSamPredictor):
         for i in range(len(masks)):
             purity_, coverage_, emd_ = self.compute_mask_scores(
                 masks=masks[i],
-                reference_masks=reference_masks[i],
+                reference_masks=reference_masks,
                 all_points=all_points,
                 emd_cost=cost_matrix,
             )
@@ -777,11 +868,18 @@ class PerDinoPredictor(PerSamPredictor):
 
         # Merge masks
         if self.use_score_filter:
-            masks = self._merge_masks_with_score_filter(scores, predicted_masks)
+            final_mask = self._merge_masks_with_score_filter(scores, predicted_masks)
         else:
-            masks = self._merge_masks_with_topk(scores, samples, predicted_masks)
+            final_mask = self._merge_masks_with_topk(scores, samples, predicted_masks)
 
-        return torch.tensor(masks, dtype=torch.float, device="cuda")
+        # Resize mask back to original size
+        final_mask = np.where(final_mask, 255, 0).astype(np.uint8).squeeze()
+        final_mask = cv2.resize(
+            final_mask,
+            (original_image_size[1], original_image_size[0]),
+            interpolation=cv2.INTER_LINEAR,
+        )
+        return final_mask[None, ...]
 
     def compute_mask_scores(
         self,
@@ -791,6 +889,8 @@ class PerDinoPredictor(PerSamPredictor):
         emd_cost: torch.Tensor,
     ):
         original_masks = masks
+
+        # resize mask to patch size, to use per-patch EMD cost
         masks = cv2.resize(
             masks[0].astype(np.float32),
             (self.feature_size, self.feature_size),
@@ -799,7 +899,7 @@ class PerDinoPredictor(PerSamPredictor):
         if masks.max() <= 0:
             thres = masks.max() - 1e-6
         else:
-            thres = masks.max()
+            thres = 0
         masks = masks > thres
 
         # Earth mover distance between reference mask and predicted mask
@@ -845,11 +945,14 @@ class PerDinoPredictor(PerSamPredictor):
             reduced_num_of_points: reduced number of points
         """
         # Cosine similarity
+        # TODO we do a similarity matrix for all features, not just the reference features. (really fast though)
         sim = reference_features @ target_features.t()
         cost_matrix = (1 - sim) / 2
 
         # forward matching
-        forward_sim = sim[reference_masks.flatten().bool()]
+        forward_sim = sim[
+            reference_masks.flatten().bool()
+        ]  # select only the features within the mask
         indices_forward = linear_sum_assignment(forward_sim.cpu(), maximize=True)
         indices_forward = [
             torch.as_tensor(index, dtype=torch.int64, device="cuda")
@@ -859,7 +962,7 @@ class PerDinoPredictor(PerSamPredictor):
         non_zero_mask_indices = reference_masks.flatten().nonzero()[:, 0]
 
         # backward matching
-        backward_sim = sim.t()[indices_forward]
+        backward_sim = sim.t()[indices_forward[1]]
         indices_backward = linear_sum_assignment(backward_sim.cpu(), maximize=True)
         indices_backward = [
             torch.as_tensor(index, dtype=torch.int64, device="cuda")
@@ -904,7 +1007,7 @@ class PerDinoPredictor(PerSamPredictor):
         ).tolist()
         points = []
         for x, y in zip(points_matched_x, points_matched_y):
-            if int(x) < self.input_size and int(y) < self.input_size:
+            if int(x) < self.image_size and int(y) < self.image_size:
                 points.append([x, y])
         points = np.array(points)
 
@@ -921,9 +1024,9 @@ class PerDinoPredictor(PerSamPredictor):
         return (points, box, sim, cost_matrix, reduced_num_of_points)
 
     def extract_features(
-        self, image: torch.Tensor, mask: torch.Tensor | None = None
+        self, image: np.ndarray, mask: np.ndarray | None = None
     ) -> tuple[torch.Tensor, torch.Tensor] | tuple[torch.Tensor, None]:
-        """Extract path level features using DinoV2 model.
+        """Extract patch level features using DinoV2 model.
 
         Args:
             mask: input mask
@@ -933,23 +1036,25 @@ class PerDinoPredictor(PerSamPredictor):
             image_embedding: 64, 64, 256
             reference_features: X, 256
         """
-        # resize image to dino_model using torch transforms, F.resize does not exist
-        image = transforms.Resize(self.image_size)(image)
-        image = self.encoder_transform(image)
 
-        features = self.dino.forward_features(image.cuda())["x_prenorm"][:, 1:]
+        # change to bs, 3, h, w instead of h, w, 3
+        # image = image.transpose(2, 0, 1)
+        image = self.encoder_transform(image)[None, ...]
+        features = self.dino.forward_features(image.cuda())["x_prenorm"][:, 1:].detach()
         features = features.reshape(-1, self.dino.embed_dim)
         # normalize features for cosine similarity
         features = F.normalize(features, dim=1, p=2)
 
         if mask is not None:
-            mask = F.resize(mask, self.image_size)
+            mask = mask.max(axis=2)
+            mask[mask > 0] = 1
+            mask = self.encoder_mask_transform(mask).cuda().unsqueeze(0)
             # apply pooling to mask
             mask_pooled = F.avg_pool2d(
                 mask, kernel_size=(self.dino.patch_size, self.dino.patch_size)
             )
             # apply mask threshold after pooling, since pooling changes the mask values
-            mask_pooled = (mask_pooled > self.threshold).float()
+            # mask_pooled = (mask_pooled > self.threshold).float()
             return features, mask_pooled
 
         return features, None
@@ -983,8 +1088,8 @@ class PerDinoPredictor(PerSamPredictor):
         return scores, samples, labels, predicted_masks, mask_metrics
 
     def _merge_masks_with_score_filter(
-        self, scores: torch.Tensor, predicted_masks: torch.Tensor
-    ) -> torch.Tensor:
+        self, scores: np.ndarray, predicted_masks: np.ndarray
+    ) -> np.ndarray:
         """Merge masks using score-based filtering."""
         distances = 1 - scores
         distances, rank = torch.sort(distances, descending=True)
@@ -1000,8 +1105,8 @@ class PerDinoPredictor(PerSamPredictor):
         return masks[None, ...]
 
     def _merge_masks_with_topk(
-        self, scores: torch.Tensor, samples: torch.Tensor, predicted_masks: torch.Tensor
-    ) -> torch.Tensor:
+        self, scores: np.ndarray, samples: np.ndarray, predicted_masks: np.ndarray
+    ) -> np.ndarray:
         """Merge masks using top-k approach."""
         topk = min(self.num_merging_masks, scores.size(0))
         topk_idx = scores.topk(topk)[1]

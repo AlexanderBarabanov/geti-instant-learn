@@ -153,7 +153,7 @@ def cluster_points(points: np.ndarray, n_clusters: int = 8) -> np.ndarray:
     for c in range(n_clusters):
         prototype = points[cluster == c].mean(axis=0)
         prototypes.append(prototype)
-    return np.array(prototypes)
+    return np.array(prototypes).astype(np.int64)
 
 
 def similarity_maps_to_visualization(
@@ -250,9 +250,10 @@ def save_visualization(
 
     # Create visualization output
     base = os.path.splitext(output_path)[0]
-    for name, data in visual_outputs.items():
-        fn = f"{base}_{name}.png"
-        cv2.imwrite(fn, data[0])
+    if visual_outputs is not None:
+        for name, data in visual_outputs.items():
+            fn = f"{base}_{name}.png"
+            cv2.imwrite(fn, data[0])
 
     # Draw each instance mask with a different color
     for i, instance in enumerate(masks_result.mask):
@@ -295,6 +296,9 @@ def show_cosine_distance(reference_features: dict[int, torch.Tensor]) -> None:
         return
 
     for label, features in reference_features.items():
+        if len(features) > 10:
+            print(f"Skipping class {label} with {len(features)} features")
+            continue
         if features.shape[0] > 1:
             n_features = features.shape[0]
             high_similarity_found = False
@@ -480,7 +484,7 @@ def is_in_mask(point, mask):
     Check if a point is in a mask.
     """
     h, w = mask.shape
-    point = point.astype(np.int)
+    point = point.astype(np.int64)
     point = point[:, ::-1]  # y,x
     point = np.clip(point, 0, [h - 1, w - 1])
     return mask[point[:, 0], point[:, 1]]
@@ -490,7 +494,10 @@ def sample_points(
     points: np.ndarray, sample_range: tuple[int, int] = (4, 6), max_iterations: int = 30
 ) -> tuple[list[np.ndarray], list[np.ndarray]]:
     """
-    Sample points by generating point sets of different sizes.
+    Sample points by generating point sets of different sizes. Point sets can contain duplicates.
+    Point sets have equal length so they can be batched. Note that each point sets has increased amount of
+    points. e.g. subset0.shape = X, 1, 2 and subset1.shape = X, 2, 2, subset3.shape = X, 3, 2 etc.
+    This is used to generate prompts with different granularity.
 
     For small point sets (≤8 points), generates all possible combinations.
     For larger sets (>8 points), uses random sampling to generate max_iterations samples.
@@ -510,6 +517,7 @@ def sample_points(
                 - (max_iterations, i) for large point sets
                 - (n_combinations, i) for small point sets
                 containing ones for each sampled point
+
     """
     sample_list = []
     label_list = []
