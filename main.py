@@ -49,8 +49,9 @@ def predict_on_dataset(
     if not os.path.exists(output_path):
         os.mkdir(output_path)
 
-    if args.class_name:  # filter on class_name
-        dataframe = dataframe[dataframe.class_name == args.class_name]
+    if args.class_name:  # filter on class_name(s)
+        class_names = [name.strip() for name in args.class_name.split(",")]
+        dataframe = dataframe[dataframe.class_name.isin(class_names)]
 
     for class_name in tqdm(
         dataframe.class_name.unique(),
