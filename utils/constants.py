@@ -21,6 +21,7 @@ DATASETS = [
     "all",
     "DAVIS",
     "PerSeg",
+    "peanuts_small"
 ]
 ALGORITHMS = ["all", "PerSAM", "PerDINO"]
 MAPI_ENCODER_PATH = os.path.join(DATA_PATH, "otx_models", "sam_vit_b_zsl_encoder.xml")

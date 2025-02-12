@@ -141,6 +141,7 @@ class SAMLearnableVisualPrompter:
         decoder_model: SAMDecoder,
         reference_features: VisualPromptingFeatures | None = None,
         threshold: float = 0.65,
+        per_point: bool = True,
     ):
         """Initializes ZSL pipeline.
 
@@ -152,12 +153,15 @@ class SAMLearnableVisualPrompter:
                 Defaults to None.
             threshold (float, optional): Threshold to match vs reference features on infer(). Greater value means a
             stricter matching. Defaults to 0.65.
+            per_point (bool, optional): Generate a mask for every point. When setting this to True the decoder will be called
+            for every proposed point and masks will be merged.
         """
         self.encoder = encoder_model
         self.decoder = decoder_model
         self._used_indices: np.ndarray | None = None
         self._reference_features: np.ndarray | None = None
         self._reference_masks: np.ndarray | None = None
+        self._per_point = per_point
 
         if reference_features is not None:
             self._reference_features = reference_features.feature_vectors
@@ -333,6 +337,76 @@ class SAMLearnableVisualPrompter:
         """A wrapper of the SAMLearnableVisualPrompter.infer() method"""
         return self.infer(image, reference_features, apply_masks_refinement)
 
+    def _infer_per_point(self, points_scores, bg_coords, original_shape, image_embeddings, apply_masks_refinement):
+        predicted_masks: List = []
+        used_points: List = []
+        for idx, points_score in enumerate(points_scores):
+            # remove points with very low confidence
+            if points_score[-1] in [-1.0, 0.0]:
+                continue
+
+            x, y = points_score[:2]
+            # TODO: for P2SAM we actually want multiple output prompts, one per part-level feature/cluster
+            is_done = False
+            for pm in predicted_masks:
+                # check if that point is within the current predicted mask
+                if pm[int(y), int(x)] > 0:
+                    is_done = True
+                    break
+            if is_done:
+                continue
+
+            point_coords = np.concatenate(
+                (np.array([[x, y]]), bg_coords),
+                axis=0,
+                dtype=np.float32,
+            )
+            point_coords = self.decoder.apply_coords(point_coords, original_shape)
+            point_labels = np.array([1] + [0] * len(bg_coords), dtype=np.float32)
+            inputs_decoder = {
+                "point_coords": point_coords[None],
+                "point_labels": point_labels[None],
+                "orig_size": original_shape[None],
+            }
+            inputs_decoder["image_embeddings"] = image_embeddings
+
+            _prediction: dict[str, np.ndarray] = self._predict_masks(
+                inputs_decoder,
+                original_shape,
+                apply_masks_refinement,
+            )
+            _prediction.update({"scores": points_score[-1]})
+
+            predicted_masks.append(_prediction[self.decoder.output_blob_name])
+            used_points.append(points_score)
+
+        return predicted_masks, used_points
+
+    def _infer_per_image(self, points_scores, bg_coords, original_shape, image_embeddings, apply_masks_refinement):
+        # remove low confidence points
+        points_scores = points_scores[points_scores[:, -1] > 0.0, :]
+
+        point_coords = np.concatenate([points_scores[:,:2], bg_coords], axis=0)
+        point_labels = np.array([1] * len(points_scores) + [0] * len(bg_coords), dtype=np.float32)
+        point_coords = self.decoder.apply_coords(point_coords, original_shape)
+        inputs_decoder = {
+            "point_coords": point_coords[None],
+            "point_labels": point_labels[None],
+            "orig_size": original_shape[None],
+        }
+        inputs_decoder["image_embeddings"] = image_embeddings
+
+        _prediction: dict[str, np.ndarray] = self._predict_masks(
+            inputs_decoder,
+            original_shape,
+            apply_masks_refinement,
+        )
+        predicted_masks = [_prediction[self.decoder.output_blob_name]]
+        used_points = list(points_scores)
+
+        return predicted_masks, used_points
+
+
     def infer(
         self,
         image: np.ndarray,
@@ -398,45 +472,21 @@ class SAMLearnableVisualPrompter:
         for label in total_points_scores:
             points_scores = total_points_scores[label]
             bg_coords = total_bg_coords[label]
-            for idx, points_score in enumerate(points_scores):
-                # remove points with very low confidence
-                if points_score[-1] in [-1.0, 0.0]:
-                    continue
 
-                x, y = points_score[:2]
-                # TODO: for P2SAM we actually want multiple output prompts, one per part-level feature/cluster
-                is_done = False
-                for pm in predicted_masks.get(label, []):
-                    # check if that point is within the current predicted mask
-                    if pm[int(y), int(x)] > 0:
-                        is_done = True
-                        break
-                if is_done:
-                    continue
-
-                point_coords = np.concatenate(
-                    (np.array([[x, y]]), bg_coords),
-                    axis=0,
-                    dtype=np.float32,
-                )
-                point_coords = self.decoder.apply_coords(point_coords, original_shape)
-                point_labels = np.array([1] + [0] * len(bg_coords), dtype=np.float32)
-                inputs_decoder = {
-                    "point_coords": point_coords[None],
-                    "point_labels": point_labels[None],
-                    "orig_size": original_shape[None],
-                }
-                inputs_decoder["image_embeddings"] = image_embeddings
-
-                _prediction: dict[str, np.ndarray] = self._predict_masks(
-                    inputs_decoder,
-                    original_shape,
-                    apply_masks_refinement,
-                )
-                _prediction.update({"scores": points_score[-1]})
-
-                predicted_masks[label].append(_prediction[self.decoder.output_blob_name])
-                used_points[label].append(points_score)
+            if self._per_point:
+                predicted_masks[label], used_points[label] = self._infer_per_point(
+                    points_scores=points_scores,
+                    bg_coords=bg_coords,
+                    original_shape=original_shape,
+                    image_embeddings=image_embeddings,
+                    apply_masks_refinement=apply_masks_refinement)
+            else:
+                predicted_masks[label], used_points[label] = self._infer_per_image(
+                    points_scores=points_scores,
+                    bg_coords=bg_coords,
+                    original_shape=original_shape,
+                    image_embeddings=image_embeddings,
+                    apply_masks_refinement=apply_masks_refinement)
 
         # check overlapping area between different label masks
         _inspect_overlapping_areas(predicted_masks, used_points)
@@ -1147,7 +1197,7 @@ def _get_prompt_candidates(
             similarity = np.zeros((*sim.shape, 3))
             similarity[:, :] = np.expand_dims(sim * 255, axis=2)
             _draw_points(similarity, points_scores[:, 0], points_scores[:, 1], size=15, color=(255, 255, 255))
-            _draw_points(similarity, bg_coords[:, 0], bg_coords[:, 1], size=15, color=(0, 0, 255))
+            _draw_points(similarity, bg_coords[:, 0], bg_coords[:, 1], size=15, color=(255, 0, 0))
             visual_output["similarity"][label] = similarity
 
     return total_points_scores, total_bg_coords, visual_output
