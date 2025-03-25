@@ -1,5 +1,7 @@
 from typing import List
 
+import torch
+
 from context_learner.processes.process_base import Process
 from context_learner.types.features import Features
 
@@ -25,3 +27,26 @@ class FeatureSelector(Process):
             >>> r = select([Features()])
         """
         return [Features()]
+
+    def get_all_class_features(
+        self, features_per_image: List[Features]
+    ) -> dict[int, list[torch.Tensor]]:
+        """
+        This method gets all features for all classes over all images.
+
+        Args:
+            features_per_image: A list of features for each reference image.
+
+        Returns:
+            A dictionary of features for each class.
+        """
+        all_features_per_class = {}
+
+        # First collect all features per class over all images
+        for features in features_per_image:
+            for class_id, local_features_list in features.local_features.items():
+                if class_id not in all_features_per_class:
+                    all_features_per_class[class_id] = []
+                all_features_per_class[class_id].extend(local_features_list)
+
+        return all_features_per_class

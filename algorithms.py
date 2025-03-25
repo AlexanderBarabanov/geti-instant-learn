@@ -182,19 +182,22 @@ class PerSamPredictor:
         test_feat = self.get_image_embedding_sam(image)
         c, h, w = test_feat.shape
         test_feat = test_feat / test_feat.norm(dim=0, keepdim=True)
+        # tesst_feat has shape 256 64 64
         test_feat = test_feat.reshape(c, h * w)
 
         for class_idx, reference_features in self.reference_features.items():
             # Cosine similarity
-            sim = reference_features @ test_feat
-            sim = sim.reshape(reference_features.shape[0], 1, h, w)
+            sim = (
+                reference_features @ test_feat
+            )  # (1,1,256) @ (256, 64*64)  ->  (1,1,64*64)
+            sim = sim.reshape(reference_features.shape[0], 1, h, w)  # (1,1,64,64)
 
-            sim = F.interpolate(sim, scale_factor=4, mode="bilinear")
+            sim = F.interpolate(sim, scale_factor=4, mode="bilinear")  # 1, 1, 256, 256
             sim = self.sam_model.model.postprocess_masks(
                 sim,
                 input_size=self.sam_model.input_size,
                 original_size=self.sam_model.original_size,
-            ).squeeze()
+            ).squeeze()  # 1280, 1280
             sim_masks_per_class[class_idx] = sim
 
             # Point selection

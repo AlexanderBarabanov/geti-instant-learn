@@ -1,9 +1,26 @@
 import torch
 from context_learner.types.data import Data
 
-class Similarities(Data):
-    def __init__(self):
-        pass
 
-    def from_tensor(self, similarities: torch.Tensor):
-        pass
+class Similarities(Data):
+    """
+    This class represents similarities of a single image. Each image has a similarity representation
+    and can have multiple similarity representations based on the number of masks per class.
+    Similarities are stored as stacked tensors per class.
+    """
+
+    def __init__(self):
+        self._data: dict[int, torch.Tensor] = {}
+
+    def add(
+        self,
+        similarities: torch.Tensor,
+        class_id: int,
+    ):
+        if class_id not in self._data:
+            self._data[class_id] = similarities
+        else:
+            # Concatenate along first dimension since similarities are (1, encoder_dim, encoder_dim)
+            self._data[class_id] = torch.cat(
+                [self._data[class_id], similarities], dim=0
+            )

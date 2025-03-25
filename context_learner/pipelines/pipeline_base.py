@@ -1,7 +1,7 @@
 from typing import List
 
 from context_learner.types.image import Image
-from context_learner.types.annotations import Annotations
+from context_learner.types.priors import Priors
 from context_learner.types.state import State
 
 
@@ -12,20 +12,23 @@ class Pipeline:
     def get_state(self):
         return self._state
 
-    def learn(self, reference_images: List[Image], reference_annotations: List[Annotations]):
+    def reset_state(self):
+        self._state = State()
+
+    def learn(self, reference_images: List[Image], reference_priors: List[Priors]):
         """
         This method learns the context
 
         Args:
             reference_images: A list of images ot learn from.
-            reference_annotations: A list of multi-modal annotations associated with the image.
+            reference_priors: A list of priors associated with the image.
 
         Returns:
             None
 
         Examples:
             >>> p = Pipeline()
-            >>> p.learn([Image()], [Annotations()])
+            >>> p.learn([Image()], [Priors()])
         """
         pass
 

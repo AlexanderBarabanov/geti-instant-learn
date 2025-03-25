@@ -64,3 +64,13 @@ def load_dino_model() -> DinoVisionTransformer:
     dinov2.eval()
     dinov2.to(device="cuda")
     return dinov2
+
+
+def load_sam_predictor(sam_name: str) -> SamPredictor:
+    if sam_name not in MODEL_MAP:
+        raise ValueError(f"Invalid model type: {sam_name}")
+
+    name, checkpoint_path = MODEL_MAP[sam_name]
+    sam_model = sam_model_registry[name](checkpoint=checkpoint_path)
+    sam_model.eval().cuda()
+    return SamPredictor(sam_model)

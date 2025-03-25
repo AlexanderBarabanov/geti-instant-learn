@@ -4,11 +4,38 @@ from context_learner.types.data import Data
 
 
 class Image(Data):
-    def __init__(self):
-        pass
+    """This is a wrapper around a torch tensor or numpy array that represents an image.
+    The default data type is a numpy array because of the use of OpenCV.
+    """
 
-    def from_tensor(self, image: torch.Tensor):
-        pass
+    def __init__(self, image: torch.Tensor | np.ndarray):
+        if isinstance(image, torch.Tensor):
+            self._data = image.numpy()
+        else:
+            self._data = image
 
-    def from_ndarray(self, image: np.ndarray):
-        pass
+        self._size = self._data.shape[:2]
+        self._transformed_size: tuple[int, int] = None
+
+    @property
+    def data(self) -> np.ndarray:
+        return self._data
+
+    @property
+    def tensor(self) -> torch.Tensor:
+        return torch.from_numpy(self._data)
+
+    @property
+    def size(self) -> tuple[int, int]:
+        return self._size
+
+    @property
+    def transformed_size(self) -> tuple[int, int]:
+        return self._transformed_size
+
+    @transformed_size.setter
+    def transformed_size(self, value: tuple[int, int]):
+        self._transformed_size = value
+
+    def __str__(self):
+        return f"Image(size={self.size}, transformed_size={self.transformed_size})"

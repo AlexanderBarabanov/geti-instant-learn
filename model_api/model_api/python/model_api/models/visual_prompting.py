@@ -386,7 +386,7 @@ class SAMLearnableVisualPrompter:
         # remove low confidence points
         points_scores = points_scores[points_scores[:, -1] > 0.0, :]
 
-        point_coords = np.concatenate([points_scores[:,:2], bg_coords], axis=0)
+        point_coords = np.concatenate([points_scores[:, :2], bg_coords], axis=0)
         point_labels = np.array([1] * len(points_scores) + [0] * len(bg_coords), dtype=np.float32)
         point_coords = self.decoder.apply_coords(point_coords, original_shape)
         inputs_decoder = {
@@ -405,7 +405,6 @@ class SAMLearnableVisualPrompter:
         used_points = list(points_scores)
 
         return predicted_masks, used_points
-
 
     def infer(
         self,
@@ -479,14 +478,16 @@ class SAMLearnableVisualPrompter:
                     bg_coords=bg_coords,
                     original_shape=original_shape,
                     image_embeddings=image_embeddings,
-                    apply_masks_refinement=apply_masks_refinement)
+                    apply_masks_refinement=apply_masks_refinement,
+                )
             else:
                 predicted_masks[label], used_points[label] = self._infer_per_image(
                     points_scores=points_scores,
                     bg_coords=bg_coords,
                     original_shape=original_shape,
                     image_embeddings=image_embeddings,
-                    apply_masks_refinement=apply_masks_refinement)
+                    apply_masks_refinement=apply_masks_refinement,
+                )
 
         # check overlapping area between different label masks
         _inspect_overlapping_areas(predicted_masks, used_points)
