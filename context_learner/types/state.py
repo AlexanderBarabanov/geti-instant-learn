@@ -22,8 +22,12 @@ class State(Data):
         self.priors: List[Priors] = []
         self.masks: List[Masks] = []
         self.annotations: List[Annotations] = []
-        self.encoder_input_size: tuple[int, int] = None
         self.used_points: List[Points] = []
+
+        # Encoder configuration
+        self.encoder_input_size: int = None
+        self.encoder_patch_size: int = None
+        self.encoder_feature_size: int = None
 
     def __repr__(self):
         # Show the state a little prettier

@@ -22,7 +22,6 @@ class SamEncoder(Encoder):
     def __init__(self, state: State, sam_predictor: SamPredictor):
         super().__init__(state)
         self.predictor: SamPredictor = sam_predictor
-        # TODO we should not change the state from inside a process
         self._state.encoder_input_size = self.predictor.model.image_encoder.img_size
 
     def __call__(
@@ -72,7 +71,9 @@ class SamEncoder(Encoder):
         self.predictor.set_image(image.data)
         # save the size after preprocessing for later use
         image.transformed_size = self.predictor.input_size
-        return self.predictor.get_image_embedding().squeeze().permute(1, 2, 0)
+        embedding = self.predictor.get_image_embedding().squeeze().permute(1, 2, 0)
+        embedding = F.normalize(embedding, p=2, dim=-1)
+        return embedding
 
     def _extract_local_features(
         self, features: Features, masks_per_class: Masks

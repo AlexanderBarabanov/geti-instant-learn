@@ -53,7 +53,7 @@ class GridPromptGenerator(PromptGenerator):
                     if len(foreground_points) == 0:
                         # add empty points for this similarity map
                         priors.points.add(
-                            torch.empty((0, 3), device=foreground_points.device),
+                            torch.empty((0, 4), device=foreground_points.device),
                             class_id,
                         )
                         continue

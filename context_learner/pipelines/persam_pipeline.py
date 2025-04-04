@@ -13,7 +13,9 @@ from context_learner.processes.feature_selectors.feature_selector_base import (
 )
 from context_learner.processes.mask_processors.mask_processor_base import MaskProcessor
 from context_learner.processes.mask_processors.mask_to_polygon import MasksToPolygons
-from context_learner.processes.prompt_generators.grid_prompt import GridPromptGenerator
+from context_learner.processes.prompt_generators.grid_prompt_generator import (
+    GridPromptGenerator,
+)
 from context_learner.processes.prompt_generators.prompt_generator_base import (
     PromptGenerator,
 )

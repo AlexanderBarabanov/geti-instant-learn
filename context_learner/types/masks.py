@@ -19,15 +19,14 @@ class Masks(Prompt):
         if not mask.dtype == torch.bool:
             mask = (mask > 0).bool()
 
-        if mask.ndim == 3:  # HWC input
+        if mask.ndim == 3 and mask.shape[0] != 1:  # HWC format
             if mask.shape[-1] == 1:
                 max_channel = 0
             else:
                 max_channel = torch.argmax(mask.sum(dim=(0, 1)))
-            mask = mask[:, :, max_channel]
-
-        # Mask should be a 3D tensor since it will be stacked
-        mask = mask.unsqueeze(0)
+            mask = mask[:, :, max_channel].unsqueeze(0)
+        elif mask.ndim == 2:
+            mask = mask.unsqueeze(0)
 
         if class_id not in self._data:
             self._data[class_id] = mask

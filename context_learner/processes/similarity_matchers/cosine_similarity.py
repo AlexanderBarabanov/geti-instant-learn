@@ -17,8 +17,7 @@ class CosineSimilarity(SimilarityMatcher):
     ) -> List[Similarities]:
         """
         This function computes the cosine similarity between the reference features and the target features.
-        This is done per image, per class and per mask.
-        For now, we only use first reference features instance.
+        This similarity matcher expects the features of multiple reference images to be reduced (averaged/clustered) into a single Features object.
 
         Args:
             reference_features: List[Features] List of reference features, one per prior image instance

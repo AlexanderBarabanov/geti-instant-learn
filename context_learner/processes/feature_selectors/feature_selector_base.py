@@ -28,7 +28,7 @@ class FeatureSelector(Process):
         """
         return [Features()]
 
-    def get_all_class_features(
+    def get_all_local_class_features(
         self, features_per_image: List[Features]
     ) -> dict[int, list[torch.Tensor]]:
         """

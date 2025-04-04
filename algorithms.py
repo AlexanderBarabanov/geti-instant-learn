@@ -948,7 +948,6 @@ class PerDinoPredictor(PerSamPredictor):
             reduced_num_of_points: reduced number of points
         """
         # Cosine similarity
-        # TODO we do a similarity matrix for all features, not just the reference features. (really fast though)
         sim = reference_features @ target_features.t()
         cost_matrix = (1 - sim) / 2
 
@@ -965,7 +964,7 @@ class PerDinoPredictor(PerSamPredictor):
         non_zero_mask_indices = reference_masks.flatten().nonzero()[:, 0]
 
         # backward matching
-        backward_sim = sim.t()[indices_forward[1]]
+        backward_sim = sim.t()[indices_forward[1]]  # THIS USES (and needs) FULL SIM MAP
         indices_backward = linear_sum_assignment(backward_sim.cpu(), maximize=True)
         indices_backward = [
             torch.as_tensor(index, dtype=torch.int64, device="cuda")

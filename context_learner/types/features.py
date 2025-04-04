@@ -49,9 +49,17 @@ class Features(Data):
     def global_features(self):
         return self._global_features
 
+    @global_features.setter
+    def global_features(self, global_features: torch.Tensor):
+        self._global_features = global_features
+
     @property
     def local_features(self):
         return self._local_features
+
+    @local_features.setter
+    def local_features(self, local_features: dict[int, List[torch.Tensor]]):
+        self._local_features = local_features
 
     def get_local_features(
         self, class_idx: int, cluster_id: int | None = None

@@ -21,11 +21,11 @@ class ClusterFeatures(FeatureSelector):
             features_per_image: A list of features for each reference image.
             num_clusters: The number of clusters to use.
         Returns:
-            A list containing a single Features object with the averaged features per cluster.
+            A list of Features object with the averaged features per cluster.
         """
         result_features = Features()
 
-        for class_id, feature_list in self.get_all_class_features(
+        for class_id, feature_list in self.get_all_local_class_features(
             features_per_image
         ).items():
             original_device = feature_list[0].device
@@ -38,6 +38,8 @@ class ClusterFeatures(FeatureSelector):
             part_level_features = []
             for c in range(num_clusters):
                 part_level_feature = features_np[kmeans.labels_ == c].mean(axis=0)
+                # Even though input features are normalized, when we take the mean of a cluster's features,
+                # the resulting centroid is not guaranteed to have unit norm
                 part_level_feature = part_level_feature / np.linalg.norm(
                     part_level_feature, axis=-1, keepdims=True
                 )
