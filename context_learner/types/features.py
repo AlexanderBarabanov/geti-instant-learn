@@ -25,10 +25,10 @@ class Features(Data):
 
     def __init__(self, global_features: torch.Tensor = None):
         """
-            Initialize the features from a torch tensor.
+        Initialize the features from a torch tensor.
 
-            Args:
-        global_features: The global features of the image.
+        Args:
+            global_features: The global features of the image.
         """
         self._global_features: torch.Tensor = global_features
         self._local_features: dict[int, List[torch.Tensor]] = {}

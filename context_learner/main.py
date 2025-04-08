@@ -1,6 +1,15 @@
 from typing import List
 import cv2
 import os
+import warnings
+
+# Filter the specific UserWarning from PersonalizeSAM
+warnings.filterwarnings(
+    "ignore",
+    category=UserWarning,
+    module="PersonalizeSAM.per_segment_anything.modeling.tiny_vit_sam",
+)
+
 from context_learner.pipelines.matcher_pipeline import Matcher
 from context_learner.pipelines.persam_pipeline import PerSam
 from context_learner.types.image import Image
