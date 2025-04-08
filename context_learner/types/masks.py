@@ -63,6 +63,12 @@ class Masks(Prompt):
         """
         return self._data[class_id].numpy().astype(np.uint8)
 
+    def class_ids(self):
+        """
+        Return the class ids
+        """
+        return self._data.keys()
+
     @property
     def mask_shape(self) -> tuple[int, int]:
         """

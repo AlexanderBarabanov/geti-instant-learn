@@ -1,5 +1,7 @@
+import os.path
 from typing import List
 
+from Matcher.segment_anything import SamPredictor
 from context_learner.filters.masks.mask_filter_base import MaskFilter
 from context_learner.filters.masks.mask_filter_class_overlap import (
     ClassOverlapMaskFilter,
@@ -30,7 +32,7 @@ from context_learner.processes.similarity_matchers.similarity_matcher_base impor
     SimilarityMatcher,
 )
 from context_learner.types import Priors, State, Image
-from utils.models import load_sam_predictor
+from context_learner.processes.visualizations.export_visualization import ExportMaskVisualization
 
 
 class Matcher(Pipeline):
@@ -44,9 +46,8 @@ class Matcher(Pipeline):
 
     """
 
-    def __init__(self):
+    def __init__(self, sam_predictor: SamPredictor):
         super().__init__()
-        sam_predictor = load_sam_predictor(sam_name="SAM")
 
         self.encoder: Encoder = DinoEncoder(self._state)
         self.feature_selector: FeatureSelector = AllFeaturesSelector(self._state)
@@ -87,3 +88,5 @@ class Matcher(Pipeline):
         s.masks, s.used_points = self.segmenter(s.target_images, s.priors)
         s.masks = self.class_overlap_mask_filter(s.masks, s.used_points)
         s.annotations = self.mask_processor(s.masks)
+        return
+

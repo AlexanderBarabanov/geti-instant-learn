@@ -39,3 +39,6 @@ class Image(Data):
 
     def __str__(self):
         return f"Image(size={self.size}, transformed_size={self.transformed_size})"
+
+    def to_numpy(self):
+        return self._data.copy()

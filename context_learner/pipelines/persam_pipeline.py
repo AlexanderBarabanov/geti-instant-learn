@@ -1,5 +1,6 @@
 from typing import List
 
+from Matcher.segment_anything import SamPredictor
 from context_learner.filters.masks.mask_filter_base import MaskFilter
 from context_learner.filters.masks.mask_filter_class_overlap import (
     ClassOverlapMaskFilter,
@@ -30,7 +31,6 @@ from context_learner.processes.similarity_matchers.similarity_matcher_base impor
 from context_learner.types.image import Image
 from context_learner.types.priors import Priors
 from context_learner.types.state import State
-from utils.models import load_sam_predictor
 
 
 class PerSam(Pipeline):
@@ -46,9 +46,8 @@ class PerSam(Pipeline):
     True
     """
 
-    def __init__(self):
+    def __init__(self, sam_predictor: SamPredictor):
         super().__init__()
-        sam_predictor = load_sam_predictor(sam_name="SAM")
 
         self.encoder: Encoder = SamEncoder(self._state, sam_predictor)
         self.feature_selector: FeatureSelector = AverageFeatures(self._state)

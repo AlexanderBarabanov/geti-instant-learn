@@ -1,61 +1,25 @@
 import os
+from functools import partial
+
 import pandas as pd
 
+from datasets.dataset_iterators import BatchedCategoryIter
+from datasets.lvis.lvis_dataset import LVISDataset
 from utils.constants import DATA_PATH, DATAFRAME_COLUMNS
 
 
-def load_dataset(dataset_name: str) -> pd.DataFrame:
+def load_dataset(dataset_name: str, whitelist=None):
     if dataset_name == "PerSeg":
-        return load_perseg_data()
-    elif dataset_name == "DAVIS":
-        return load_davis_data()
-    elif dataset_name == "peanuts_small":
-        return load_peanuts_small()
-
-
-def load_peanuts_small() -> pd.DataFrame:
-    images_path = os.path.join(DATA_PATH, "peanuts_small", "images")
-    annotations_path = os.path.join(DATA_PATH, "peanuts_small", "masks")
-
-    data = pd.DataFrame(columns=DATAFRAME_COLUMNS)
-
-    for class_name in os.listdir(images_path):
-        if ".DS" in class_name:
-            continue
-
-        for file_name in os.listdir(os.path.join(images_path, class_name)):
-            if ".DS" in file_name:
-                continue
-
-            frame = int(file_name[:-4])  # Remove .jpg and convert to int
-
-            data = pd.concat(
-                [
-                    data,
-                    pd.DataFrame(
-                        [
-                            {
-                                "class_name": class_name,
-                                "file_name": file_name,
-                                "image": os.path.join(
-                                    images_path, class_name, file_name
-                                ),
-                                "mask_image": os.path.join(
-                                    annotations_path,
-                                    class_name,
-                                    file_name[:-4] + ".png",
-                                ),
-                                "frame": frame,
-                            }
-                        ]
-                    ),
-                ],
-                ignore_index=True,
-            )
-
-    # sort on class_name and frame
-    data.sort_values(by=["class_name", "frame"], inplace=True)
-    return data
+        # return load_perseg_data()
+        raise NotImplementedError()
+    elif dataset_name == "lvis":
+        whitelist = whitelist if whitelist is not None else ("cupcake", "sheep", "pastry", "doughnut")
+        return LVISDataset(whitelist=whitelist, iterator_type=BatchedCategoryIter, iterator_kwargs={"batch_size": 5})
+    elif dataset_name == "lvis_validation":
+        whitelist = whitelist if whitelist is not None else ("cupcake", "sheep", "pastry", "doughnut")
+        return LVISDataset(whitelist=whitelist, iterator_type=BatchedCategoryIter, iterator_kwargs={"batch_size": 5}, name="validation")
+    else:
+        raise ValueError(f"Unknown dataset name {dataset_name}")
 
 
 def load_perseg_data() -> pd.DataFrame:
@@ -147,5 +111,49 @@ def load_davis_data() -> pd.DataFrame:
                 )
 
     # Sort by class_name and frame
+    data.sort_values(by=["class_name", "frame"], inplace=True)
+    return data
+
+def load_peanuts_small_data() -> pd.DataFrame:
+    images_path = os.path.join(DATA_PATH, "peanuts_small", "images")
+    annotations_path = os.path.join(DATA_PATH, "peanuts_small", "masks")
+
+    data = pd.DataFrame(columns=DATAFRAME_COLUMNS)
+
+    for class_name in os.listdir(images_path):
+        if ".DS" in class_name:
+            continue
+
+        for file_name in os.listdir(os.path.join(images_path, class_name)):
+            if ".DS" in file_name:
+                continue
+
+            frame = int(file_name[:-4])  # Remove .jpg and convert to int
+
+            data = pd.concat(
+                [
+                    data,
+                    pd.DataFrame(
+                        [
+                            {
+                                "class_name": class_name,
+                                "file_name": file_name,
+                                "image": os.path.join(
+                                    images_path, class_name, file_name
+                                ),
+                                "mask_image": os.path.join(
+                                    annotations_path,
+                                    class_name,
+                                    file_name[:-4] + ".png",
+                                ),
+                                "frame": frame,
+                            }
+                        ]
+                    ),
+                ],
+                ignore_index=True,
+            )
+
+    # sort on class_name and frame
     data.sort_values(by=["class_name", "frame"], inplace=True)
     return data

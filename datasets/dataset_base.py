@@ -1,13 +1,15 @@
 from typing import Tuple, List, Dict, Sized, Iterable
 
+from typing import List, Dict, Iterable
 import requests
 import zipfile
 import os
 import numpy as np
 import torch
+import logging
 
-def log(msg: str):
-    print(msg)
+from datasets.dataset_iterator_base import DatasetIter
+
 
 class Annotation:
     def __init__(self, height: int, width: int):
@@ -27,70 +29,15 @@ class Image:
         raise NotImplementedError()
 
 
-class DatasetIter(Sized, Iterable):
-    def __len__(self):
-        raise NotImplementedError()
-
-    def __iter__(self):
-        raise NotImplementedError()
-
-    def __init__(self, parent: 'Dataset'):
-        self._parent = parent
-
-
-class IndexIter(DatasetIter):
-    def __init__(self, parent: 'Dataset'):
-        super().__init__(parent)
-        self.index = 0
-
-    def __getitem__(self, index: int) -> Tuple[np.ndarray, Dict[int, np.ndarray]]:
-        return self._parent.get_image_by_index(index), self._parent.get_masks_by_index(index)
-
-    def __iter__(self):
-        self.index = 1
-        return self
-
-    def __len__(self):
-        return self._parent.get_image_count()
-
-    def __next__(self):
-        if self.index < len(self):
-            item = self.__getitem__(self.index)
-            self.index += 1
-            return item
-        else:
-            raise StopIteration
-
-
-class CategoryIter(DatasetIter):
-    def __init__(self, parent: 'Dataset'):
-        super().__init__(parent)
-        self.index = 0
-
-    def __getitem__(self, index: int) -> Tuple[List[np.ndarray], List[np.ndarray]]:
-        return self._parent.get_images_by_category(index), self._parent.get_masks_by_category(index)
-
-    def __iter__(self):
-        self.index = 1
-        return self
-
-    def __len__(self):
-        return self._parent.get_category_count()
-
-    def __next__(self):
-        if self.index < len(self):
-            item = self.__getitem__(self.index)
-            self.index += 1
-            return item
-        else:
-            raise StopIteration
-
-
 class Dataset(torch.utils.data.Dataset, Iterable):
 
-    def __init__(self, iterator_type: type(DatasetIter)):
+    def __init__(self, iterator_type: type(DatasetIter), iterator_kwargs={}):
         self._iterator_type = iterator_type
+        self._iterator_kwargs = iterator_kwargs
         self.index = 0
+
+    def get_categories(self):
+        raise NotImplementedError()
 
     def get_image_by_index(self, index: int) -> np.ndarray:
         """
@@ -119,12 +66,15 @@ class Dataset(torch.utils.data.Dataset, Iterable):
         """
         raise NotImplementedError()
 
-    def get_images_by_category(self, category_index_or_name: int | str) -> List[np.ndarray]:
+    def get_images_by_category(self, category_index_or_name: int | str, start: int = None, end: int = None) -> List[np.ndarray]:
         """
         This method returns a list of images of a certain category.
+            The parameters start and end are passed through Python's slice() function.
 
         Args:
             category_index_or_name: The category name or category index
+            start: The first index to return
+            end: end-1 is the last index to return
 
         Returns:
             A list of numpy arrays
@@ -132,13 +82,16 @@ class Dataset(torch.utils.data.Dataset, Iterable):
         """
         raise NotImplementedError()
 
-    def get_masks_by_category(self, category_index_or_name: int | str) -> List[np.ndarray]:
+    def get_masks_by_category(self, category_index_or_name: int | str, start: int = None, end: int = None) -> List[np.ndarray]:
         """
         This method returns a list of masks of a certain category.
             each individual instance of the category has a unique pixel value.
+            The parameters start and end are passed through Python's slice() function.
 
         Args:
             category_index_or_name: The category name or category index
+            start: The first index to return
+            end: end-1 is the last index to return
 
         Returns:
             A dict of masks per category.
@@ -146,54 +99,123 @@ class Dataset(torch.utils.data.Dataset, Iterable):
         raise NotImplementedError()
 
     def get_image_count(self):
+        """
+        This method returns the number of images in the dataset
+        """
         return 0
 
-    def get_category_count(self):
+    def get_image_count_per_category(self, category_index_or_name: int | str):
+        """
+        This method returns the number of images per category.
+
+        Args:
+            category_index_or_name: The category name or category index
+
+        Returns:
+            The number of images in a certain category
+        """
         return 0
+
+    def get_instance_count_per_category(self, category_index_or_name: int | str):
+        """
+        This method returns the number of instances per category.
+
+        Args:
+            category_index_or_name: The category name or category index
+
+        Returns:
+            The number of instances in a certain category
+        """
+        return 0
+
+
+    def get_category_count(self):
+        """ This method returns the number of categories """
+        return 0
+
+    def get_image_filename(self, index: int):
+        """
+        Gives the source filename of the image.
+
+        Args:
+            index: The index for which to return the filename
+
+        Returns:
+            The filename of the image.
+
+        """
+        return ""
+
+    def get_image_filename_in_category(self, category_index_or_name: int | str, index: int):
+        """
+        Gives the source filename of the image.
+
+        Args:
+            category_index_or_name: The category name or category index
+            index: The index for which to return the filename (index within the category)
+
+        Returns:
+            The filename of the image.
+
+        """
+        return ""
+
+    def category_index_to_id(self, index: int) -> int:
+        """ Return the category id given the category index """
+        return -1
+
+    def category_id_to_name(self, id: int) -> str:
+        """ Return the category name given a category id """
+        return ""
+
+    def category_name_to_id(self, name: str) -> int:
+        """ Return the category id given a category name """
+        return -1
+
+    def category_name_to_index(self, name: str) -> int:
+        """ Return the category index given a category name """
+        return -1
+
+    def category_index_to_name(self, index: int) -> str:
+        """ Return the category index given a category name """
+        return self.category_id_to_name(self.category_index_to_id(index))
 
     def _download(self, source: str, destination: str):
         """ Helper function to download data with caching """
         if os.path.isfile(destination):
-            log(f"Using cached downloaded file {destination}")
+            logging.info(f"Using cached downloaded file {destination}")
             return
         else:
-            log(f"Downloading data from {source} to {destination}...")
+            logging.info(f"Downloading data from {source} to {destination}...")
 
         response = requests.get(source)
         if response.status_code == 200:
             with open(destination, 'wb') as file:
                 file.write(response.content)
-            log(f'Downloaded {source} to {destination}')
+            logging.info(f'Downloaded {source} to {destination}')
         else:
-            log(f'Failed to download {source}')
+            logging.info(f'Failed to download {source}')
 
     def _unzip(self, source: str, destination: str):
         """ Helper function to unzip data with caching """
         if os.path.isfile(destination) or os.path.isdir(destination):
-            log(f"Using cached unzipped file or folder {destination}")
+            logging.info(f"Using cached unzipped file or folder {destination}")
             return
 
         with zipfile.ZipFile(source, 'r') as zf:
             zf.extractall(os.path.dirname(source))
 
-        log(f'Unzipped {source} to {destination}')
-
-    def __iter__(self) -> DatasetIter:
-        """
-        Get a new instance of the iterator. This prevents the class from creating a new iterator
-            for every index operation and if a slightly faster method.
-
-        Returns:
-            A descendent of DatasetIter
-        """
-        return self._iterator_type(self)
+        logging.info(f'Unzipped {source} to {destination}')
 
     def __len__(self) -> int:
         """
         Returns: the number of items in this dataset. What an item exactly entails is
             determined by the iterator.
         """
-        return len(self._iterator_type(self))
+        return len(self._iterator_type(parent=self, **self._iterator_kwargs))
+
+    def __iter__(self):
+        return self._iterator_type(parent=self, **self._iterator_kwargs)
 
     def __get_item__(self, index: int):
         """
@@ -206,4 +228,4 @@ class Dataset(torch.utils.data.Dataset, Iterable):
         Returns:
             A new item from the dataset iterator
         """
-        return self._iterator_type(self)[index]
+        return self._iterator_type(parent=self, **self._iterator_kwargs)[index]

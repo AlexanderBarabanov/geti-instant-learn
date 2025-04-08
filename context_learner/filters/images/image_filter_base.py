@@ -1,9 +1,9 @@
 from typing import List
 
 from context_learner.filters.filter_base import Filter
-from context_learner.types.priors import Prompt
+from context_learner.types import Image
 
 
-class PriorFilterBase(Filter):
-    def __call__(self, priors: List[Prompt]) -> List[Prompt]:
-        return priors
+class ImageFilterBase(Filter):
+    def __call__(self, images: List[Image]) -> List[Image]:
+        return images

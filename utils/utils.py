@@ -222,66 +222,19 @@ def similarity_maps_to_visualization(
 
     return similarity
 
+def gen_colors(n: int):
+    hsv_tuples = [(x / n, 0.5, 0.5) for x in range(n)]
+    rgb_tuples = map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples)
+    colors = [(0, 0, 0), ] + list(rgb_tuples)
+    return (np.array(colors) * 255).astype(np.uint8)
 
-def save_visualization(
-    image: np.ndarray,
-    masks_result: PredictedMask,
-    visual_outputs: dict[str, dict[int, np.ndarray]],
-    output_path: str,
-    points=None,
-    scores=None,
-) -> None:
-    """
-    Save a visualization of the segmentation mask overlaid on the image.
 
-    Args:
-        image: RGB image as numpy array
-        mask: Segmentation mask object with mask.mask containing instance masks
-        visual_output: Extra images representing the intermediate results of the algorithm
-        output_path: Path where to save the visualization
-        points: Optional points to visualize
-        scores: Optional confidence scores for the points
-    """
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-    # Get unique colors for each instance mask
-    mask_colors = get_colors(len(masks_result.mask))
-    image_vis = image.copy()
-
-    # Create visualization output
-    base = os.path.splitext(output_path)[0]
-    if visual_outputs is not None:
-        for name, data in visual_outputs.items():
-            fn = f"{base}_{name}.png"
-            cv2.imwrite(fn, data[0])
-
-    # Draw each instance mask with a different color
-    for i, instance in enumerate(masks_result.mask):
-        masked_img = np.where(instance[..., None], mask_colors[i], image_vis)
-        image_vis = cv2.addWeighted(image_vis, 0.2, masked_img, 0.8, 0)
-
-    # Draw points and confidence scores if provided
-    if points is not None and scores is not None:
-        for i, point in enumerate(points):
-            # Draw star marker
-            x, y = int(point[0]), int(point[1])
-            size = int(image.shape[0] / 50)  # Scale marker size with image
-            cv2.drawMarker(image_vis, (x, y), (255, 255, 255), cv2.MARKER_STAR, size)
-
-            # Add confidence score text
-            confidence = float(scores[i])
-            cv2.putText(
-                image_vis,
-                f"{confidence:.2f}",
-                (x + 5, y - 5),  # Offset text slightly from point
-                cv2.FONT_HERSHEY_SIMPLEX,
-                image.shape[0] / 1500,  # Font scale relative to image height
-                (255, 255, 255),  # White text
-                1,
-            )  # Line thickness
-
-    # Save visualization
-    cv2.imwrite(output_path, cv2.cvtColor(image_vis, cv2.COLOR_RGB2BGR))
+def color_overlay(image: np.ndarray, mask: np.ndarray):
+    mask_colors = gen_colors(np.max(mask))
+    color_mask = mask_colors[mask]  # create color map
+    color_mask[mask == 0] = image[mask == 0]  # set background to original color
+    image_vis = cv2.addWeighted(image, 0.2, color_mask, 0.8, 0)
+    return image_vis[:, :, ::-1]  # BGR2RGB
 
 
 def show_cosine_distance(reference_features: dict[int, torch.Tensor]) -> None:

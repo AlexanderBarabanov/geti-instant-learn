@@ -46,10 +46,10 @@ class DinoEncoder(Encoder):
                 MaybeToTensor(),
                 transforms.Lambda(lambda x: x.unsqueeze(0) if x.ndim == 2 else x),
                 transforms.Lambda(lambda x: x.float()),
-                transforms.Resize(self.input_image_size),
+                transforms.Resize([self.input_image_size, self.input_image_size]),
                 # torch min pool instead of avg pool:
                 transforms.Lambda(lambda x: (x * -1) + 1),
-                torch.nn.MaxPool2d(
+                torch.nn.AvgPool2d(
                     kernel_size=(self.patch_size, self.patch_size),
                 ),
                 transforms.Lambda(lambda x: (x * -1) + 1),

@@ -21,9 +21,11 @@ DATASETS = [
     "all",
     "DAVIS",
     "PerSeg",
-    "peanuts_small"
+    "peanuts_small",
+    "lvis",
+    "lvis_validation"
 ]
-ALGORITHMS = ["all", "PerSAM", "PerDINO"]
+ALGORITHMS = ["all", "PerSAMModular", "MatcherModular", "PerSAMMAPI"]
 MAPI_ENCODER_PATH = os.path.join(DATA_PATH, "otx_models", "sam_vit_b_zsl_encoder.xml")
 MAPI_DECODER_PATH = os.path.join(DATA_PATH, "otx_models", "sam_vit_b_zsl_decoder.xml")
 DATAFRAME_COLUMNS = ["class_name", "file_name", "image", "mask_image", "frame"]
