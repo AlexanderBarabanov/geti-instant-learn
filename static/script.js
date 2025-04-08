@@ -143,6 +143,50 @@ document.addEventListener('DOMContentLoaded', () => {
             const canvas = document.createElement('canvas');
             canvas.id = canvasId;
 
+            // --- Create Controls Container ---
+            const controlsContainer = document.createElement('div');
+            controlsContainer.classList.add('item-controls'); // Add a class for styling
+
+            // --- Point Display Mode Controls ---
+            const pointModeDiv = document.createElement('div');
+            pointModeDiv.style.marginBottom = '10px';
+            pointModeDiv.innerHTML = '<strong>Show Points:</strong> ';
+
+            const modeGroupName = `point-mode-${canvasId}`;
+
+            const radioUsed = document.createElement('input');
+            radioUsed.type = 'radio';
+            radioUsed.name = modeGroupName;
+            radioUsed.id = `mode-used-${canvasId}`;
+            radioUsed.value = 'used';
+            radioUsed.checked = true; // Default to showing used points
+            radioUsed.dataset.canvasId = canvasId;
+            radioUsed.addEventListener('change', () => redrawCanvas(canvasId));
+
+            const labelUsed = document.createElement('label');
+            labelUsed.htmlFor = `mode-used-${canvasId}`;
+            labelUsed.textContent = 'Used Points';
+            labelUsed.style.marginRight = '10px';
+
+            const radioAll = document.createElement('input');
+            radioAll.type = 'radio';
+            radioAll.name = modeGroupName;
+            radioAll.id = `mode-all-${canvasId}`;
+            radioAll.value = 'all';
+            radioAll.dataset.canvasId = canvasId;
+            radioAll.addEventListener('change', () => redrawCanvas(canvasId));
+
+            const labelAll = document.createElement('label');
+            labelAll.htmlFor = `mode-all-${canvasId}`;
+            labelAll.textContent = 'All Points';
+
+            pointModeDiv.appendChild(radioUsed);
+            pointModeDiv.appendChild(labelUsed);
+            pointModeDiv.appendChild(radioAll);
+            pointModeDiv.appendChild(labelAll);
+            controlsContainer.appendChild(pointModeDiv);
+
+            // --- Mask Controls (Existing Logic) ---
             const maskControlsDiv = document.createElement('div');
             maskControlsDiv.classList.add('mask-controls');
             maskControlsDiv.innerHTML = '<strong>Masks:</strong>'; // Start with title
@@ -177,16 +221,20 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             maskControlsDiv.appendChild(unselectAllButton);
             maskControlsDiv.appendChild(document.createElement('br')); // Add line break
+            controlsContainer.appendChild(maskControlsDiv);
+            // --- End Mask Controls ---
 
             targetItemDiv.appendChild(canvas);
-            targetItemDiv.appendChild(maskControlsDiv);
+            targetItemDiv.appendChild(controlsContainer); // Add the combined controls
             resultsContainer.appendChild(targetItemDiv);
 
             // Store data needed for redraws
             canvasDataStore[canvasId] = {
                 image: null,
                 masks: result.masks || [],
-                points: result.points || [],
+                // Store both sets of points
+                used_points: result.used_points || [],
+                prior_points: result.prior_points || [],
                 element: canvas,
                 clickablePoints: [] // Initialize clickable points storage
             };
@@ -283,107 +331,107 @@ document.addEventListener('DOMContentLoaded', () => {
     function redrawCanvas (canvasId) {
         const data = canvasDataStore[canvasId];
         if (!data || !data.image) {
-            console.warn(`Data or image not ready for canvas ${canvasId}`);
-            return; // Image not loaded yet or data missing
+            // console.warn(`No image data or image not loaded for canvas ${canvasId}`);
+            return; // Don't draw if image isn't ready
         }
 
         const canvas = data.element;
         const ctx = canvas.getContext('2d');
-        const img = data.image;
-        const masks = data.masks;
-        const points = data.points;
-
-        // Clear previous clickable points for this canvas
-        data.clickablePoints = [];
-
-        // 1. Clear canvas and draw base image
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.globalAlpha = 1.0; // Ensure base image is fully opaque
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-        // 2. Draw visible mask overlays
-        masks.forEach(mask => {
-            const checkboxId = `${canvasId}-mask-${mask.instance_id}`;
-            const checkbox = document.getElementById(checkboxId);
-            const maskUri = mask.mask_data_uri; // Use data URI
+        // Calculate a base size for points proportional to image size
+        // Use a small fraction of the average dimension, with a minimum size
+        const baseSize = Math.max(3, Math.min(canvas.width, canvas.height) * 0.01);
 
-            if (checkbox && checkbox.checked && maskUri) {
-                const cachedMaskImg = maskImageCache[maskUri]; // Use data URI as key
+        // Define sizes based on baseSize (make them larger)
+        const starOuterRadius = baseSize * 1.8;
+        const starInnerRadius = baseSize * 0.7;
+        const dotRadius = baseSize * 0.8;
+        const squareSize = baseSize * 1.5;
+        const clickRadius = starOuterRadius; // Use outer radius for click detection
 
-                if (cachedMaskImg && cachedMaskImg !== 'loading') {
-                    ctx.globalAlpha = 0.3; // Alpha for the mask overlay
-                    ctx.drawImage(cachedMaskImg, 0, 0, canvas.width, canvas.height);
+        // Draw the base image
+        ctx.drawImage(data.image, 0, 0, canvas.width, canvas.height);
+
+        // Draw selected masks
+        const maskControlsDiv = canvas.nextElementSibling.querySelector('.mask-controls'); // Find controls next to canvas
+        const visibleMaskIds = new Set();
+        if (maskControlsDiv) {
+            const checkboxes = maskControlsDiv.querySelectorAll('input[type="checkbox"]:checked');
+            checkboxes.forEach(cb => visibleMaskIds.add(cb.value));
+        }
+
+        data.masks.forEach(mask => {
+            if (visibleMaskIds.has(mask.instance_id)) {
+                const maskImg = maskImageCache[mask.mask_data_uri];
+                if (maskImg && maskImg.complete) {
+                    ctx.globalAlpha = 0.5; // Apply transparency
+                    ctx.drawImage(maskImg, 0, 0, canvas.width, canvas.height);
                     ctx.globalAlpha = 1.0; // Reset alpha
-                } else if (cachedMaskImg === 'loading') {
-                    // console.log(`Mask from data URI still loading...`);
-                } else if (cachedMaskImg === null) {
-                    // console.log(`Mask from data URI failed to load.`);
-                } else {
-                    console.warn(`Mask image not found in cache for data URI`);
-                    // preloadMaskImages(canvasId); // Could retry loading
+                } else if (!maskImg) {
+                    console.warn(`Mask image not preloaded or failed for ${mask.instance_id}`);
                 }
             }
         });
 
-        // 3. Draw points on top AND store clickable regions for FG points
-        if (points && points.length > 0) {
-            points.forEach((point, idx) => {
-                const classId = point.class_id || 0;
-                const color = COLORS[classId % COLORS.length];
-                const pointX = point.x;
-                const pointY = point.y;
-                const label = point.label;
-                const correspondingMaskInstanceId = `mask_${idx}`; // Assumed link
+        // --- Draw Points Based on Mode ---
+        const modeSelector = `input[name="point-mode-${canvasId}"]:checked`;
+        const selectedModeInput = document.querySelector(modeSelector);
+        const mode = selectedModeInput ? selectedModeInput.value : 'used'; // Default to 'used' if not found
 
-                // Determine if the mask is selected (for styling and click logic)
-                const checkboxId = `${canvasId}-mask-${correspondingMaskInstanceId}`;
-                const checkbox = document.getElementById(checkboxId);
-                const isMaskSelected = checkbox ? checkbox.checked : false;
-
-                let clickRadius = 0; // Radius for click detection
-
-                if (isMaskSelected) { // Draw prominent star if mask is selected
-                    const outerRadius = 30; // Increased outer radius further
-                    const innerRadius = 12;  // Increased inner radius further
-                    const numPoints = 5;
-                    clickRadius = outerRadius;
-                    ctx.fillStyle = color;
-                    drawStar(ctx, pointX, pointY, outerRadius, innerRadius, numPoints);
-                    ctx.fill();
-                    ctx.strokeStyle = 'black';
-                    ctx.lineWidth = 1;
-                    drawStar(ctx, pointX, pointY, outerRadius, innerRadius, numPoints);
-                    ctx.stroke();
-                    // Store clickable info
-                    data.clickablePoints.push({ x: pointX, y: pointY, radius: clickRadius, maskInstanceId: correspondingMaskInstanceId });
-
-                } else { // Mask not selected
-                    if (label > 0) { // Foreground point (mask not selected)
-                        const radius = 12; // Make unselected FG points larger dots
-                        clickRadius = radius;
-                        ctx.fillStyle = color;
-                        ctx.beginPath();
-                        ctx.arc(pointX, pointY, radius, 0, 2 * Math.PI, false);
-                        ctx.fill();
-                        // Store clickable info
-                        data.clickablePoints.push({ x: pointX, y: pointY, radius: clickRadius, maskInstanceId: correspondingMaskInstanceId });
-
-                    } else { // Background point (mask never selected)
-                        const rectSize = 20; // Increased rectangle size
-                        clickRadius = rectSize / 2;
-                        const bgColor = 'rgba(0, 128, 128, 1)';
-                        ctx.fillStyle = bgColor;
-                        ctx.fillRect(pointX - rectSize / 2, pointY - rectSize / 2, rectSize, rectSize);
-                        ctx.strokeStyle = 'black';
-                        ctx.lineWidth = 1;
-                        ctx.strokeRect(pointX - rectSize / 2, pointY - rectSize / 2, rectSize, rectSize);
-                        // Store clickable info for background points too (though they won't toggle masks)
-                        // We could potentially add other interactions later
-                        data.clickablePoints.push({ x: pointX, y: pointY, radius: clickRadius, maskInstanceId: null }); // No corresponding mask to toggle
-                    }
-                }
-            });
+        let pointsToDraw = [];
+        if (mode === 'all') {
+            pointsToDraw = data.prior_points;
+        } else { // Default to 'used'
+            pointsToDraw = data.used_points;
         }
+
+        data.clickablePoints = []; // Clear previous clickable points
+        const pointColorAllMode = 'cyan'; // New brighter color for 'all' mode
+
+        pointsToDraw.forEach(point => {
+            const x = point.x;
+            const y = point.y;
+            const label = point.label;
+
+            if (label === 0) {
+                // Always draw Background points as RED Squares
+                ctx.fillStyle = 'red'; // Always red for background points
+                ctx.beginPath();
+                ctx.rect(x - squareSize / 2, y - squareSize / 2, squareSize, squareSize);
+                ctx.fill();
+                // Optional: Add outline
+                // ctx.strokeStyle = 'black';
+                // ctx.lineWidth = 0.5;
+                // ctx.stroke();
+            } else {
+                // Foreground points (label > 0)
+                if (mode === 'used') {
+                    // Draw Stars for Used Foreground Points
+                    ctx.fillStyle = 'lime';
+                    ctx.strokeStyle = 'black';
+                    ctx.lineWidth = 0.5;
+                    drawStar(ctx, x, y, starOuterRadius, starInnerRadius, 5); // Use dynamic sizes
+                    ctx.fill();
+                    // ctx.stroke();
+                } else {
+                    // Draw Dots for All Foreground Prior Points
+                    ctx.fillStyle = pointColorAllMode; // Use new color
+                    ctx.beginPath();
+                    ctx.arc(x, y, dotRadius, 0, 2 * Math.PI); // Use dynamic size
+                    ctx.fill();
+                }
+            }
+
+            // Store point info for potential clicks (regardless of mode)
+            data.clickablePoints.push({
+                x: x,
+                y: y,
+                radius: clickRadius, // Use consistent click radius based on star size
+                info: point // Store the whole point object
+            });
+        });
+        // --- End Point Drawing ---
     }
 
     // Function to handle clicks on the canvas

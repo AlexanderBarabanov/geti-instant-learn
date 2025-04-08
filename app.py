@@ -241,20 +241,28 @@ def run_processing():
         # --- 4. Process Results from selected pipeline's state ---
         results = []
         # Check lengths using selected_pipeline._state
-        if len(target_image_objects) != len(selected_pipeline._state.masks):
+        num_targets = len(target_image_objects)
+        if num_targets != len(selected_pipeline._state.masks):
             raise ValueError(
                 "Mismatch between number of target images and masks in state."
             )
-        if len(target_image_objects) != len(selected_pipeline._state.used_points):
+        if num_targets != len(selected_pipeline._state.used_points):
             raise ValueError(
                 "Mismatch between number of target images and used points in state."
             )
+        if hasattr(selected_pipeline._state, "priors") and num_targets != len(
+            selected_pipeline._state.priors
+        ):
+            raise ValueError(
+                "Mismatch between number of target images and generated priors in state."
+            )
 
-        for i, (target_img_obj, masks_obj, points_obj) in enumerate(
+        for i, (target_img_obj, masks_obj, used_points_obj, prior_obj) in enumerate(
             zip(
                 target_image_objects,
                 selected_pipeline._state.masks,
                 selected_pipeline._state.used_points,
+                selected_pipeline._state.priors,  # Include priors in the zip
             )
         ):
             # Encode target image directly
@@ -309,14 +317,18 @@ def run_processing():
                         )
                         instance_counter += 1
 
-            # Process points
-            web_points = process_points_for_web(points_obj)
+            # Process used points
+            web_used_points = process_points_for_web(used_points_obj)
+
+            # Process all prior points
+            web_prior_points = process_points_for_web(prior_obj.points)
 
             results.append(
                 {
                     "image_data_uri": img_data_uri,
                     "masks": processed_mask_data_uris,
-                    "points": web_points,
+                    "used_points": web_used_points,  # Keep the used points
+                    "prior_points": web_prior_points,  # Add all prior points
                 }
             )
 
