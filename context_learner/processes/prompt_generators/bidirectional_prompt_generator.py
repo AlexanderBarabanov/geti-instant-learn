@@ -1,21 +1,21 @@
 from typing import List, Tuple
-
 import torch
-import numpy as np
-
+from torch.nn import functional as F
+from scipy.optimize import linear_sum_assignment
 from context_learner.processes.prompt_generators.prompt_generator_base import (
     PromptGenerator,
 )
 from context_learner.types.priors import Priors
 from context_learner.types.features import Features
 from context_learner.types.masks import Masks
+from context_learner.types.similarities import Similarities
 from context_learner.types.state import State
-from scipy.optimize import linear_sum_assignment
 
 
 class BidirectionalPromptGenerator(PromptGenerator):
-    def __init__(self, state: State):
+    def __init__(self, state: State, num_background_points: int = 2):
         super().__init__(state)
+        self.num_background_points = num_background_points
 
     def __call__(
         self,
@@ -46,18 +46,25 @@ class BidirectionalPromptGenerator(PromptGenerator):
 
         for i, target_features in enumerate(target_features_list):
             priors = Priors()
+            similarities = Similarities()
             similarity_map = (
                 flattened_global_features @ target_features.global_features.T
             )
 
             for class_id, mask in reference_masks.data.items():
-                (
-                    matched_indices,
-                    similarity_scores,
-                    _,
-                    background_point_info,
-                ) = self._perform_matching(similarity_map, mask)
-                bg_target_idx, bg_similarity_score = background_point_info
+                # Select background points based on similarity to averaged local feature
+                averaged_feature_sim_map, bg_target_indices, bg_similarity_scores = (
+                    self._select_background_points(similarity_map, mask)
+                )
+                averaged_feature_sim_map = self._resize_similarity_map(
+                    averaged_feature_sim_map, self._state.target_images[i].size
+                )
+                similarities.add(averaged_feature_sim_map, class_id)
+
+                # Perform foreground matching
+                matched_indices, similarity_scores, _ = self._perform_matching(
+                    similarity_map, mask
+                )
 
                 # Process foreground points
                 if len(similarity_scores) > 0:
@@ -77,79 +84,76 @@ class BidirectionalPromptGenerator(PromptGenerator):
                     )
                     fg_bg_points = image_level_fg_points
                 else:
-                    # Add empty tensor if no foreground points
                     fg_bg_points = torch.empty(0, 4, device=similarity_map.device)
 
-                # Process background point
-                if bg_target_idx is not None:
-                    bg_point = self._extract_point_coordinates(
-                        [None, bg_target_idx.unsqueeze(0)],  # Pass target index
-                        bg_similarity_score.unsqueeze(0),  # Pass similarity score
+                # Process background points
+                if (
+                    bg_target_indices is not None
+                    and bg_similarity_scores is not None
+                    and bg_target_indices.numel() > 0
+                ):
+                    bg_points = self._extract_point_coordinates(
+                        [None, bg_target_indices],
+                        bg_similarity_scores,
                     )
-                    image_level_bg_point = self._transform_to_image_coordinates(
-                        bg_point,
+                    image_level_bg_points = self._transform_to_image_coordinates(
+                        bg_points,
                         original_image_size=self._state.target_images[i].size,
                     )
-                    bg_point_label = torch.zeros(
-                        (1, 1), device=image_level_bg_point.device
+                    bg_point_labels = torch.zeros(
+                        (len(image_level_bg_points), 1),
+                        device=image_level_bg_points.device,
                     )
-                    image_level_bg_point = torch.cat(
-                        [image_level_bg_point, bg_point_label], dim=1
+                    image_level_bg_points = torch.cat(
+                        [image_level_bg_points, bg_point_labels], dim=1
                     )
-                    fg_bg_points = torch.cat([fg_bg_points, image_level_bg_point])
+                    fg_bg_points = torch.cat([fg_bg_points, image_level_bg_points])
                 else:
-                    # Handle case where no background point could be found (e.g., empty mask)
-                    # Depending on desired behavior, could add an empty tensor or skip
-                    print(f"No BG point found for class {class_id}")
+                    print(f"No BG points found for class {class_id}")
 
                 priors.points.add(fg_bg_points, class_id)
             priors_per_image.append(priors)
-
+            self._state.similarities.append(similarities)
         return priors_per_image
 
     def _perform_matching(
         self,
         similarity_map: torch.Tensor,
         mask: torch.Tensor,
-    ) -> Tuple[
-        list, torch.Tensor, list, Tuple[torch.Tensor | None, torch.Tensor | None]
-    ]:
+    ) -> Tuple[list, torch.Tensor, list]:
         """
-        Perform bidirectional matching using the similarity map.
+        Perform bidirectional matching using the similarity map for foreground points.
         Linear sum assignment finds the optimal pairing between masked reference features and target features to maximize overall similarity.
+        Applies a bidirectional check to filter matches.
 
         Args:
             similarity_map: torch.Tensor - Similarity matrix [num_ref_features, num_target_features]
             mask: torch.Tensor - Mask [num_ref_features]
         Returns:
             tuple containing:
-                matched_indices: list - Indices of matched foreground points [ref_indices, target_indices]
+                matched_indices: list - Indices of matched foreground points [ref_indices, target_indices] after bidirectional filtering
                 similarity_scores: torch.Tensor - Similarity scores of matched foreground points
-                indices_forward: list - Original forward matching indices
-                background_point: tuple - (target_index, similarity_score) for the background point, or (None, None)
+                indices_forward: list - Original forward matching indices [original_ref_indices, target_indices] before bidirectional filtering
         """
         masked_ref_indices = mask.flatten().nonzero(as_tuple=True)[0]
         if masked_ref_indices.numel() == 0:
             # Handle case where mask is empty
+            empty_indices = [
+                torch.empty(0, dtype=torch.int64, device=similarity_map.device)
+            ] * 2
+            empty_scores = torch.empty(
+                0, dtype=similarity_map.dtype, device=similarity_map.device
+            )
             return (
-                [torch.empty(0, dtype=torch.int64, device=similarity_map.device)] * 2,
-                torch.empty(
-                    0, dtype=similarity_map.dtype, device=similarity_map.device
-                ),
-                [torch.empty(0, dtype=torch.int64, device=similarity_map.device)] * 2,
-                (None, None),
+                empty_indices,
+                empty_scores,
+                empty_indices,
             )
 
-        # Forward matching (reference -> target)
+        # Forward matching (reference -> target) for foreground points
         forward_sim = similarity_map[
             masked_ref_indices
-        ]  # select only the features within the mask
-
-        # Find background point (minimum similarity within the masked reference features)
-        # First, find the minimum similarity for each target feature across all masked ref features
-        # Then, find the target feature with the overall minimum similarity
-        min_sim_per_target, _ = torch.min(forward_sim, dim=0)
-        min_similarity_score, min_target_idx = torch.min(min_sim_per_target, dim=0)
+        ]  # select only the features within the mask [num_masked_ref, num_target]
 
         # Perform linear sum assignment for foreground points
         indices_forward = linear_sum_assignment(
@@ -162,52 +166,114 @@ class BidirectionalPromptGenerator(PromptGenerator):
         # Map masked reference indices back to original similarity map indices
         original_ref_indices = masked_ref_indices[indices_forward[0]]
         sim_scores_forward = similarity_map[original_ref_indices, indices_forward[1]]
+        original_indices_forward = [
+            original_ref_indices,
+            indices_forward[1],
+        ]  # Store original forward match indices
 
         # Backward matching (target -> reference)
-        backward_sim = similarity_map.t()[indices_forward[1]]
-        indices_backward = linear_sum_assignment(
-            backward_sim.cpu().numpy(), maximize=True
-        )
-        indices_backward = [
-            torch.as_tensor(index, dtype=torch.int64, device=similarity_map.device)
-            for index in indices_backward
-        ]
-
-        # Filter matches - keep only those where backward match points back to a reference feature within the mask
-        # indices_backward[1] contains indices relative to the original similarity map's reference dimension
-        indices_to_keep = torch.isin(indices_backward[1], masked_ref_indices)
-
-        percentage_to_keep = (
-            indices_to_keep.sum() / len(indices_to_keep)
-            if len(indices_to_keep) > 0
-            else 0
-        )
-        print(
-            f"Of the total amount of {len(indices_to_keep)} matches, {indices_to_keep.sum()} were kept. ({percentage_to_keep * 100:.2f}%)"
-        )
-
-        # Ensure indices_forward uses original reference indices before filtering
-        original_indices_forward = [original_ref_indices, indices_forward[1]]
-
-        if indices_to_keep.any():  # Check if any True values exist
-            filtered_indices = [
-                original_indices_forward[0][indices_to_keep],
-                original_indices_forward[1][indices_to_keep],
+        # Select target features that were matched in the forward pass
+        target_indices_from_forward = indices_forward[1]
+        if target_indices_from_forward.numel() > 0:
+            backward_sim = similarity_map.t()[
+                target_indices_from_forward
+            ]  # [num_matched_targets, num_ref_features]
+            indices_backward = linear_sum_assignment(
+                backward_sim.cpu().numpy(), maximize=True
+            )
+            indices_backward = [
+                torch.as_tensor(index, dtype=torch.int64, device=similarity_map.device)
+                for index in indices_backward
             ]
-            filtered_sim_scores = sim_scores_forward[indices_to_keep]
-        else:
-            # If no matches pass the filter, keep the original matches from forward assignment
-            filtered_indices = original_indices_forward
-            filtered_sim_scores = sim_scores_forward
+            # indices_backward[0] refers to the index within target_indices_from_forward
+            # indices_backward[1] refers to the index within the full reference features (original ref index)
 
-        background_point_info = (min_target_idx, min_similarity_score)
+            # Map backward result indices back to the original forward match indices
+            corresponding_forward_indices = indices_backward[0]
+
+            # Check if the backward match's reference feature is within the original mask
+            matched_original_ref_indices_backward = indices_backward[1]
+            indices_to_keep_mask = torch.isin(
+                matched_original_ref_indices_backward, masked_ref_indices
+            )
+
+            # Filter the original forward matches based on the backward check
+            filtered_forward_indices_idx = corresponding_forward_indices[
+                indices_to_keep_mask
+            ]
+
+            percentage_to_keep = (
+                indices_to_keep_mask.sum() / len(indices_to_keep_mask)
+                if len(indices_to_keep_mask) > 0
+                else 0
+            )
+            print(
+                f"Of the total amount of {len(indices_to_keep_mask)} potential matches, {indices_to_keep_mask.sum()} were kept via bidirectional check. ({percentage_to_keep * 100:.2f}%)"
+            )
+
+            if filtered_forward_indices_idx.numel() > 0:
+                filtered_indices = [
+                    original_indices_forward[0][filtered_forward_indices_idx],
+                    original_indices_forward[1][filtered_forward_indices_idx],
+                ]
+                filtered_sim_scores = sim_scores_forward[filtered_forward_indices_idx]
+            else:
+                # If no matches pass the filter, result is empty
+                filtered_indices = [
+                    torch.empty(0, dtype=torch.int64, device=similarity_map.device)
+                ] * 2
+                filtered_sim_scores = torch.empty(
+                    0, dtype=similarity_map.dtype, device=similarity_map.device
+                )
+        else:
+            # If no forward matches, result is empty
+            filtered_indices = [
+                torch.empty(0, dtype=torch.int64, device=similarity_map.device)
+            ] * 2
+            filtered_sim_scores = torch.empty(
+                0, dtype=similarity_map.dtype, device=similarity_map.device
+            )
 
         return (
             filtered_indices,
             filtered_sim_scores,
             original_indices_forward,
-            background_point_info,
         )
+
+    def _select_background_points(
+        self, similarity_map: torch.Tensor, mask: torch.Tensor
+    ) -> Tuple[torch.Tensor | None, torch.Tensor | None]:
+        """
+        Select the N background points based on lowest average similarity to masked reference features.
+
+        Args:
+            similarity_map: torch.Tensor - Similarity matrix [num_ref_features, num_target_features]
+            mask: torch.Tensor - Mask indicating relevant reference features [num_ref_features]
+
+        Returns:
+            tuple containing:
+                avg_sim_to_masked_ref: torch.Tensor[num_target_features] - Average similarity of each target feature to the masked reference features
+                bg_point_indices: torch.Tensor[N, 2] | None - Indices [ref_indices, target_indices] (relative to original map)
+                                                           or None if no points found.
+                bg_similarity_scores: torch.Tensor[N] | None - Similarity scores of background points or None.
+        """
+        masked_ref_indices = mask.flatten().nonzero(as_tuple=True)[0]
+        if masked_ref_indices.numel() == 0:
+            return None, None
+
+        avg_sim_to_masked_ref = similarity_map[masked_ref_indices].mean(dim=0)
+        if avg_sim_to_masked_ref.numel() == 0:
+            return None, None
+
+        k = min(self.num_background_points, avg_sim_to_masked_ref.numel())
+        if k <= 0:
+            return None, None
+
+        bg_similarity_scores, bg_target_indices = torch.topk(
+            avg_sim_to_masked_ref, k, largest=False, sorted=False
+        )
+
+        return avg_sim_to_masked_ref, bg_target_indices, bg_similarity_scores
 
     def _extract_point_coordinates(
         self, matched_indices: list, similarity_scores: torch.Tensor
@@ -216,13 +282,21 @@ class BidirectionalPromptGenerator(PromptGenerator):
         Extract point coordinates from matched indices.
 
         Args:
-            matched_indices: List of matched indices [reference_indices, target_indices]
+            matched_indices: List of matched indices [reference_indices, target_indices] or [None, target_indices]
             similarity_scores: Similarity scores for the matched points
 
         Returns:
-            torch.Tensor: Points with their similarity scores (N, 3)
+            torch.Tensor: Points with their similarity scores (N, 3) [x, y, score]
         """
-        # Get target indices
+        if (
+            not matched_indices
+            or matched_indices[1] is None
+            or matched_indices[1].numel() == 0
+        ):
+            return torch.empty(
+                0, 3, dtype=similarity_scores.dtype, device=similarity_scores.device
+            )
+
         target_indices = matched_indices[1]
 
         # Extract y and x coordinates from the target indices
@@ -231,7 +305,18 @@ class BidirectionalPromptGenerator(PromptGenerator):
         x_coords = target_indices % feature_size
 
         # Stack coordinates with similarity scores
-        points = torch.stack([x_coords, y_coords, similarity_scores], dim=1)
+        # Ensure scores are reshaped correctly if they are not already 1D
+        if similarity_scores.dim() != 1:
+            similarity_scores = similarity_scores.reshape(-1)
+
+        points = torch.stack(
+            [
+                x_coords.to(similarity_scores.dtype),
+                y_coords.to(similarity_scores.dtype),
+                similarity_scores,
+            ],
+            dim=1,
+        )
 
         return points
 
@@ -248,6 +333,9 @@ class BidirectionalPromptGenerator(PromptGenerator):
         Returns:
             torch.Tensor: Points in image coordinates (x, y, score)
         """
+        if points.numel() == 0:
+            return torch.empty(0, 3, dtype=points.dtype, device=points.device)
+
         # Get encoder configuration from state
         patch_size = self._state.encoder_patch_size
         encoder_input_size = self._state.encoder_input_size
@@ -266,8 +354,8 @@ class BidirectionalPromptGenerator(PromptGenerator):
         # Combine with similarity scores and round coordinates to nearest integer
         image_points = torch.stack(
             [
-                torch.round(x_image).to(torch.int32),
-                torch.round(y_image).to(torch.int32),
+                torch.round(x_image).to(torch.int64),
+                torch.round(y_image).to(torch.int64),
                 points[:, 2],
             ],
             dim=1,
@@ -281,9 +369,37 @@ class BidirectionalPromptGenerator(PromptGenerator):
         concatenating masks for the same class ID.
 
         Masks are merged so we can do linear sum assignment in one go over multiple reference images (multi-shot).
+
+        Args:
+            reference_masks: List[Masks] - List of reference masks, one per reference image instance
+
+        Returns:
+            Masks - Merged masks
         """
         merged_masks = Masks()
         for masks_instance in reference_masks:
             for class_id, mask_tensor in masks_instance.data.items():
                 merged_masks.add(mask_tensor, class_id)
         return merged_masks
+
+    def _resize_similarity_map(
+        self, similarity_map: torch.Tensor, original_image_size: torch.Tensor
+    ) -> torch.Tensor:
+        """
+        Resize the similarity map to the original image size.
+        input is 1D tensor of shape (num_target_features,)
+        then resize to (amount of patches, amount of patches)
+        then resize to original image size using interpolate
+        """
+        similarity_map = (
+            similarity_map.reshape(
+                self._state.encoder_input_size // self._state.encoder_patch_size,
+                self._state.encoder_input_size // self._state.encoder_patch_size,
+            )
+            .unsqueeze(0)
+            .unsqueeze(0)
+        )
+        similarity_map = F.interpolate(
+            similarity_map, size=original_image_size, mode="bilinear"
+        ).squeeze(0)
+        return similarity_map

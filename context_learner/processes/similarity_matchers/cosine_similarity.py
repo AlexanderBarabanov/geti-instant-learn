@@ -36,11 +36,12 @@ class CosineSimilarity(SimilarityMatcher):
             original_image_size = self._state.target_images[i].size
             transformed_image_size = self._state.target_images[i].transformed_size
 
-            # reshape from (encoder_shape, encoder_shape, embed_dim) to (encoder_shape*encoder_shape, embed_dim)
-            normalized_target = normalized_target.reshape(
-                normalized_target.shape[0] * normalized_target.shape[1],
-                normalized_target.shape[2],
-            )
+            # reshape from (encoder_shape, encoder_shape, embed_dim) to (encoder_shape*encoder_shape, embed_dim) if necessary
+            if normalized_target.dim() == 3:
+                normalized_target = normalized_target.reshape(
+                    normalized_target.shape[0] * normalized_target.shape[1],
+                    normalized_target.shape[2],
+                )
             # compute cosine similarity of (1,1,embed_dim) and (encoder_shape*encoder_shape, embed_dim)
             all_similarities = Similarities()
             for (
@@ -56,6 +57,7 @@ class CosineSimilarity(SimilarityMatcher):
                         original_image_size=original_image_size,
                         embedding_shape=embedding_shape,
                     )
+
                     all_similarities.add(
                         similarities=similarities,
                         class_id=class_id,

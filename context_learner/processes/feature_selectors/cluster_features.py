@@ -9,11 +9,15 @@ from context_learner.processes.feature_selectors.feature_selector_base import (
 from context_learner.types.features import Features
 import torch
 
+from context_learner.types.state import State
+
 
 class ClusterFeatures(FeatureSelector):
-    def __call__(
-        self, features_per_image: List[Features], num_clusters: int = 8
-    ) -> List[Features]:
+    def __init__(self, state: State, num_clusters: int = 3):
+        super().__init__(state)
+        self.num_clusters = num_clusters
+
+    def __call__(self, features_per_image: List[Features]) -> List[Features]:
         """
         This method clusters all features (across all reference images and their masks) and averages the features per cluster.
 
@@ -31,12 +35,14 @@ class ClusterFeatures(FeatureSelector):
             original_device = feature_list[0].device
             stacked_features = torch.cat(feature_list, dim=0)
             features_np = stacked_features.cpu().numpy()
-            kmeans = KMeans(n_clusters=num_clusters, init="k-means++", random_state=42)
+            kmeans = KMeans(
+                n_clusters=self.num_clusters, init="k-means++", random_state=42
+            )
             kmeans.fit(features_np)
 
             # use centroid of cluster as prototype
             part_level_features = []
-            for c in range(num_clusters):
+            for c in range(self.num_clusters):
                 part_level_feature = features_np[kmeans.labels_ == c].mean(axis=0)
                 # Even though input features are normalized, when we take the mean of a cluster's features,
                 # the resulting centroid is not guaranteed to have unit norm
@@ -47,7 +53,7 @@ class ClusterFeatures(FeatureSelector):
 
             part_level_features = torch.stack(part_level_features, dim=0).to(
                 original_device
-            )  # n_clusters, 256
+            )  # n_clusters, embed_dim
             result_features.add_local_features(part_level_features, class_id)
 
         return [result_features]

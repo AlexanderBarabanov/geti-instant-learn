@@ -3,6 +3,8 @@ import cv2
 import os
 import warnings
 
+from utils.models import load_model
+
 # Filter the specific UserWarning from PersonalizeSAM
 warnings.filterwarnings(
     "ignore",
@@ -19,7 +21,7 @@ from utils.data import load_dataset
 from context_learner.utils.visualize import overlay_masks_and_points
 
 if __name__ == "__main__":
-    p = Matcher()
+    p = load_model(pipeline_name="MatcherModular")
     per_seg_dataset = load_dataset("PerSeg")
     image_classes_filter = "can"
     n_shot = 2

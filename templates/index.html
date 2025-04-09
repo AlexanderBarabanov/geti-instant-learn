@@ -5,99 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Visual Prompting Explorer</title>
-    <!-- Link to a CSS file for styling (optional) -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        /* Basic inline styles if not using style.css */
-        body {
-            font-family: sans-serif;
-            margin: 20px;
-        }
-
-        .controls {
-            margin-bottom: 20px;
-            padding: 15px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            background-color: #f9f9f9;
-        }
-
-        .controls label,
-        .controls input,
-        .controls select,
-        .controls button {
-            margin-right: 10px;
-            margin-bottom: 10px;
-        }
-
-        .results-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-        }
-
-        .target-item {
-            border: 1px solid #eee;
-            padding: 10px;
-            border-radius: 5px;
-            width: 500px;
-        }
-
-        .target-item canvas {
-            display: block;
-            width: 500px;
-            height: 500px;
-            object-fit: contain;
-            border: 1px solid #ddd;
-            background-color: #f0f0f0;
-        }
-
-        .mask-controls {
-            margin-top: 10px;
-            max-height: 150px;
-            overflow-y: auto;
-            border: 1px solid #eee;
-            padding: 5px;
-        }
-
-        .mask-controls label {
-            display: block;
-            margin-bottom: 3px;
-        }
-
-        #status {
-            margin-top: 15px;
-            font-weight: bold;
-        }
-
-        .loading::after {
-            content: ' .';
-            animation: dots 1s steps(5, end) infinite;
-        }
-
-        @keyframes dots {
-
-            0%,
-            20% {
-                color: rgba(0, 0, 0, 0);
-                text-shadow: .25em 0 0 rgba(0, 0, 0, 0), .5em 0 0 rgba(0, 0, 0, 0);
-            }
-
-            40% {
-                color: black;
-                text-shadow: .25em 0 0 rgba(0, 0, 0, 0), .5em 0 0 rgba(0, 0, 0, 0);
-            }
-
-            60% {
-                text-shadow: .25em 0 0 black, .5em 0 0 rgba(0, 0, 0, 0);
-            }
-
-            80%,
-            100% {
-                text-shadow: .25em 0 0 black, .5em 0 0 black;
-            }
-        }
-    </style>
 </head>
 
 <body>
@@ -108,19 +16,17 @@
         <select id="pipeline" name="pipeline">
             <option value="Matcher" selected>Matcher</option>
             <option value="PerSam">PerSam</option>
+            <option value="PerDino">PerDino</option>
         </select>
 
         <label for="dataset">Dataset:</label>
         <select id="dataset" name="dataset">
-            <!-- Add available dataset names here if needed, or keep default -->
             <option value="PerSeg">PerSeg</option>
-            <!-- <option value="OtherDataset">OtherDataset</option> -->
         </select>
 
         <label for="class_name">Class Name:</label>
         <select id="class_name" name="class_name">
             <option value="" disabled selected>Select Class...</option>
-            <!-- Options will be populated by JavaScript -->
         </select>
 
         <label for="n_shot">N-Shot:</label>
@@ -131,10 +37,8 @@
     </div>
 
     <div id="results-container" class="results-container">
-        <!-- Target images and controls will be loaded here -->
     </div>
 
-    <!-- Link to the JavaScript file -->
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 

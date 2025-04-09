@@ -10,14 +10,30 @@ from utils.constants import DATA_PATH, DATAFRAME_COLUMNS
 
 def load_dataset(dataset_name: str, whitelist=None):
     if dataset_name == "PerSeg":
-        # return load_perseg_data()
-        raise NotImplementedError()
+        return load_perseg_data()
     elif dataset_name == "lvis":
-        whitelist = whitelist if whitelist is not None else ("cupcake", "sheep", "pastry", "doughnut")
-        return LVISDataset(whitelist=whitelist, iterator_type=BatchedCategoryIter, iterator_kwargs={"batch_size": 5})
+        whitelist = (
+            whitelist
+            if whitelist is not None
+            else ("cupcake", "sheep", "pastry", "doughnut")
+        )
+        return LVISDataset(
+            whitelist=whitelist,
+            iterator_type=BatchedCategoryIter,
+            iterator_kwargs={"batch_size": 5},
+        )
     elif dataset_name == "lvis_validation":
-        whitelist = whitelist if whitelist is not None else ("cupcake", "sheep", "pastry", "doughnut")
-        return LVISDataset(whitelist=whitelist, iterator_type=BatchedCategoryIter, iterator_kwargs={"batch_size": 5}, name="validation")
+        whitelist = (
+            whitelist
+            if whitelist is not None
+            else ("cupcake", "sheep", "pastry", "doughnut")
+        )
+        return LVISDataset(
+            whitelist=whitelist,
+            iterator_type=BatchedCategoryIter,
+            iterator_kwargs={"batch_size": 5},
+            name="validation",
+        )
     else:
         raise ValueError(f"Unknown dataset name {dataset_name}")
 
@@ -113,6 +129,7 @@ def load_davis_data() -> pd.DataFrame:
     # Sort by class_name and frame
     data.sort_values(by=["class_name", "frame"], inplace=True)
     return data
+
 
 def load_peanuts_small_data() -> pd.DataFrame:
     images_path = os.path.join(DATA_PATH, "peanuts_small", "images")

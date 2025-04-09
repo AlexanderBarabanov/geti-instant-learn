@@ -1,75 +1,59 @@
-# app.py
 import os
 import cv2
 import numpy as np
 import torch
 import base64
-import warnings  # Import the warnings module
-from flask import Flask, request, jsonify, render_template, url_for, send_from_directory
-from werkzeug.utils import secure_filename
+from flask import Flask, request, jsonify, render_template
+import warnings
 
-# Filter the specific UserWarning from PersonalizeSAM
 warnings.filterwarnings(
     "ignore",
     category=UserWarning,
     module="PersonalizeSAM.per_segment_anything.modeling.tiny_vit_sam",
 )
 
-# Assume your project structure allows these imports
 from context_learner.pipelines.matcher_pipeline import Matcher
 from context_learner.pipelines.persam_pipeline import PerSam
-from context_learner.types import Image, Masks, Priors, Points
+from context_learner.pipelines.perdino_pipeline import PerDino
+from context_learner.types import Image, Masks, Priors, Points, Similarities
 from utils.data import load_dataset
+from utils.models import load_sam_predictor
 
-# --- Configuration ---
 STATIC_FOLDER = "static"
-# TEMP_IMAGE_FOLDER = os.path.join(STATIC_FOLDER, "temp_images") # No longer needed for images
-# os.makedirs(TEMP_IMAGE_FOLDER, exist_ok=True)
-
-# GENERATED_FILES = set() # No longer needed
-
 app = Flask(__name__, static_folder=STATIC_FOLDER, template_folder="templates")
-# app.config["TEMP_IMAGE_FOLDER"] = TEMP_IMAGE_FOLDER # No longer needed
 
-# Initialize *all* supported pipeline instances
-pipelines = {"Matcher": Matcher(), "PerSam": PerSam()}
+# --- Global State for Model and Pipeline ---
+print("Loading SAM predictor...")
+sam_predictor = load_sam_predictor("SAM")
+print("SAM predictor loaded.")
+current_pipeline_name = "Matcher"
+current_pipeline_instance = Matcher(sam_predictor)
+print(f"Initialized with default pipeline: {current_pipeline_name}")
+# ------------------------------------------
 
-# Initialize pipeline components
-pipeline = PerSam()
 
-
-# --- Helper Functions ---
 def prepare_image_for_web(image_np):
     """Encodes BGR image as Base64 PNG data URI."""
-    # Ensure BGR format for encoding
     if image_np.ndim == 3 and image_np.shape[2] == 3:
-        # Assuming input is RGB, convert to BGR for OpenCV encoding
         image_bgr = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
     elif image_np.ndim == 2:
-        # Convert grayscale to BGR
         image_bgr = cv2.cvtColor(image_np, cv2.COLOR_GRAY2BGR)
     else:
-        image_bgr = image_np  # Assume already BGR
+        image_bgr = image_np
 
-    # Encode image as PNG in memory
     is_success, buffer = cv2.imencode(".png", image_bgr)
     if not is_success:
         raise ValueError("Could not encode image to PNG")
 
-    # Encode buffer to Base64 string
     png_as_text = base64.b64encode(buffer).decode("utf-8")
-
-    # Return Base64 data URI
     return f"data:image/png;base64,{png_as_text}"
 
 
 def prepare_mask_image_for_web(mask_np):
     """Encodes a single-channel mask as a transparent Base64 PNG data URI."""
-    # Ensure mask is uint8 (0 or 1/True)
     if mask_np.dtype != np.uint8:
         mask_np = mask_np.astype(np.uint8)
 
-    # Create 4-channel BGRA image
     h, w = mask_np.shape
     bgra_mask = np.zeros((h, w, 4), dtype=np.uint8)
 
@@ -80,15 +64,11 @@ def prepare_mask_image_for_web(mask_np):
     # Set alpha channel (A=255 for mask, A=0 for background)
     bgra_mask[mask_np > 0, 3] = 255
 
-    # Encode BGRA image as PNG in memory
     is_success, buffer = cv2.imencode(".png", bgra_mask)
     if not is_success:
         raise ValueError("Could not encode mask image to PNG")
 
-    # Encode buffer to Base64 string
     png_as_text = base64.b64encode(buffer).decode("utf-8")
-
-    # Return Base64 data URI
     return f"data:image/png;base64,{png_as_text}"
 
 
@@ -100,7 +80,6 @@ def process_points_for_web(points_obj: Points):
 
     for class_id, list_of_tensors in points_obj.data.items():
         for tensor in list_of_tensors:
-            # Convert tensor to list of lists/tuples [x, y, score]
             points_list = tensor.cpu().tolist()
             for point_data in points_list:
                 # Ensure we have at least x, y, score, label
@@ -108,19 +87,17 @@ def process_points_for_web(points_obj: Points):
                     x = point_data[0]
                     y = point_data[1]
                     score = point_data[2]
-                    label = int(point_data[3])  # Get label (0=bg, >0=fg)
+                    label = int(point_data[3])
                     processed_points.append(
                         {
-                            "class_id": class_id,  # Keep class_id for color grouping
+                            "class_id": class_id,
                             "x": x,
                             "y": y,
                             "score": score,
                             "label": label,
                         }
                     )
-                elif (
-                    len(point_data) >= 2
-                ):  # Fallback if label is missing (shouldn't happen often)
+                elif len(point_data) >= 2:
                     x = point_data[0]
                     y = point_data[1]
                     score = point_data[2] if len(point_data) > 2 else None
@@ -130,13 +107,75 @@ def process_points_for_web(points_obj: Points):
                             "x": x,
                             "y": y,
                             "score": score,
-                            "label": 1,  # Assume foreground if label missing
+                            "label": 1,
                         }
                     )
     return processed_points
 
 
-# --- Routes ---
+def process_similarity_maps_for_web(similarities_obj: Similarities):
+    """Converts Similarity object maps to JSON-serializable list of data URIs."""
+    processed_maps = []
+    if not similarities_obj or not hasattr(similarities_obj, "data"):
+        return processed_maps
+
+    for class_id, sim_map_tensor in similarities_obj.data.items():
+        try:
+            sim_map_tensor_cpu = sim_map_tensor.cpu()
+
+            # Handle potential multiple maps per class_id (e.g., shape [N, H, W])
+            if sim_map_tensor_cpu.ndim == 3:
+                num_instances = sim_map_tensor_cpu.shape[0]
+            elif sim_map_tensor_cpu.ndim == 2:
+                num_instances = 1
+                sim_map_tensor_cpu = sim_map_tensor_cpu.unsqueeze(
+                    0
+                )  # Add batch dim for loop consistency
+            elif sim_map_tensor_cpu.ndim == 1:
+                app.logger.warning(
+                    f"Received 1D sim map for class {class_id}, skipping."
+                )
+                continue
+            else:  # Squeeze potential leading singleton dims (like batch or channel)
+                squeezed_tensor = sim_map_tensor_cpu.squeeze()
+                if squeezed_tensor.ndim == 3:
+                    sim_map_tensor_cpu = squeezed_tensor
+                    num_instances = sim_map_tensor_cpu.shape[0]
+                elif squeezed_tensor.ndim == 2:
+                    sim_map_tensor_cpu = squeezed_tensor.unsqueeze(0)
+                    num_instances = 1
+                else:
+                    app.logger.warning(
+                        f"Unexpected sim map shape {sim_map_tensor_cpu.shape} for class {class_id}, skipping."
+                    )
+                    continue
+
+            for idx in range(num_instances):
+                sim_map_np = sim_map_tensor_cpu[idx].numpy()
+
+                normalized_map = (sim_map_np * 255).astype(np.uint8)
+                inverted_normalized_map = 255 - normalized_map
+                colored_map = cv2.applyColorMap(
+                    inverted_normalized_map, cv2.COLORMAP_JET
+                )
+                map_uri = prepare_image_for_web(colored_map)
+
+                processed_maps.append(
+                    {
+                        "class_id": class_id,
+                        "instance_index": idx,
+                        "similarity_map_uri": map_uri,
+                    }
+                )
+        except Exception as e:
+            app.logger.error(
+                f"Error processing similarity map for class {class_id}: {e}",
+                exc_info=True,
+            )
+
+    return processed_maps
+
+
 @app.route("/")
 def index():
     """Serves the main HTML page."""
@@ -146,9 +185,7 @@ def index():
 @app.route("/api/classes")
 def get_classes():
     """Returns a list of unique class names for a given dataset."""
-    dataset_name = request.args.get(
-        "dataset", "PerSeg"
-    )  # Get dataset name from query param
+    dataset_name = request.args.get("dataset", "PerSeg")
     try:
         full_dataset = load_dataset(dataset_name)
         if full_dataset.empty:
@@ -171,19 +208,41 @@ def run_processing():
     """Runs the pipeline and returns results."""
     try:
         data = request.json
-        # Get selected pipeline name from request, default to Matcher
-        pipeline_name = data.get("pipeline", "Matcher")
-        if pipeline_name not in pipelines:
-            return jsonify({"error": f"Unsupported pipeline: {pipeline_name}"}), 400
+        requested_pipeline_name = data.get("pipeline", "Matcher")
 
-        # Select the pipeline instance
-        selected_pipeline = pipelines[pipeline_name]
+        global current_pipeline_instance, current_pipeline_name  # Declare globals
+
+        if requested_pipeline_name != current_pipeline_name:
+            print(
+                f"Switching pipeline from {current_pipeline_name} to {requested_pipeline_name}..."
+            )
+            try:
+                if requested_pipeline_name == "Matcher":
+                    current_pipeline_instance = Matcher(sam_predictor)
+                elif requested_pipeline_name == "PerSam":
+                    current_pipeline_instance = PerSam(sam_predictor)
+                elif requested_pipeline_name == "PerDino":
+                    current_pipeline_instance = PerDino(sam_predictor)
+                else:
+                    error_msg = f"Unsupported pipeline: {requested_pipeline_name}"
+                    app.logger.error(error_msg)
+                    return jsonify({"error": error_msg}), 400
+
+                current_pipeline_name = requested_pipeline_name
+                print(f"Pipeline switched to: {current_pipeline_name}")
+            except Exception as e:
+                error_msg = (
+                    f"Failed to switch pipeline to {requested_pipeline_name}: {str(e)}"
+                )
+                app.logger.error(error_msg, exc_info=True)
+                return jsonify({"error": error_msg}), 500
+
+        selected_pipeline = current_pipeline_instance
 
         dataset_name = data.get("dataset", "PerSeg")
         class_name_filter = data.get("class_name", "can")
         n_shot = int(data.get("n_shot", 1))
 
-        # --- 1. Load Data ---
         full_dataset = load_dataset(dataset_name)
         if not class_name_filter:
             return jsonify({"error": "Class name filter cannot be empty"}), 400
@@ -204,25 +263,22 @@ def run_processing():
             ), 400
 
         references = dataset.head(n_shot)
-        targets = dataset.iloc[n_shot:]  # Select subsequent rows as targets
+        targets = dataset.iloc[n_shot:]
 
-        # --- 2. Prepare Pipeline Input ---
+        # Prepare Pipeline Input
         reference_images = []
         reference_priors = []
-        # Use the selected pipeline's state
         selected_pipeline.reset_state()
 
         for _, ref in references.iterrows():
             image_np = cv2.cvtColor(cv2.imread(ref.image), cv2.COLOR_BGR2RGB)
-            # Read mask as default (BGR)
             mask_np = cv2.imread(ref.mask_image)
 
             ref_image_obj = Image(image_np)
             reference_images.append(ref_image_obj)
 
             masks = Masks()
-            # Pass the BGR mask directly to add method
-            masks.add(mask_np, class_id=0)  # Assuming single class 0 for now
+            masks.add(mask_np, class_id=0)
             reference_priors.append(Priors(masks=masks))
 
         target_image_objects = []
@@ -230,17 +286,16 @@ def run_processing():
         for _, target in targets.iterrows():
             img_np = cv2.cvtColor(cv2.imread(target.image), cv2.COLOR_BGR2RGB)
             target_image_objects.append(Image(img_np))
-            original_target_paths.append(target.image)  # Keep track of original path
+            original_target_paths.append(target.image)
 
-        # --- 3. Run Selected Pipeline ---
+        # Run pipeline
         selected_pipeline.learn(
             reference_images=reference_images, reference_priors=reference_priors
         )
         selected_pipeline.infer(target_image_objects)
 
-        # --- 4. Process Results from selected pipeline's state ---
+        # Process Results
         results = []
-        # Check lengths using selected_pipeline._state
         num_targets = len(target_image_objects)
         if num_targets != len(selected_pipeline._state.masks):
             raise ValueError(
@@ -257,12 +312,21 @@ def run_processing():
                 "Mismatch between number of target images and generated priors in state."
             )
 
+        has_similarities = (
+            hasattr(selected_pipeline._state, "similarities")
+            and len(selected_pipeline._state.similarities) == num_targets
+        )
+        if has_similarities:
+            print("Similarity maps found in state, processing...")
+        else:
+            print("No similarity maps found in state.")
+
         for i, (target_img_obj, masks_obj, used_points_obj, prior_obj) in enumerate(
             zip(
                 target_image_objects,
                 selected_pipeline._state.masks,
                 selected_pipeline._state.used_points,
-                selected_pipeline._state.priors,  # Include priors in the zip
+                selected_pipeline._state.priors,
             )
         ):
             # Encode target image directly
@@ -276,28 +340,20 @@ def run_processing():
             if masks_obj and hasattr(masks_obj, "data"):
                 for class_id, list_of_tensors in masks_obj.data.items():
                     for mask_tensor in list_of_tensors:
-                        # Ensure tensor is on CPU and convert to numpy
                         mask_np = mask_tensor.cpu().numpy()
-
-                        # Handle potential extra dimensions (like batch dim)
                         if mask_np.ndim > 2:
                             mask_np = np.squeeze(mask_np)
 
-                        # Convert boolean or float mask to 0/1 uint8
                         if mask_np.dtype == bool or mask_np.dtype == np.bool_:
                             mask_np = mask_np.astype(np.uint8)
                         elif (
                             mask_np.dtype == torch.float32
                             or mask_np.dtype == torch.float16
                         ):
-                            mask_np = (mask_np > 0.5).astype(
-                                np.uint8
-                            )  # Threshold float masks
+                            mask_np = (mask_np > 0.5).astype(np.uint8)
                         else:
-                            # Assume already uint8-like if not bool/float
                             mask_np = (mask_np > 0).astype(np.uint8)
 
-                        # Resize mask if necessary (should match target image)
                         if mask_np.shape != (target_img_h, target_img_w):
                             mask_np = cv2.resize(
                                 mask_np,
@@ -317,18 +373,24 @@ def run_processing():
                         )
                         instance_counter += 1
 
-            # Process used points
             web_used_points = process_points_for_web(used_points_obj)
-
-            # Process all prior points
             web_prior_points = process_points_for_web(prior_obj.points)
+
+            # Process similarity maps if available
+            web_similarity_maps = []
+            if has_similarities:
+                similarities_for_target = selected_pipeline._state.similarities[i]
+                web_similarity_maps = process_similarity_maps_for_web(
+                    similarities_for_target
+                )
 
             results.append(
                 {
                     "image_data_uri": img_data_uri,
                     "masks": processed_mask_data_uris,
-                    "used_points": web_used_points,  # Keep the used points
-                    "prior_points": web_prior_points,  # Add all prior points
+                    "used_points": web_used_points,
+                    "prior_points": web_prior_points,
+                    "similarity_maps": web_similarity_maps,
                 }
             )
 
@@ -348,17 +410,9 @@ def run_processing():
 
 
 if __name__ == "__main__":
-    # Make sure templates and static directories exist
     if not os.path.exists("templates"):
         os.makedirs("templates")
     if not os.path.exists("static"):
         os.makedirs("static")
 
-    # Create a dummy index.html if it doesn't exist
-    if not os.path.exists("templates/index.html"):
-        with open("templates/index.html", "w") as f:
-            f.write(
-                "<html><head><title>Processing App</title></head><body><h1>Processing...</h1></body></html>"
-            )
-
-    app.run(debug=True)  # debug=True for development, False for production
+    app.run(debug=True, port=5050)

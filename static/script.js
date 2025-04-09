@@ -206,40 +206,72 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             maskControlsDiv.appendChild(selectAllButton);
 
-            // Add Unselect All button
             const unselectAllButton = document.createElement('button');
             unselectAllButton.textContent = 'Unselect All';
-            unselectAllButton.style.marginLeft = '10px'; // Add some spacing
+            unselectAllButton.style.marginLeft = '10px';
             unselectAllButton.style.fontSize = '0.8em';
-            unselectAllButton.dataset.canvasId = canvasId; // Link button to canvas
+            unselectAllButton.dataset.canvasId = canvasId;
             unselectAllButton.addEventListener('click', (event) => {
                 const targetCanvasId = event.target.dataset.canvasId;
                 const controlsDiv = event.target.parentElement;
                 const checkboxes = controlsDiv.querySelectorAll('input[type="checkbox"]');
                 checkboxes.forEach(cb => cb.checked = false);
-                redrawCanvas(targetCanvasId); // Redraw after unselecting
+                redrawCanvas(targetCanvasId);
             });
             maskControlsDiv.appendChild(unselectAllButton);
-            maskControlsDiv.appendChild(document.createElement('br')); // Add line break
+            maskControlsDiv.appendChild(document.createElement('br'));
             controlsContainer.appendChild(maskControlsDiv);
-            // --- End Mask Controls ---
 
             targetItemDiv.appendChild(canvas);
-            targetItemDiv.appendChild(controlsContainer); // Add the combined controls
+            targetItemDiv.appendChild(controlsContainer);
             resultsContainer.appendChild(targetItemDiv);
 
             // Store data needed for redraws
             canvasDataStore[canvasId] = {
                 image: null,
                 masks: result.masks || [],
-                // Store both sets of points
                 used_points: result.used_points || [],
                 prior_points: result.prior_points || [],
                 element: canvas,
-                clickablePoints: [] // Initialize clickable points storage
+                clickablePoints: []
             };
 
-            // Add click listener to the canvas
+            // --- Similarity Map Display ---
+            if (result.similarity_maps && result.similarity_maps.length > 0) {
+                const simMapContainer = document.createElement('div');
+                simMapContainer.classList.add('similarity-map-container');
+                simMapContainer.style.marginTop = '15px';
+                simMapContainer.innerHTML = '<h5>Similarity Maps:</h5>';
+
+                result.similarity_maps.forEach(simMap => {
+                    const mapDiv = document.createElement('div');
+                    mapDiv.classList.add('similarity-map-item');
+                    mapDiv.style.display = 'inline-block'; // Display maps side-by-side
+                    mapDiv.style.margin = '5px';
+
+                    const title = document.createElement('p');
+                    // Display instance index if available
+                    const instanceText = simMap.hasOwnProperty('instance_index') ? ` (Instance ${simMap.instance_index})` : '';
+                    title.textContent = `Class ID: ${simMap.class_id}${instanceText}`;
+                    title.style.textAlign = 'center';
+                    title.style.fontSize = '0.9em';
+                    title.style.marginBottom = '2px';
+
+                    const img = document.createElement('img');
+                    img.src = simMap.similarity_map_uri;
+                    img.alt = `Similarity map for class ${simMap.class_id}`;
+                    img.style.width = '150px'; // Set a fixed width for consistency
+                    img.style.height = 'auto';
+                    img.style.border = '1px solid #ccc';
+
+                    mapDiv.appendChild(title);
+                    mapDiv.appendChild(img);
+                    simMapContainer.appendChild(mapDiv);
+                });
+                // Insert similarity maps after controls but within the target item div
+                targetItemDiv.appendChild(simMapContainer);
+            }
+
             canvas.addEventListener('click', handleCanvasClick);
 
             // Create checkboxes and add listeners
@@ -282,8 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
             img.onerror = () => {
                 console.error(`Failed to load image from data URI`);
                 const ctx = canvas.getContext('2d');
-                // Draw error text on canvas if image fails to load
-                canvas.width = 300; // Example dimensions
+                canvas.width = 300;
                 canvas.height = 100;
                 ctx.fillStyle = 'red';
                 ctx.font = '16px sans-serif';
@@ -316,12 +347,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function drawStar (ctx, x, y, outerRadius, innerRadius, points) {
         ctx.beginPath();
-        ctx.moveTo(x, y - outerRadius); // Start at top point
+        ctx.moveTo(x, y - outerRadius);
         for (let i = 0; i < points; i++) {
-            // Outer point
-            let angle = Math.PI / points * (2 * i + 1.5); // Angle adjustment to start at top
+            let angle = Math.PI / points * (2 * i + 1.5);
             ctx.lineTo(x + outerRadius * Math.cos(angle), y + outerRadius * Math.sin(angle));
-            // Inner point
             angle = Math.PI / points * (2 * i + 2.5);
             ctx.lineTo(x + innerRadius * Math.cos(angle), y + innerRadius * Math.sin(angle));
         }
@@ -331,8 +360,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function redrawCanvas (canvasId) {
         const data = canvasDataStore[canvasId];
         if (!data || !data.image) {
-            // console.warn(`No image data or image not loaded for canvas ${canvasId}`);
-            return; // Don't draw if image isn't ready
+            return;
         }
 
         const canvas = data.element;
@@ -374,22 +402,21 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // --- Draw Points Based on Mode ---
         const modeSelector = `input[name="point-mode-${canvasId}"]:checked`;
         const selectedModeInput = document.querySelector(modeSelector);
-        const mode = selectedModeInput ? selectedModeInput.value : 'used'; // Default to 'used' if not found
+        const mode = selectedModeInput ? selectedModeInput.value : 'used';
 
         let pointsToDraw = [];
         if (mode === 'all') {
             pointsToDraw = data.prior_points;
-        } else { // Default to 'used'
+        } else {
             pointsToDraw = data.used_points;
         }
 
         data.clickablePoints = []; // Clear previous clickable points
         const pointColorAllMode = 'cyan'; // New brighter color for 'all' mode
 
-        pointsToDraw.forEach(point => {
+        pointsToDraw.forEach((point, idx) => {
             const x = point.x;
             const y = point.y;
             const label = point.label;
@@ -400,10 +427,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.beginPath();
                 ctx.rect(x - squareSize / 2, y - squareSize / 2, squareSize, squareSize);
                 ctx.fill();
-                // Optional: Add outline
-                // ctx.strokeStyle = 'black';
-                // ctx.lineWidth = 0.5;
-                // ctx.stroke();
             } else {
                 // Foreground points (label > 0)
                 if (mode === 'used') {
@@ -413,10 +436,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     ctx.lineWidth = 0.5;
                     drawStar(ctx, x, y, starOuterRadius, starInnerRadius, 5); // Use dynamic sizes
                     ctx.fill();
-                    // ctx.stroke();
                 } else {
                     // Draw Dots for All Foreground Prior Points
-                    ctx.fillStyle = pointColorAllMode; // Use new color
+                    ctx.fillStyle = pointColorAllMode;
                     ctx.beginPath();
                     ctx.arc(x, y, dotRadius, 0, 2 * Math.PI); // Use dynamic size
                     ctx.fill();
@@ -428,22 +450,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 x: x,
                 y: y,
                 radius: clickRadius, // Use consistent click radius based on star size
-                info: point // Store the whole point object
+                info: point, // Store the whole point object
+                originalIndex: idx // Store the original index
             });
         });
-        // --- End Point Drawing ---
     }
 
-    // Function to handle clicks on the canvas
     function handleCanvasClick (event) {
         const canvas = event.target;
         const canvasId = canvas.id;
         const data = canvasDataStore[canvasId];
         if (!data || !data.clickablePoints) return;
 
-        // Get click coordinates relative to the canvas
         const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;    // Handle CSS scaling
+        const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
         const clickX = (event.clientX - rect.left) * scaleX;
         const clickY = (event.clientY - rect.top) * scaleY;
@@ -456,18 +476,31 @@ document.addEventListener('DOMContentLoaded', () => {
             const pt = data.clickablePoints[i];
             const distance = Math.sqrt(Math.pow(clickX - pt.x, 2) + Math.pow(clickY - pt.y, 2));
 
-            if (distance <= pt.radius && pt.maskInstanceId) { // Check distance and if it's a FG point with a mask ID
+            // Check if click is near a foreground point (label > 0)
+            if (distance <= pt.radius && pt.info.label > 0) {
                 clickedOnPoint = true;
-                const checkboxId = `${canvasId}-mask-${pt.maskInstanceId}`;
-                const checkbox = document.getElementById(checkboxId);
-                if (checkbox) {
-                    checkbox.checked = !checkbox.checked; // Toggle the checkbox
-                    redrawCanvas(canvasId); // Redraw to reflect the change
+                const pointIndex = pt.originalIndex; // Get the stored original index
+
+                // Check if the index is valid for the masks array
+                let targetInstanceId = null;
+                if (data.masks && pointIndex < data.masks.length) {
+                    targetInstanceId = data.masks[pointIndex].instance_id;
                 }
-                break; // Stop after finding the first hit (topmost)
+
+                if (targetInstanceId) {
+                    const checkboxId = `${canvasId}-mask-${targetInstanceId}`;
+                    const checkbox = document.getElementById(checkboxId);
+                    if (checkbox) {
+                        // Toggle the checkbox state
+                        checkbox.checked = !checkbox.checked;
+                        // Redraw the canvas to reflect the change
+                        redrawCanvas(canvasId);
+                    }
+                } else {
+                    console.warn(`No mask found for clicked point's index: ${pointIndex}`);
+                }
+                break; // Stop checking other points once one is found
             }
         }
-        // Optional: Add logic here if click didn't hit any point
-        // if (!clickedOnPoint) { console.log("Clicked on background"); }
     }
 });

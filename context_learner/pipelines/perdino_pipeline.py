@@ -6,8 +6,8 @@ from context_learner.filters.masks.mask_filter_class_overlap import (
     ClassOverlapMaskFilter,
 )
 from context_learner.pipelines.pipeline_base import Pipeline
+from context_learner.processes.encoders.dino_encoder import DinoEncoder
 from context_learner.processes.encoders.encoder_base import Encoder
-from context_learner.processes.encoders.sam_encoder import SamEncoder
 from context_learner.processes.feature_selectors.average_features import AverageFeatures
 from context_learner.processes.feature_selectors.cluster_features import ClusterFeatures
 from context_learner.processes.feature_selectors.feature_selector_base import (
@@ -34,9 +34,10 @@ from context_learner.types.priors import Priors
 from context_learner.types.state import State
 
 
-class PerSam(Pipeline):
+class PerDino(Pipeline):
     """
-    This is the PerSam algorithm pipeline
+    This is the PerDino algorithm pipeline that uses DinoV2 for encoding the images
+
 
     >>> p = PerSam()
     >>> p.learn([Image()] * 3, [Annotations()] * 3)
@@ -48,17 +49,21 @@ class PerSam(Pipeline):
     def __init__(self, sam_predictor: SamPredictor):
         super().__init__()
 
-        self.encoder: Encoder = SamEncoder(self._state, sam_predictor)
-        # self.feature_selector: FeatureSelector = AverageFeatures(self._state)
-        self.feature_selector: FeatureSelector = ClusterFeatures(self._state)
+        self.encoder: Encoder = DinoEncoder(self._state)
+        self.feature_selector: FeatureSelector = AverageFeatures(self._state)
+        # self.feature_selector: FeatureSelector = ClusterFeatures(
+        #     self._state, num_clusters=3
+        # )
         self.similarity_matcher: SimilarityMatcher = CosineSimilarity(self._state)
-        self.prompt_generator: PromptGenerator = GridPromptGenerator(self._state)
+        self.prompt_generator: PromptGenerator = GridPromptGenerator(
+            self._state, downsizing=32, similarity_threshold=0.65, num_bg_points=1
+        )
         self.segmenter: Segmenter = SamDecoder(self._state, sam_predictor)
         self.mask_processor: MaskProcessor = MasksToPolygons(self._state)
         self.class_overlap_mask_filter: MaskFilter = ClassOverlapMaskFilter(self._state)
 
     def learn(self, reference_images: List[Image], reference_priors: List[Priors]):
-        s: State = self._state  # More compact name
+        s: State = self._state
 
         # Set input inside the state for convenience
         s.reference_images = reference_images
@@ -71,7 +76,7 @@ class PerSam(Pipeline):
         s.reference_features = self.feature_selector(s.reference_features)
 
     def infer(self, target_images: List[Image]):
-        s: State = self._state  # More compact name
+        s: State = self._state
 
         # Set input inside the state for convenience
         s.target_images = target_images

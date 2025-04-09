@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 import torch
 import torch.nn.functional as F
@@ -34,9 +34,9 @@ class SimilarityMatcher(Process):
     def _resize_similarities(
         self,
         similarities: torch.Tensor,
-        transformed_image_size: tuple[int, int],
         original_image_size: tuple[int, int],
         embedding_shape: tuple[int, int],
+        transformed_image_size: Optional[tuple[int, int]] = None,
     ) -> torch.Tensor:
         """
         This function resizes the similarities to the target image size while removing padding.
@@ -50,30 +50,46 @@ class SimilarityMatcher(Process):
         Returns:
             torch.Tensor The resized similarities
         """
-        similarities = similarities.reshape(
-            similarities.shape[0],
-            1,  # needed for bilinear interpolation
-            embedding_shape[0],
-            embedding_shape[1],
-        )
-        # resize the similarities to the target image size
-        similarities = F.interpolate(
-            similarities,
-            size=self._state.encoder_input_size,
-            mode="bilinear",
-            align_corners=False,
-        )
-        # remove padding
-        similarities = similarities[
-            ...,
-            : transformed_image_size[0],
-            : transformed_image_size[1],
-        ]
-        # resize back to original size
-        similarities = F.interpolate(
-            similarities,
-            size=original_image_size,
-            mode="bilinear",
-            align_corners=False,
-        ).squeeze(1)
+        if transformed_image_size is not None:
+            similarities = similarities.reshape(
+                similarities.shape[0],
+                1,  # needed for bilinear interpolation
+                embedding_shape[0],
+                embedding_shape[1],
+            )
+            # resize the similarities to the target image size
+            similarities = F.interpolate(
+                similarities,
+                size=self._state.encoder_input_size,
+                mode="bilinear",
+                align_corners=False,
+            )
+            # remove padding
+            similarities = similarities[
+                ...,
+                : transformed_image_size[0],
+                : transformed_image_size[1],
+            ]
+            # resize back to original size
+            similarities = F.interpolate(
+                similarities,
+                size=original_image_size,
+                mode="bilinear",
+                align_corners=False,
+            ).squeeze(1)
+        else:
+            similarities = similarities.reshape(
+                similarities.shape[0],
+                self._state.encoder_input_size // self._state.encoder_patch_size,
+                self._state.encoder_input_size // self._state.encoder_patch_size,
+            ).unsqueeze(0)
+            similarities = F.interpolate(
+                similarities,
+                size=original_image_size,
+                mode="bilinear",
+                align_corners=False,
+            ).squeeze(0)
+            if similarities.ndim == 4:
+                similarities = similarities.squeeze(0)
+
         return similarities

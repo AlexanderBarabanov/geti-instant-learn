@@ -1,5 +1,5 @@
 import os
-from algorithms import PerDinoPredictor, PerSamPredictor
+from context_learner.pipelines.perdino_pipeline import PerDino
 from model_api.models.model import Model
 from model_api.models.visual_prompting import SAMLearnableVisualPrompter
 
@@ -13,9 +13,7 @@ from PersonalizeSAM.per_segment_anything import SamPredictor
 from efficientvit.sam_model_zoo import create_efficientvit_sam_model
 
 
-def load_model(
-    backbone_name="SAM", pipeline_name="PerSAM"
-) -> Pipeline:
+def load_model(backbone_name="SAM", pipeline_name="PerSAM") -> Pipeline:
     if backbone_name not in MODEL_MAP:
         raise ValueError(f"Invalid model type: {backbone_name}")
 
@@ -37,6 +35,8 @@ def load_model(
     # Construct pipeline
     if pipeline_name == "PerSAMModular":
         return PerSam(sam_model)
+    elif pipeline_name == "PerDinoModular":
+        return PerDino(sam_model)
     elif pipeline_name == "MatcherModular":
         return Matcher(sam_model)
     elif pipeline_name == "PerSAMMAPI":

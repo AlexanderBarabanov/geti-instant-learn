@@ -44,6 +44,8 @@ class GridPromptGenerator(PromptGenerator):
             priors = Priors()
             original_image_size = self._state.target_images[i].size
             for class_id, similarities in similarities_per_image.data.items():
+                background_points = self._get_background_points(similarities)
+
                 for similarity_map in similarities:
                     foreground_points = self._get_foreground_points(
                         similarity_map, original_image_size, encoder_input_size
@@ -57,8 +59,6 @@ class GridPromptGenerator(PromptGenerator):
                             class_id,
                         )
                         continue
-
-                    background_points = self._get_background_points(similarity_map)
 
                     fg_point_labels = torch.ones(
                         (len(foreground_points), 1), device=foreground_points.device
@@ -146,6 +146,9 @@ class GridPromptGenerator(PromptGenerator):
         if self.num_bg_points == 0:
             return torch.empty((0, 3), device=similarity.device)
 
+        # Stack all similarity maps
+        if similarity.ndim == 3:
+            similarity = similarity.sum(dim=0)
         _, w_sim = similarity.shape
         bg_values, bg_indices = torch.topk(
             similarity.flatten(), self.num_bg_points, largest=False

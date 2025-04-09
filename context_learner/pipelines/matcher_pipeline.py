@@ -32,7 +32,6 @@ from context_learner.processes.similarity_matchers.similarity_matcher_base impor
     SimilarityMatcher,
 )
 from context_learner.types import Priors, State, Image
-from context_learner.processes.visualizations.export_visualization import ExportMaskVisualization
 
 
 class Matcher(Pipeline):
@@ -88,5 +87,3 @@ class Matcher(Pipeline):
         s.masks, s.used_points = self.segmenter(s.target_images, s.priors)
         s.masks = self.class_overlap_mask_filter(s.masks, s.used_points)
         s.annotations = self.mask_processor(s.masks)
-        return
-
