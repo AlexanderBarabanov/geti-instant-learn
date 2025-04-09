@@ -75,12 +75,10 @@ class BidirectionalPromptGenerator(PromptGenerator):
                     image_level_fg_points = torch.cat(
                         [image_level_fg_points, fg_point_labels], dim=1
                     )
-                    priors.points.add(image_level_fg_points, class_id)
+                    fg_bg_points = image_level_fg_points
                 else:
                     # Add empty tensor if no foreground points
-                    priors.points.add(
-                        torch.empty((0, 4), device=similarity_map.device), class_id
-                    )
+                    fg_bg_points = torch.empty(0, 4, device=similarity_map.device)
 
                 # Process background point
                 if bg_target_idx is not None:
@@ -98,12 +96,13 @@ class BidirectionalPromptGenerator(PromptGenerator):
                     image_level_bg_point = torch.cat(
                         [image_level_bg_point, bg_point_label], dim=1
                     )
-                    priors.points.add(image_level_bg_point, class_id)
+                    fg_bg_points = torch.cat([fg_bg_points, image_level_bg_point])
                 else:
                     # Handle case where no background point could be found (e.g., empty mask)
                     # Depending on desired behavior, could add an empty tensor or skip
                     print(f"No BG point found for class {class_id}")
 
+                priors.points.add(fg_bg_points, class_id)
             priors_per_image.append(priors)
 
         return priors_per_image

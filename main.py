@@ -1,6 +1,6 @@
 # ruff: noqa: E402
 import warnings
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Optional
 
 import sys
 
@@ -98,6 +98,7 @@ def predict_on_dataset2(
     pipeline_name: str,
     backbone_name: str,
     number_of_priors_tests: int,
+    number_of_batches: Optional[int]
 ):
     """
     This runs predictions on the dataset and evaluates them
@@ -111,7 +112,8 @@ def predict_on_dataset2(
         pipeline_name: The algorithm namen
         backbone_name: The model name
         number_of_priors_tests: The number of priors to try
-
+        number_of_batches: The number of batches per class to process (limited testing)
+            pass None to process all data
     Returns:
 
     """
@@ -167,6 +169,8 @@ def predict_on_dataset2(
                 gt_masks = visualizer.arrays_to_masks(masks)
                 visualizer(images=pipeline._state.target_images, masks=gt_masks, names=export_paths_gt)
                 metrics_calculators[priors_batch_index](predictions=pipeline._state.masks, references=gt_masks, mapping={0: category_name})
+                if number_of_batches is not None and batch_index > number_of_batches:
+                    break
 
             if priors_batch_index >= number_of_priors_tests - 1:
                 break  # Do not proceed with the next batch of priors
@@ -210,6 +214,7 @@ def main2():
     # Determine which models, datasets and algorithms to process
     datasets_to_run = DATASETS if args.dataset_name == "all" else [args.dataset_name]
     pipelines_to_run = ALGORITHMS if args.algo == "all" else [args.algo]
+    pipelines_to_run = ["MatcherModular"]
     backbones_to_run = MODEL_MAP.keys() if args.sam_name == "all" else [args.sam_name]
 
     # Create data frame with results
@@ -228,12 +233,13 @@ def main2():
                 unique_output = os.path.join(output_path, f"{dataset_name}_{backbone_name}_{pipeline_name}")
                 all_metrics_df = predict_on_dataset2(args, pipeline,
                                                      priors_dataset=dataset,
-                                                      dataset=dataset,
-                                                      unique_output=unique_output,
-                                                      dataset_name=dataset_name,
-                                                      pipeline_name=pipeline_name,
-                                                      backbone_name=backbone_name,
-                                                      number_of_priors_tests=1)
+                                                     dataset=dataset,
+                                                     unique_output=unique_output,
+                                                     dataset_name=dataset_name,
+                                                     pipeline_name=pipeline_name,
+                                                     backbone_name=backbone_name,
+                                                     number_of_priors_tests=1,
+                                                     number_of_batches=None)
                 all_results.append(all_metrics_df)
 
                 # Save and print (intermediate) results
