@@ -92,7 +92,8 @@ class LVISImage(Image):
         if not os.path.isfile(image_filename):
             logging.info(f"Downloading {self.source_url}")
             img_data = requests.get(self.source_url).content
-            with open(self.filename, 'wb') as handler:
+            os.makedirs(os.path.dirname(image_filename), exist_ok=True)
+            with open(image_filename, 'wb') as handler:
                 handler.write(img_data)
 
         pil_image = PILImage.open(image_filename).convert('RGB')
@@ -102,7 +103,7 @@ class LVISImage(Image):
 
 class LVISDataset(Dataset):
 
-    def __init__(self, root_path=os.path.expanduser(os.path.join("~", "data", "lvis")), whitelist: Optional[Union[str, List[str]]]=None, name="training", iterator_type: type(DatasetIter) = IndexIter, download_full_dataset=False, copy_files=False, iterator_kwargs={}):
+    def __init__(self, root_path=os.path.expanduser(os.path.join("~", "data", "lvis")), whitelist: Optional[Union[str, List[str]]]=None, name="training", iterator_type: type(DatasetIter) = IndexIter, download_full_dataset=True, copy_files=False, iterator_kwargs={}):
         """
         This method initializes the LVIS dataset. This class downloads and inflates all files.
 
@@ -341,7 +342,7 @@ class LVISDataset(Dataset):
         self._category_name_to_id = {d["name"]: d["id"] for d in categories_info}
         self.image_count = {d["name"]: d["image_count"] for d in categories_info}
         self.instance_count = {d["name"]: d["instance_count"] for d in categories_info}
-        self.instances_per_image = [c["instance_count"] / c["image_count"] for c in categories_info]
+        self.instances_per_image = {c["name"]: c["instance_count"] / c["image_count"] for c in categories_info if c["image_count"] > 0}
         if len(self._whitelist) == 0:
             self._whitelist = list(self._category_name_to_id.keys())
         self._category_index_to_id = [self._category_name_to_id[cn] for cn in self._whitelist]
@@ -381,9 +382,11 @@ class LVISDataset(Dataset):
             for image_info in images_info[name]:
                 image_id = image_info["id"]
                 if image_id in self._image_to_annotations[name].keys():
+                    coco_subset = os.path.dirname(image_info["coco_url"]).split("/")[-1]
                     base_name = os.path.basename(image_info["coco_url"])
                     output_filename = os.path.join(self._root_path, name, base_name)
-                    source_filename = os.path.join(self._subset_files["source_folders"][name], base_name)
+                    base_folder = os.path.join(*(["/"] + self._subset_files["source_folders"][name].split("/")[:-1] + [coco_subset]))
+                    source_filename = os.path.join(base_folder, base_name)
                     i = LVISImage(output_filename, image_info["height"], image_info["width"], source_url=image_info["coco_url"], source_filename=source_filename, copy_file=self._copy_files)
                     for annotation_id in self._image_to_annotations[name][image_id]:
                         annotation = self._annotations[name][annotation_id]
