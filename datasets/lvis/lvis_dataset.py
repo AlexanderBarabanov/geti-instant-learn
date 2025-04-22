@@ -153,9 +153,9 @@ class LVISDataset(Dataset):
         self._category_id_to_name: Dict[int, str] = {}
         self._category_name_to_id: Dict[str, int] = {}
 
-        self.instance_count = None
-        self.image_count = None
-        self.instances_per_image = None
+        self.instance_count: Dict[str, int] = {}  # name: count
+        self.image_count: Dict[str, int] = {}  # name: count
+        self.instances_per_image: Dict[str, float] = {}  # name: count per image
 
         # Images and Annotations
         self._image_index_to_id: Dict[str, List[int]] = {}  # subset_name: [image_id]
@@ -548,7 +548,7 @@ class LVISDataset(Dataset):
 
 def test_index_iter():
     # Use default index iterator (PyTorch style)
-    dataset = LVISDataset(whitelist=['teacup', 'doughnut'], download_full_dataset=True, copy_files=False)
+    dataset = LVISDataset(whitelist=["cupcake", "sheep", "pastry", "doughnut"], download_full_dataset=True, copy_files=False)
 
     for image_index, (image, masks) in enumerate(dataset):
         # Generate and save overlays
@@ -563,7 +563,7 @@ def test_index_iter():
 
 def test_category_iter():
     # Use category iterator
-    dataset = LVISDataset(whitelist=['teacup', 'doughnut'], iterator_type=CategoryIter, download_full_dataset=True, copy_files=False)
+    dataset = LVISDataset(whitelist=["cupcake", "sheep", "pastry", "doughnut"], iterator_type=CategoryIter, download_full_dataset=True, copy_files=False)
 
     for category_index, (images, masks) in enumerate(dataset):
         for image_index, (image, mask) in enumerate(zip(images, masks)):
@@ -577,5 +577,5 @@ def test_category_iter():
 
 
 if __name__ == "__main__":
-    test_index_iter()
+    # test_index_iter()
     test_category_iter()

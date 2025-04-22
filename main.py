@@ -214,7 +214,6 @@ def main2():
     # Determine which models, datasets and algorithms to process
     datasets_to_run = DATASETS if args.dataset_name == "all" else [args.dataset_name]
     pipelines_to_run = ALGORITHMS if args.algo == "all" else [args.algo]
-    pipelines_to_run = ["MatcherModular"]
     backbones_to_run = MODEL_MAP.keys() if args.sam_name == "all" else [args.sam_name]
 
     # Create data frame with results

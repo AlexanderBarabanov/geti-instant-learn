@@ -1,6 +1,4 @@
-from typing import Tuple, List, Dict, Sized, Iterable
-
-from typing import List, Dict, Iterable
+from typing import List, Dict, Iterable, Type
 import requests
 import zipfile
 import os
@@ -30,8 +28,7 @@ class Image:
 
 
 class Dataset(torch.utils.data.Dataset, Iterable):
-
-    def __init__(self, iterator_type: type(DatasetIter), iterator_kwargs={}):
+    def __init__(self, iterator_type: Type[DatasetIter], iterator_kwargs={}):
         self._iterator_type = iterator_type
         self._iterator_kwargs = iterator_kwargs
         self.index = 0
@@ -66,7 +63,9 @@ class Dataset(torch.utils.data.Dataset, Iterable):
         """
         raise NotImplementedError()
 
-    def get_images_by_category(self, category_index_or_name: int | str, start: int = None, end: int = None) -> List[np.ndarray]:
+    def get_images_by_category(
+        self, category_index_or_name: int | str, start: int = None, end: int = None
+    ) -> List[np.ndarray]:
         """
         This method returns a list of images of a certain category.
             The parameters start and end are passed through Python's slice() function.
@@ -82,7 +81,9 @@ class Dataset(torch.utils.data.Dataset, Iterable):
         """
         raise NotImplementedError()
 
-    def get_masks_by_category(self, category_index_or_name: int | str, start: int = None, end: int = None) -> List[np.ndarray]:
+    def get_masks_by_category(
+        self, category_index_or_name: int | str, start: int = None, end: int = None
+    ) -> List[np.ndarray]:
         """
         This method returns a list of masks of a certain category.
             each individual instance of the category has a unique pixel value.
@@ -128,9 +129,8 @@ class Dataset(torch.utils.data.Dataset, Iterable):
         """
         return 0
 
-
     def get_category_count(self):
-        """ This method returns the number of categories """
+        """This method returns the number of categories"""
         return 0
 
     def get_image_filename(self, index: int):
@@ -146,7 +146,9 @@ class Dataset(torch.utils.data.Dataset, Iterable):
         """
         return ""
 
-    def get_image_filename_in_category(self, category_index_or_name: int | str, index: int):
+    def get_image_filename_in_category(
+        self, category_index_or_name: int | str, index: int
+    ):
         """
         Gives the source filename of the image.
 
@@ -161,27 +163,27 @@ class Dataset(torch.utils.data.Dataset, Iterable):
         return ""
 
     def category_index_to_id(self, index: int) -> int:
-        """ Return the category id given the category index """
+        """Return the category id given the category index"""
         return -1
 
     def category_id_to_name(self, id: int) -> str:
-        """ Return the category name given a category id """
+        """Return the category name given a category id"""
         return ""
 
     def category_name_to_id(self, name: str) -> int:
-        """ Return the category id given a category name """
+        """Return the category id given a category name"""
         return -1
 
     def category_name_to_index(self, name: str) -> int:
-        """ Return the category index given a category name """
+        """Return the category index given a category name"""
         return -1
 
     def category_index_to_name(self, index: int) -> str:
-        """ Return the category index given a category name """
+        """Return the category index given a category name"""
         return self.category_id_to_name(self.category_index_to_id(index))
 
     def _download(self, source: str, destination: str):
-        """ Helper function to download data with caching """
+        """Helper function to download data with caching"""
         if os.path.isfile(destination):
             logging.info(f"Using cached downloaded file {destination}")
             return
@@ -190,22 +192,22 @@ class Dataset(torch.utils.data.Dataset, Iterable):
 
         response = requests.get(source)
         if response.status_code == 200:
-            with open(destination, 'wb') as file:
+            with open(destination, "wb") as file:
                 file.write(response.content)
-            logging.info(f'Downloaded {source} to {destination}')
+            logging.info(f"Downloaded {source} to {destination}")
         else:
-            logging.info(f'Failed to download {source}')
+            logging.info(f"Failed to download {source}")
 
     def _unzip(self, source: str, destination: str):
-        """ Helper function to unzip data with caching """
+        """Helper function to unzip data with caching"""
         if os.path.isfile(destination) or os.path.isdir(destination):
             logging.info(f"Using cached unzipped file or folder {destination}")
             return
 
-        with zipfile.ZipFile(source, 'r') as zf:
+        with zipfile.ZipFile(source, "r") as zf:
             zf.extractall(os.path.dirname(source))
 
-        logging.info(f'Unzipped {source} to {destination}')
+        logging.info(f"Unzipped {source} to {destination}")
 
     def __len__(self) -> int:
         """
