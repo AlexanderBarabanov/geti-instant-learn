@@ -1,17 +1,13 @@
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 import numpy as np
 import torch
 from torch.nn import functional as F
 
 from context_learner.processes.encoders.encoder_base import Encoder
-from context_learner.types.features import Features
-from context_learner.types.image import Image
-from context_learner.types.masks import Masks
-from context_learner.types.priors import Priors
-from context_learner.types.state import State
+from context_learner.types import Features, Image, Masks, Priors, State
 
-from PersonalizeSAM.per_segment_anything.predictor import SamPredictor
+from third_party.Matcher.segment_anything.predictor import SamPredictor
 
 
 class SamEncoder(Encoder):

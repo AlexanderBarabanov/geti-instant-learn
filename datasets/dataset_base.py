@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import logging
 
-from datasets.dataset_iterator_base import DatasetIter
+from datasets.dataset_iterators import DatasetIter
 
 
 class Annotation:

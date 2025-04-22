@@ -9,3 +9,12 @@ model_api/data/
 __MACOSX/
 .idea
 results/
+node_modules/
+.prettier-caches/
+node_modules/
+.mypy_cache/
+.ruff_cache/
+.cache/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/

@@ -1,66 +1,61 @@
+import argparse
 from typing import List
 
-from Matcher.segment_anything import SamPredictor
-from context_learner.filters.masks.mask_filter_base import MaskFilter
-from context_learner.filters.masks.mask_filter_class_overlap import (
-    ClassOverlapMaskFilter,
-)
+from third_party.Matcher.segment_anything import SamPredictor
+from context_learner.filters.masks import MaskFilter
+from context_learner.filters.masks import ClassOverlapMaskFilter
 from context_learner.pipelines.pipeline_base import Pipeline
-from context_learner.processes.encoders.encoder_base import Encoder
-from context_learner.processes.encoders.sam_encoder import SamEncoder
-from context_learner.processes.feature_selectors.average_features import AverageFeatures
-from context_learner.processes.feature_selectors.cluster_features import ClusterFeatures
-from context_learner.processes.feature_selectors.feature_selector_base import (
+from context_learner.processes.encoders import SamEncoder, Encoder
+from context_learner.processes.feature_selectors import (
+    ClusterFeatures,
     FeatureSelector,
 )
-from context_learner.processes.mask_processors.mask_processor_base import MaskProcessor
-from context_learner.processes.mask_processors.mask_to_polygon import MasksToPolygons
-from context_learner.processes.prompt_generators.grid_prompt_generator import (
+from context_learner.processes.mask_processors import MaskProcessor, MasksToPolygons
+from context_learner.processes.prompt_generators import (
     GridPromptGenerator,
-)
-from context_learner.processes.prompt_generators.prompt_generator_base import (
     PromptGenerator,
 )
-from context_learner.processes.segmenters.sam_decoder import SamDecoder
-from context_learner.processes.segmenters.segmenter_base import Segmenter
-from context_learner.processes.similarity_matchers.cosine_similarity import (
+from context_learner.processes.segmenters import SamDecoder, Segmenter
+from context_learner.processes.similarity_matchers import (
     CosineSimilarity,
-)
-from context_learner.processes.similarity_matchers.similarity_matcher_base import (
     SimilarityMatcher,
 )
-from context_learner.types.image import Image
-from context_learner.types.priors import Priors
-from context_learner.types.state import State
+from context_learner.types import Image, Priors, State
 
 
 class PerSam(Pipeline):
     """
-    This is the PerSam algorithm pipeline
+    This is the PerSam algorithm pipeline. Its based on the paper "Personalize Segment Anything Model with One Shot"
+    https://arxiv.org/abs/2305.03048
 
-    >>> p = PerSam()
-    >>> p.learn([Image()] * 3, [Annotations()] * 3)
-    >>> a = p.infer([Image()])
-    >>> isinstance(a[0], Annotations)
-    True
+    It matches reference objects to target images by comparing their features extracted by SAM and using Cosine Similarity.
+    A grid prompt generator is used to generate prompts for the segmenter and to allow for multi object target images.
     """
 
-    def __init__(self, sam_predictor: SamPredictor):
-        super().__init__()
+    def __init__(self, sam_predictor: SamPredictor, args: argparse.Namespace):
+        super().__init__(args)
 
         self.encoder: Encoder = SamEncoder(self._state, sam_predictor)
         # self.feature_selector: FeatureSelector = AverageFeatures(self._state)
-        self.feature_selector: FeatureSelector = ClusterFeatures(self._state)
+        self.feature_selector: FeatureSelector = ClusterFeatures(
+            self._state, num_clusters=self.args.num_clusters
+        )
         self.similarity_matcher: SimilarityMatcher = CosineSimilarity(self._state)
-        self.prompt_generator: PromptGenerator = GridPromptGenerator(self._state)
-        self.segmenter: Segmenter = SamDecoder(self._state, sam_predictor)
+        self.prompt_generator: PromptGenerator = GridPromptGenerator(
+            self._state,
+            similarity_threshold=self.args.similarity_threshold,
+            num_bg_points=self.args.num_background_points,
+        )
+        self.segmenter: Segmenter = SamDecoder(
+            self._state,
+            sam_predictor=sam_predictor,
+            apply_mask_refinement=self.args.apply_mask_refinement,
+        )
         self.mask_processor: MaskProcessor = MasksToPolygons(self._state)
         self.class_overlap_mask_filter: MaskFilter = ClassOverlapMaskFilter(self._state)
 
     def learn(self, reference_images: List[Image], reference_priors: List[Priors]):
-        s: State = self._state  # More compact name
-
-        # Set input inside the state for convenience
+        s: State = self._state
         s.reference_images = reference_images
         s.reference_priors = reference_priors
 
@@ -71,9 +66,7 @@ class PerSam(Pipeline):
         s.reference_features = self.feature_selector(s.reference_features)
 
     def infer(self, target_images: List[Image]):
-        s: State = self._state  # More compact name
-
-        # Set input inside the state for convenience
+        s: State = self._state
         s.target_images = target_images
 
         # Start running the pipeline

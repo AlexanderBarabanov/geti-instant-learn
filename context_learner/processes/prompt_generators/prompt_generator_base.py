@@ -2,9 +2,8 @@ from typing import List
 
 import torch
 
-from context_learner.processes.process_base import Process
-from context_learner.types.priors import Priors
-from context_learner.types.similarities import Similarities
+from context_learner.processes import Process
+from context_learner.types import Priors, Similarities
 
 
 class PromptGenerator(Process):

@@ -1,8 +1,7 @@
 from typing import List
 
-from context_learner.processes.process_base import Process
-from context_learner.types.masks import Masks
-from context_learner.types.priors import Priors
+from context_learner.processes import Process
+from context_learner.types import Masks, Priors
 
 
 class Segmenter(Process):

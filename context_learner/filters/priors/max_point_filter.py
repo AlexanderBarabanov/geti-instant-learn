@@ -3,8 +3,7 @@ from typing import List
 import torch
 
 from context_learner.filters.priors.prior_filter_base import PriorFilter
-from context_learner.types.priors import Priors
-from context_learner.types.state import State
+from context_learner.types import Priors, State
 
 
 class MaxPointFilter(PriorFilter):
@@ -59,13 +58,12 @@ class MaxPointFilter(PriorFilter):
 
         fg_indices = (points[:, 3] == 1).nonzero()[:, 0]
         bg_indices = (points[:, 3] == 0).nonzero()[:, 0]
-        num_bg_points = bg_indices.shape[0]
 
         fg_points = points[fg_indices]
         bg_points = points[bg_indices]
 
         _, fg_indices_sorted = torch.sort(fg_points[:, 2], descending=True)
-        fg_indices_select = fg_indices_sorted[:self.max_num_points]
+        fg_indices_select = fg_indices_sorted[: self.max_num_points]
         fg_points_select = fg_points[fg_indices_select]
 
         # return best matching foreground points and add all background_points

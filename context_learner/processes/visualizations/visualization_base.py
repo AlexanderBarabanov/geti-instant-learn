@@ -2,13 +2,8 @@ from typing import List
 
 import torch
 import numpy as np
-from context_learner.processes.process_base import Process
-from context_learner.types import Points
-from context_learner.types.features import Features
-from context_learner.types.image import Image
-from context_learner.types.masks import Masks
-from context_learner.types.priors import Priors
-from context_learner.types.state import State
+from context_learner.processes import Process
+from context_learner.types import Points, Priors, Masks, State
 
 
 class Visualization(Process):
@@ -16,11 +11,11 @@ class Visualization(Process):
         super().__init__(state)
 
     @staticmethod
-    def priors_to_masks(priors: List[Priors]) -> List[Masks]:
+    def masks_from_priors(priors: List[Priors]) -> List[Masks]:
         return [m.masks for m in priors]
 
     @staticmethod
-    def priors_to_points(priors: List[Priors]) -> List[Points]:
+    def points_from_priors(priors: List[Priors]) -> List[Points]:
         return [m.points for m in priors]
 
     @staticmethod

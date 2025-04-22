@@ -1,35 +1,24 @@
-# ruff: noqa: E402
-import warnings
-from typing import Tuple, List, Dict, Optional
-
-import sys
-
-from context_learner.pipelines.pipeline_base import Pipeline
-from context_learner.processes.calculators.segmentation_metrics import SegmentationMetrics
-from context_learner.processes.visualizations.export_visualization import ExportMaskVisualization
-from context_learner.types.image import Image
-from context_learner.types.masks import Masks
-from context_learner.types.priors import Priors
-from datasets.dataset_base import Dataset, DatasetIter
-from datasets.dataset_iterators import BatchedCategoryIter, BatchedSingleCategoryIter
-from utils.args import get_arguments
-
-warnings.filterwarnings("ignore", category=FutureWarning)
 import argparse
 import os
+import sys
 import shutil
 import time
 import cv2
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from algorithms import PerDinoPredictor, PerSamPredictor
-from utils.constants import MODEL_MAP, DATASETS, ALGORITHMS
-from P2SAM.eval_utils import AverageMeter, intersectionAndUnion
-from model_api.models.visual_prompting import Prompt, SAMLearnableVisualPrompter
+import logging
+from typing import List, Dict, Optional
+
+from context_learner.pipelines import Pipeline
+from context_learner.processes.calculators import SegmentationMetrics
+from context_learner.processes.visualizations import ExportMaskVisualization
+from context_learner.types import Image, Masks, Priors
+from datasets import Dataset, BatchedSingleCategoryIter
+from utils.args import get_arguments
+from utils.constants import MODEL_MAP, DATASETS, PIPELINES
 from utils.models import load_model
 from utils.data import load_dataset
-import logging
 
 
 def handle_output_path(output_path: str, overwrite: bool):
@@ -37,7 +26,9 @@ def handle_output_path(output_path: str, overwrite: bool):
         if overwrite:
             shutil.rmtree(output_path)
         else:
-            choice = input(f"Output path {output_path} already exists. Do you want to overwrite it? (y/n)\n")
+            choice = input(
+                f"Output path {output_path} already exists. Do you want to overwrite it? (y/n)\n"
+            )
             if choice == "y":
                 print("Removing existing output data")
                 shutil.rmtree(output_path)
@@ -50,7 +41,7 @@ def handle_output_path(output_path: str, overwrite: bool):
 
 def get_all_instances(images: List[np.ndarray], masks: List[np.ndarray], count: int):
     """
-    This method returns priors including masks. It only all first instances.
+    This method returns priors including masks.
 
     Args:
         images: The list of images of a certain category
@@ -76,7 +67,14 @@ def get_all_instances(images: List[np.ndarray], masks: List[np.ndarray], count: 
 
 
 def save_priors(prior_images: List[Image], prior_masks: List[Masks], output_path):
-    # save prior images and masks to disk (merging instances)
+    """
+    This method saves the priors to disk.
+
+    Args:
+        prior_images: The list of prior images
+        prior_masks: The list of prior masks
+        output_path: The path to save the priors
+    """
     os.makedirs(output_path, exist_ok=True)
     for i, (image, mask) in enumerate(zip(prior_images, prior_masks)):
         mask_np = mask.to_numpy()[0]  # Mask is CHW
@@ -88,7 +86,7 @@ def save_priors(prior_images: List[Image], prior_masks: List[Masks], output_path
         cv2.imwrite(os.path.join(output_path, f"prior_{i}.png"), overlay)
 
 
-def predict_on_dataset2(
+def predict_on_dataset(
     args: argparse.Namespace,
     pipeline: Pipeline,
     priors_dataset: Dataset,
@@ -98,7 +96,7 @@ def predict_on_dataset2(
     pipeline_name: str,
     backbone_name: str,
     number_of_priors_tests: int,
-    number_of_batches: Optional[int]
+    number_of_batches: Optional[int],
 ):
     """
     This runs predictions on the dataset and evaluates them
@@ -120,55 +118,132 @@ def predict_on_dataset2(
     unique_output = handle_output_path(unique_output, args.overwrite)
     print(f"Output path: {unique_output}")
 
-    visualizer = ExportMaskVisualization(state=pipeline._state, output_folder=unique_output)
-    metrics_calculators: Dict[int, SegmentationMetrics] = dict()  # keep metrics per prior
+    visualizer = ExportMaskVisualization(
+        state=pipeline._state, output_folder=unique_output
+    )
+    metrics_calculators: Dict[int, SegmentationMetrics] = (
+        dict()
+    )  # keep metrics per prior
 
     time_sum = 0
     time_count = 0
     # Iterate over all categories in the dataset
-    for category_index, batches in tqdm(enumerate(dataset), total=dataset.get_category_count(), desc="categories"):
+    for category_index, batches in tqdm(
+        enumerate(dataset), total=dataset.get_category_count(), desc="categories"
+    ):
         category_name = dataset.category_index_to_name(category_index)
 
         # Find the index of the current category in the priors_dataset.
         priors_cat_index = priors_dataset.category_name_to_index(category_name)
 
         # Iterate over all priors in the batch (break after number_of_prior_test iterations)
-        for priors_batch_index, (priors_images, priors_masks) in tqdm(enumerate(BatchedSingleCategoryIter(priors_dataset, args.n_shot, priors_cat_index)), desc=f"priors {category_name}"):
-
+        for priors_batch_index, (priors_images, priors_masks) in tqdm(
+            enumerate(
+                BatchedSingleCategoryIter(priors_dataset, args.n_shot, priors_cat_index)
+            ),
+            desc=f"priors {category_name}",
+        ):
             # Add a new metrics calculator if needed
             if priors_batch_index not in metrics_calculators.keys():
-                metrics_calculators[priors_batch_index] = SegmentationMetrics(state=pipeline._state, categories=dataset.get_categories())
+                metrics_calculators[priors_batch_index] = SegmentationMetrics(
+                    state=pipeline._state, categories=dataset.get_categories()
+                )
 
             # Select  priors
-            priors_images, priors_masks = get_all_instances(priors_images, priors_masks, args.n_shot)
+            priors_images, priors_masks = get_all_instances(
+                priors_images, priors_masks, args.n_shot
+            )
 
             # Learn using the priors (currently only use the first masks)
             priors = [Priors(masks=priors_masks[0])]
             pipeline.learn(reference_images=priors_images, reference_priors=priors)
 
             # Save priors
-            priors_export_paths = [os.path.join("priors", f"priors_batch_{priors_batch_index}", category_name, f"prior_{image_index}.png") for image_index in range(len(priors_images))]
-            masks_priors = visualizer.priors_to_masks(pipeline._state.reference_priors)
-            visualizer(images=pipeline._state.reference_images, masks=masks_priors, names=priors_export_paths)
+            priors_export_paths = [
+                os.path.join(
+                    "priors",
+                    f"priors_batch_{priors_batch_index}",
+                    category_name,
+                    f"prior_{image_index}.png",
+                )
+                for image_index in range(len(priors_images))
+            ]
+            masks_priors = visualizer.masks_from_priors(
+                pipeline._state.reference_priors
+            )
+            visualizer(
+                images=pipeline._state.reference_images,
+                masks=masks_priors,
+                names=priors_export_paths,
+            )
 
             # Iterate over all batches
             batches.reset()  # reset batch iterator because it was consumed
-            for batch_index, (images, masks) in enumerate(tqdm(batches, total=len(batches), desc=f"batches {category_name}")):
+            for batch_index, (images, masks) in enumerate(
+                tqdm(batches, total=len(batches), desc=f"batches {category_name}")
+            ):
                 target_images = [Image(image) for image in images]
                 start_time = time.time()
                 pipeline.infer(target_images=target_images)
-                time_sum += (time.time() - start_time)
+                time_sum += time.time() - start_time
                 time_count += len(images)
 
                 # Generate names for exported files and export them
-                export_paths = [os.path.join("predictions", f"priors_batch_{priors_batch_index}", category_name, os.path.basename(batches.get_image_filename(batch_index, image_index))) for image_index in range(len(images))]
-                export_paths_all_points = [os.path.join("predictions_all_points", f"priors_batch_{priors_batch_index}", category_name, os.path.basename(batches.get_image_filename(batch_index, image_index))) for image_index in range(len(images))]
-                export_paths_gt = [os.path.join("ground_truth", f"priors_batch_{priors_batch_index}",category_name, os.path.basename(batches.get_image_filename(batch_index, image_index))) for image_index in range(len(images))]
-                visualizer(images=pipeline._state.target_images, masks=pipeline._state.masks, names=export_paths)
-                visualizer(images=pipeline._state.target_images, masks=pipeline._state.masks, names=export_paths_all_points, points=visualizer.priors_to_points(visualizer._state.priors))
+                export_paths = [
+                    os.path.join(
+                        "predictions",
+                        f"priors_batch_{priors_batch_index}",
+                        category_name,
+                        os.path.basename(
+                            batches.get_image_filename(batch_index, image_index)
+                        ),
+                    )
+                    for image_index in range(len(images))
+                ]
+                export_paths_all_points = [
+                    os.path.join(
+                        "predictions_all_points",
+                        f"priors_batch_{priors_batch_index}",
+                        category_name,
+                        os.path.basename(
+                            batches.get_image_filename(batch_index, image_index)
+                        ),
+                    )
+                    for image_index in range(len(images))
+                ]
+                export_paths_gt = [
+                    os.path.join(
+                        "ground_truth",
+                        f"priors_batch_{priors_batch_index}",
+                        category_name,
+                        os.path.basename(
+                            batches.get_image_filename(batch_index, image_index)
+                        ),
+                    )
+                    for image_index in range(len(images))
+                ]
+                visualizer(
+                    images=pipeline._state.target_images,
+                    masks=pipeline._state.masks,
+                    names=export_paths,
+                )
+                visualizer(
+                    images=pipeline._state.target_images,
+                    masks=pipeline._state.masks,
+                    names=export_paths_all_points,
+                    points=visualizer.points_from_priors(visualizer._state.priors),
+                )
                 gt_masks = visualizer.arrays_to_masks(masks)
-                visualizer(images=pipeline._state.target_images, masks=gt_masks, names=export_paths_gt)
-                metrics_calculators[priors_batch_index](predictions=pipeline._state.masks, references=gt_masks, mapping={0: category_name})
+                visualizer(
+                    images=pipeline._state.target_images,
+                    masks=gt_masks,
+                    names=export_paths_gt,
+                )
+                metrics_calculators[priors_batch_index](
+                    predictions=pipeline._state.masks,
+                    references=gt_masks,
+                    mapping={0: category_name},
+                )
                 if number_of_batches is not None and batch_index > number_of_batches:
                     break
 
@@ -182,8 +257,14 @@ def predict_on_dataset2(
         ln = len(metrics["category"])
         metrics["prior_index"] = [prior_index] * ln
         metrics["inference_time"] = [time_count / time_sum] * ln
-        metrics["images_per_category"] = [dataset.get_image_count_per_category(cat_name) for cat_name in metrics["category"]]
-        metrics["instances_per_category"] = [dataset.get_instance_count_per_category(cat_name) for cat_name in metrics["category"]]
+        metrics["images_per_category"] = [
+            dataset.get_image_count_per_category(cat_name)
+            for cat_name in metrics["category"]
+        ]
+        metrics["instances_per_category"] = [
+            dataset.get_instance_count_per_category(cat_name)
+            for cat_name in metrics["category"]
+        ]
         metrics["dataset_name"] = [dataset_name] * ln
         metrics["pipeline_name"] = [pipeline_name] * ln
         metrics["backbone_name"] = [backbone_name] * ln
@@ -197,23 +278,28 @@ def predict_on_dataset2(
     all_metrics_df = pd.DataFrame.from_dict(all_metrics)
 
     # Print stats
-    print(f"\nDataset: {dataset_name}, Backbone: {backbone_name}, Pipeline: {pipeline_name}")
+    print(
+        f"\nDataset: {dataset_name}, Backbone: {backbone_name}, Pipeline: {pipeline_name}"
+    )
     print("nmIoU:      %.2f" % (100 * all_metrics_df.iou.mean()))
     print("mPrecision: %.2f" % (100 * all_metrics_df.recall.mean()))
     print("mRecall:    %.2f" % (100 * all_metrics_df.precision.mean()))
-    print("Inference time: %.2f seconds/target image" % all_metrics_df.inference_time.mean())
+    print(
+        "Inference time: %.2f seconds/target image"
+        % all_metrics_df.inference_time.mean()
+    )
     return all_metrics_df
 
 
-def main2():
+def main():
     # Initialize
     args = get_arguments()
     output_path = os.path.expanduser(os.path.join("~", "outputs"))
     os.makedirs(output_path, exist_ok=True)
 
-    # Determine which models, datasets and algorithms to process
+    # Determine which models, datasets and pipelines to process
     datasets_to_run = DATASETS if args.dataset_name == "all" else [args.dataset_name]
-    pipelines_to_run = ALGORITHMS if args.algo == "all" else [args.algo]
+    pipelines_to_run = PIPELINES if args.pipeline == "all" else [args.pipeline]
     backbones_to_run = MODEL_MAP.keys() if args.sam_name == "all" else [args.sam_name]
 
     # Create data frame with results
@@ -228,26 +314,39 @@ def main2():
         for dataset_name in datasets_to_run:
             dataset = load_dataset(dataset_name, whitelist=args.class_name)
             for pipeline_name in pipelines_to_run:
-                pipeline = load_model(backbone_name, pipeline_name)
-                unique_output = os.path.join(output_path, f"{dataset_name}_{backbone_name}_{pipeline_name}")
-                all_metrics_df = predict_on_dataset2(args, pipeline,
-                                                     priors_dataset=dataset,
-                                                     dataset=dataset,
-                                                     unique_output=unique_output,
-                                                     dataset_name=dataset_name,
-                                                     pipeline_name=pipeline_name,
-                                                     backbone_name=backbone_name,
-                                                     number_of_priors_tests=1,
-                                                     number_of_batches=None)
+                pipeline = load_model(backbone_name, pipeline_name, args)
+                unique_output = os.path.join(
+                    output_path, f"{dataset_name}_{backbone_name}_{pipeline_name}"
+                )
+                all_metrics_df = predict_on_dataset(
+                    args,
+                    pipeline,
+                    priors_dataset=dataset,
+                    dataset=dataset,
+                    unique_output=unique_output,
+                    dataset_name=dataset_name,
+                    pipeline_name=pipeline_name,
+                    backbone_name=backbone_name,
+                    number_of_priors_tests=1,
+                    number_of_batches=None,
+                )
                 all_results.append(all_metrics_df)
 
                 # Save and print (intermediate) results
                 all_result_dataframe = pd.concat(all_results, ignore_index=True)
-                all_results_dataframe_filename = os.path.join(output_path, f"models-{backbones_str}_datasets-{datasets_str}_algorithms-{pipelines_str}_all_results.csv")
+                all_results_dataframe_filename = os.path.join(
+                    output_path,
+                    f"models-{backbones_str}_datasets-{datasets_str}_algorithms-{pipelines_str}_all_results.csv",
+                )
                 all_result_dataframe.to_csv(all_results_dataframe_filename)
 
-                avg_results_dataframe_filename = os.path.join(output_path, f"models-{backbones_str}_datasets-{datasets_str}_algorithms-{pipelines_str}_avg_results.csv")
-                avg_result_dataframe = all_result_dataframe.groupby(["dataset_name", "pipeline_name", "backbone_name"]).mean(numeric_only=True)
+                avg_results_dataframe_filename = os.path.join(
+                    output_path,
+                    f"models-{backbones_str}_datasets-{datasets_str}_algorithms-{pipelines_str}_avg_results.csv",
+                )
+                avg_result_dataframe = all_result_dataframe.groupby(
+                    ["dataset_name", "pipeline_name", "backbone_name"]
+                ).mean(numeric_only=True)
                 avg_result_dataframe.to_csv(avg_results_dataframe_filename)
 
     print(f"\n\n Results: {avg_result_dataframe}")
@@ -255,4 +354,4 @@ def main2():
 
 if __name__ == "__main__":
     logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-    main2()
+    main()

@@ -1,14 +1,12 @@
 import os
 import cv2
-from typing import List, Tuple
+from typing import List
 import numpy as np
 
-from context_learner.processes.visualizations.visualization_base import Visualization
-from context_learner.types import Points
-from context_learner.types.image import Image
-from context_learner.types.masks import Masks
-from context_learner.types.priors import Priors
-from context_learner.types.state import State
+from context_learner.processes.visualizations.visualization_base import (
+    Visualization,
+)
+from context_learner.types import Image, Masks, Points, State
 from utils.utils import get_colors
 
 
@@ -18,7 +16,9 @@ class ExportMaskVisualization(Visualization):
         self.output_folder = output_folder
 
     @staticmethod
-    def create_overlay(image: np.ndarray, masks: np.ndarray, points=None, scores=None, types=None) -> np.ndarray:
+    def create_overlay(
+        image: np.ndarray, masks: np.ndarray, points=None, scores=None, types=None
+    ) -> np.ndarray:
         """
         Save a visualization of the segmentation mask overlaid on the image.
 
@@ -46,19 +46,42 @@ class ExportMaskVisualization(Visualization):
                     # Draw star marker
                     x, y = int(point[0]), int(point[1])
                     size = int(image.shape[0] / 50)  # Scale marker size with image
-                    cv2.drawMarker(image_vis, (x, y), (255, 255, 255), cv2.MARKER_STAR if types[i] == 1. else cv2.MARKER_SQUARE , size)
+                    cv2.drawMarker(
+                        image_vis,
+                        (x, y),
+                        (255, 255, 255),
+                        cv2.MARKER_STAR if types[i] == 1.0 else cv2.MARKER_SQUARE,
+                        size,
+                    )
 
                     # Add confidence score text
                     confidence = float(scores[i])
-                    cv2.putText(image_vis,f"{confidence:.2f}",(x + 5, y - 5), cv2.FONT_HERSHEY_SIMPLEX, image.shape[0] / 1500, (255, 255, 255), 1)
+                    cv2.putText(
+                        image_vis,
+                        f"{confidence:.2f}",
+                        (x + 5, y - 5),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        image.shape[0] / 1500,
+                        (255, 255, 255),
+                        1,
+                    )
         return image_vis
 
-    def __call__(self, images: List[Image], masks: List[Masks], names: List[str], points: List[Points] = None):
+    def __call__(
+        self,
+        images: List[Image],
+        masks: List[Masks],
+        names: List[str],
+        points: List[Points] = None,
+    ):
         # Use points from the state if they are not passed
         if points is None:
             points = [None] * len(images)
             for i in range(len(points)):
-                if len(self._state.used_points) > 0 and len(self._state.used_points[i].data.keys()) > 0:
+                if (
+                    len(self._state.used_points) > 0
+                    and len(self._state.used_points[i].data.keys()) > 0
+                ):
                     points[i] = self._state.used_points[i]
 
         # Generate overlay
@@ -80,14 +103,20 @@ class ExportMaskVisualization(Visualization):
                 mask_np = masks_per_class.to_numpy(class_id)
                 if points[i] is not None:
                     current_points = points[i].data[class_id][0]
-                    yxs, scores, types = current_points.cpu().numpy()[:, :2], current_points.cpu().numpy()[:, 2], current_points.cpu().numpy()[:, 3]
+                    yxs, scores, types = (
+                        current_points.cpu().numpy()[:, :2],
+                        current_points.cpu().numpy()[:, 2],
+                        current_points.cpu().numpy()[:, 3],
+                    )
                 else:
                     yxs = scores = types = None
-                image_vis = self.create_overlay(image=image_np, masks=mask_np, points=yxs, scores=scores, types=types)
+                image_vis = self.create_overlay(
+                    image=image_np,
+                    masks=mask_np,
+                    points=yxs,
+                    scores=scores,
+                    types=types,
+                )
 
             # Save visualization
             cv2.imwrite(output_filename, cv2.cvtColor(image_vis, cv2.COLOR_RGB2BGR))
-
-
-
-

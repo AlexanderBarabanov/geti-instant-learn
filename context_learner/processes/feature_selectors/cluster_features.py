@@ -3,16 +3,21 @@ from typing import List
 import numpy as np
 from sklearn.cluster import KMeans
 
+import torch
+
 from context_learner.processes.feature_selectors.feature_selector_base import (
     FeatureSelector,
 )
-from context_learner.types.features import Features
-import torch
-
-from context_learner.types.state import State
+from context_learner.types import Features, State
 
 
 class ClusterFeatures(FeatureSelector):
+    """
+    This class clusters the features of the reference images and averages the features per cluster.
+    This is loosly based on the paper "Part-aware Personalized Segment Anything Model for Patient-Specific Segmentation"
+    https://arxiv.org/abs/2403.05433
+    """
+
     def __init__(self, state: State, num_clusters: int = 3):
         super().__init__(state)
         self.num_clusters = num_clusters

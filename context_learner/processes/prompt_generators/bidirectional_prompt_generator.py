@@ -2,14 +2,11 @@ from typing import List, Tuple
 import torch
 from torch.nn import functional as F
 from scipy.optimize import linear_sum_assignment
+
 from context_learner.processes.prompt_generators.prompt_generator_base import (
     PromptGenerator,
 )
-from context_learner.types.priors import Priors
-from context_learner.types.features import Features
-from context_learner.types.masks import Masks
-from context_learner.types.similarities import Similarities
-from context_learner.types.state import State
+from context_learner.types import Features, Masks, Priors, Similarities, State
 
 
 class BidirectionalPromptGenerator(PromptGenerator):
@@ -201,15 +198,6 @@ class BidirectionalPromptGenerator(PromptGenerator):
             filtered_forward_indices_idx = corresponding_forward_indices[
                 indices_to_keep_mask
             ]
-
-            percentage_to_keep = (
-                indices_to_keep_mask.sum() / len(indices_to_keep_mask)
-                if len(indices_to_keep_mask) > 0
-                else 0
-            )
-            print(
-                f"Of the total amount of {len(indices_to_keep_mask)} potential matches, {indices_to_keep_mask.sum()} were kept via bidirectional check. ({percentage_to_keep * 100:.2f}%)"
-            )
 
             if filtered_forward_indices_idx.numel() > 0:
                 filtered_indices = [

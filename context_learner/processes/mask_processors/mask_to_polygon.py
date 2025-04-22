@@ -2,9 +2,10 @@ import cv2
 import numpy as np
 from typing import List
 
-from context_learner.processes.mask_processors.mask_processor_base import MaskProcessor
-from context_learner.types.masks import Masks
-from context_learner.types.annotations import Annotations
+from context_learner.processes.mask_processors.mask_processor_base import (
+    MaskProcessor,
+)
+from context_learner.types import Annotations, Masks
 
 
 class MasksToPolygons(MaskProcessor):

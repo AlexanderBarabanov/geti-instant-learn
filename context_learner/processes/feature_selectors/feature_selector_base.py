@@ -2,8 +2,8 @@ from typing import List
 
 import torch
 
-from context_learner.processes.process_base import Process
-from context_learner.types.features import Features
+from context_learner.processes import Process
+from context_learner.types import Features
 
 
 class FeatureSelector(Process):

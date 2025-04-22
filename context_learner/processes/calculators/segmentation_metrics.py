@@ -1,17 +1,10 @@
-import os
-import cv2
-from typing import List, Tuple, Dict, Any
+from typing import List, Dict, Any
 import numpy as np
 
-from context_learner.processes.calculators.calculators_base import Calculator
-from context_learner.types.image import Image
-from context_learner.types.masks import Masks
-from context_learner.types.priors import Priors
-from context_learner.types.state import State
-from utils.utils import get_colors
-from typing import Optional
+from context_learner.processes.calculators.calculator_base import Calculator
+from context_learner.types import Masks, State
 from sklearn.metrics import confusion_matrix
-import pandas as pd
+
 
 class SegmentationMetrics(Calculator):
     def __init__(self, state: State, categories: List[str]):
@@ -26,24 +19,27 @@ class SegmentationMetrics(Calculator):
         super().__init__(state)
         self.n_samples = 0
         self.tp_count = self.fp_count = self.fn_count = self.tn_count = 0
-        self.confusion: Dict[str: np.ndarray] = dict()  # category: binary confusion summation
+        self.confusion: Dict[str : np.ndarray] = (
+            dict()
+        )  # category: binary confusion summation
         if categories is not None:
             self.categories = list({"background"}.union(set(categories)))
 
     def get_metrics(self) -> Dict[str, List[Any]]:
-        d = {"category": [],
-             "true_positives": [],
-             "true_negatives": [],
-             "false_positives": [],
-             "false_negatives": [],
-             "precision": [],
-             "recall": [],
-             "f1score": [],
-             "jaccard": [],
-             "iou": [],
-             "dice": [],
-             "accuracy": [],
-             }
+        d = {
+            "category": [],
+            "true_positives": [],
+            "true_negatives": [],
+            "false_positives": [],
+            "false_negatives": [],
+            "precision": [],
+            "recall": [],
+            "f1score": [],
+            "jaccard": [],
+            "iou": [],
+            "dice": [],
+            "accuracy": [],
+        }
         for cat_name, confusion in self.confusion.items():
             diag = np.diag(confusion)
             up = np.triu(confusion, k=1)
@@ -73,8 +69,12 @@ class SegmentationMetrics(Calculator):
             d["accuracy"].append(accuracy)
         return d
 
-
-    def __call__(self, predictions: List[Masks], references: List[Masks], mapping: Dict[int, str] = None):
+    def __call__(
+        self,
+        predictions: List[Masks],
+        references: List[Masks],
+        mapping: Dict[int, str] = None,
+    ):
         """
         This class compares predicted and reference masks. Individual instances are merged into one mask.
         If no mapping is provided then a mapping is created according to indices in self.categories.
@@ -89,7 +89,7 @@ class SegmentationMetrics(Calculator):
             mapping = {idx: name for idx, name in enumerate(self.categories)}
         else:
             # For internal calculations include the background class
-            mapping = {idx+1: name for idx, name in mapping.items()}
+            mapping = {idx + 1: name for idx, name in mapping.items()}
             mapping[0] = "background"
         class_ids = list(sorted(mapping.keys()))
         if len(class_ids) > 2:
@@ -102,18 +102,23 @@ class SegmentationMetrics(Calculator):
             pred_mask = np.zeros([*reference.mask_shape])  # pred shape can be empty
             ref_mask = np.zeros([*reference.mask_shape])
             for class_id in class_ids:
-                if (class_id-1 not in reference.class_ids() and class_id-1 not in prediction.class_ids()) or class_id == 0:
+                if (
+                    class_id - 1 not in reference.class_ids()
+                    and class_id - 1 not in prediction.class_ids()
+                ) or class_id == 0:
                     continue
-                if class_id-1 in reference.class_ids():
-                    ref = reference.to_numpy(class_id-1)
+                if class_id - 1 in reference.class_ids():
+                    ref = reference.to_numpy(class_id - 1)
                     ref_mask[np.max(ref, axis=0) > 0] = class_id
 
-                if class_id-1 in prediction.class_ids():
-                    pred = prediction.to_numpy(class_id-1)
+                if class_id - 1 in prediction.class_ids():
+                    pred = prediction.to_numpy(class_id - 1)
                     pred_mask[np.max(pred, axis=0) > 0] = class_id
 
             # Calculate confusion matrix of this image
-            conf = confusion_matrix(y_true=ref_mask.flatten(), y_pred=pred_mask.flatten(), labels=class_ids)
+            conf = confusion_matrix(
+                y_true=ref_mask.flatten(), y_pred=pred_mask.flatten(), labels=class_ids
+            )
             if class_name in self.confusion.keys():
                 self.confusion[class_name] = self.confusion[class_name] + conf
             else:

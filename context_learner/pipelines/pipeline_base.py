@@ -1,20 +1,18 @@
+import argparse
 from typing import List
 
-from context_learner.types.image import Image
-from context_learner.types.priors import Priors
-from context_learner.types.state import State
+from context_learner.types import Image, Priors, State
 
 
 class Pipeline:
-    def __init__(self):
+    def __init__(self, args: argparse.Namespace = None):
         self._state = State()
+        self.args = args
 
     def get_state(self):
         return self._state
 
     def reset_state(self):
-        # Clear lists within the *existing* state object
-        # Keep encoder config and other non-list attributes
         self._state.reference_images.clear()
         self._state.reference_priors.clear()
         self._state.reference_features.clear()
@@ -26,8 +24,6 @@ class Pipeline:
         self._state.masks.clear()
         self._state.annotations.clear()
         self._state.used_points.clear()
-
-        # No need to create a new state object or copy config
 
     def learn(self, reference_images: List[Image], reference_priors: List[Priors]):
         """

@@ -4,7 +4,7 @@ import torch
 from context_learner.processes.feature_selectors.feature_selector_base import (
     FeatureSelector,
 )
-from context_learner.types.features import Features
+from context_learner.types import Features
 
 
 class AllFeaturesSelector(FeatureSelector):

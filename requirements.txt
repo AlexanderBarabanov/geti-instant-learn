@@ -2,7 +2,10 @@ matplotlib
 tqdm
 numpy
 opencv-python
-torch
-datumaro
 gradio
 umap-learn
+flask
+pandas
+scipy
+scikit-learn
+pre-commit

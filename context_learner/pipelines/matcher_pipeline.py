@@ -1,34 +1,23 @@
-import os.path
+import argparse
 from typing import List
 
-from Matcher.segment_anything import SamPredictor
-from context_learner.filters.masks.mask_filter_base import MaskFilter
-from context_learner.filters.masks.mask_filter_class_overlap import (
-    ClassOverlapMaskFilter,
-)
-from context_learner.filters.priors.max_point_filter import MaxPointFilter
-from context_learner.filters.priors.prior_filter_base import PriorFilter
+from third_party.Matcher.segment_anything import SamPredictor
+from context_learner.filters.masks import MaskFilter, ClassOverlapMaskFilter
+from context_learner.filters.priors import MaxPointFilter, PriorFilter
 from context_learner.pipelines.pipeline_base import Pipeline
-from context_learner.processes.encoders.dino_encoder import DinoEncoder
-from context_learner.processes.encoders.encoder_base import Encoder
-from context_learner.processes.feature_selectors.feature_selector_base import (
+from context_learner.processes.encoders import DinoEncoder, Encoder
+from context_learner.processes.feature_selectors import (
     FeatureSelector,
+    AllFeaturesSelector,
 )
-from context_learner.processes.feature_selectors.all_features import AllFeaturesSelector
-from context_learner.processes.mask_processors.mask_processor_base import MaskProcessor
-from context_learner.processes.mask_processors.mask_to_polygon import MasksToPolygons
-from context_learner.processes.prompt_generators.bidirectional_prompt_generator import (
+from context_learner.processes.mask_processors import MaskProcessor, MasksToPolygons
+from context_learner.processes.prompt_generators import (
     BidirectionalPromptGenerator,
-)
-from context_learner.processes.prompt_generators.prompt_generator_base import (
     PromptGenerator,
 )
-from context_learner.processes.segmenters.sam_decoder import SamDecoder
-from context_learner.processes.segmenters.segmenter_base import Segmenter
-from context_learner.processes.similarity_matchers.cosine_similarity import (
+from context_learner.processes.segmenters import SamDecoder, Segmenter
+from context_learner.processes.similarity_matchers import (
     CosineSimilarity,
-)
-from context_learner.processes.similarity_matchers.similarity_matcher_base import (
     SimilarityMatcher,
 )
 from context_learner.types import Priors, State, Image
@@ -40,29 +29,33 @@ class Matcher(Pipeline):
     https://arxiv.org/abs/2305.13310
 
     Main novelties:
-    - Uses DinoV2 patch encoding instead of SAM for encoding the images
+    - Uses DinoV2 patch encoding instead of SAM for encoding the images, resulting in a more robust feature extractor
+    - Uses a bidirectional prompt generator to generate prompts for the segmenter
     - Has a more complex mask postprocessing step to remove and merge masks
-
     """
 
-    def __init__(self, sam_predictor: SamPredictor):
-        super().__init__()
+    def __init__(self, sam_predictor: SamPredictor, args: argparse.Namespace):
+        super().__init__(args)
 
         self.encoder: Encoder = DinoEncoder(self._state)
         self.feature_selector: FeatureSelector = AllFeaturesSelector(self._state)
         self.similarity_matcher: SimilarityMatcher = CosineSimilarity(self._state)
         self.prompt_generator: PromptGenerator = BidirectionalPromptGenerator(
-            self._state
+            self._state, num_background_points=self.args.num_background_points
         )
-        self.point_filter: PriorFilter = MaxPointFilter(self._state, max_num_points=40)
-        self.segmenter: Segmenter = SamDecoder(self._state, sam_predictor)
+        self.point_filter: PriorFilter = MaxPointFilter(
+            self._state, max_num_points=self.args.num_foreground_points
+        )
+        self.segmenter: Segmenter = SamDecoder(
+            self._state,
+            sam_predictor=sam_predictor,
+            apply_mask_refinement=self.args.apply_mask_refinement,
+        )
         self.mask_processor: MaskProcessor = MasksToPolygons(self._state)
         self.class_overlap_mask_filter: MaskFilter = ClassOverlapMaskFilter(self._state)
 
     def learn(self, reference_images: List[Image], reference_priors: List[Priors]):
-        s: State = self._state  # More compact name
-
-        # Set input inside the state for convenience
+        s: State = self._state
         s.reference_images = reference_images
         s.reference_priors = reference_priors
 
@@ -73,9 +66,7 @@ class Matcher(Pipeline):
         s.reference_features = self.feature_selector(s.reference_features)
 
     def infer(self, target_images: List[Image]):
-        s: State = self._state  # More compact name
-
-        # Set input inside the state for convenience
+        s: State = self._state
         s.target_images = target_images
 
         # Start running the pipeline

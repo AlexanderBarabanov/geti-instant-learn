@@ -2,7 +2,7 @@ from typing import Sized, Iterable
 
 
 class DatasetIter(Sized, Iterable):
-    def __init__(self, parent: 'Dataset'):
+    def __init__(self, parent: "Dataset"):  # type: ignore  # noqa: F821
         self._parent = parent
 
     def __len__(self):

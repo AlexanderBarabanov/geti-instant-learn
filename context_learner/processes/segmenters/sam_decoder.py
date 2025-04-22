@@ -1,16 +1,10 @@
 from typing import List
-
 import numpy as np
+import torch
 
 from context_learner.processes.segmenters.segmenter_base import Segmenter
-from context_learner.types.image import Image
-from context_learner.types.masks import Masks
-from context_learner.types.priors import Priors
-from context_learner.types.points import Points
-from context_learner.types.state import State
-
-from PersonalizeSAM.per_segment_anything.predictor import SamPredictor
-import torch
+from context_learner.types import Image, Masks, Priors, Points, State
+from third_party.PersonalizeSAM.per_segment_anything.predictor import SamPredictor
 
 
 class SamDecoder(Segmenter):
@@ -21,6 +15,15 @@ class SamDecoder(Segmenter):
         apply_mask_refinement: bool = False,
         target_guided_attention: bool = False,
     ):
+        """
+        Initialize the SamDecoder.
+
+        Args:
+            state: State the pipeline state object
+            sam_predictor: SamPredictor the SAM predictor
+            apply_mask_refinement: bool whether to apply mask refinement
+            target_guided_attention: bool whether to use target guided attention, TODO: not implemented yet
+        """
         super().__init__(state)
         self.predictor = sam_predictor
         self.apply_mask_refinement = apply_mask_refinement

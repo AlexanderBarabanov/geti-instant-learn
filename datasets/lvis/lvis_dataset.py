@@ -1,11 +1,8 @@
-import colorsys
 import json
 import shutil
 from collections import OrderedDict
-
-from datasets.dataset_base import Dataset, Annotation, Image, DatasetIter
 import os
-from typing import List, Dict, Any, Iterable, Union, Optional
+from typing import List, Dict, Union, Optional
 import pickle
 import pycocotools.mask as mask_utils
 import numpy as np
@@ -14,6 +11,7 @@ from PIL import Image as PILImage
 import cv2
 import logging
 
+from datasets.dataset_base import Dataset, Annotation, Image, DatasetIter
 from datasets.dataset_iterators import IndexIter, CategoryIter
 from utils.utils import color_overlay
 
@@ -44,7 +42,9 @@ def segment_to_mask(segment: List[float], height: int, width: int):
 
 
 class LVISAnnotation(Annotation):
-    def __init__(self, height: int, width: int, segments: List[float], category_id: int):
+    def __init__(
+        self, height: int, width: int, segments: List[float], category_id: int
+    ):
         super().__init__(height, width)
         self.segments = segments
         self.category_id = category_id
@@ -55,7 +55,15 @@ class LVISAnnotation(Annotation):
 
 
 class LVISImage(Image):
-    def __init__(self, filename: str, height: int, width: int, source_url: str = None, source_filename: str = None, copy_file = False):
+    def __init__(
+        self,
+        filename: str,
+        height: int,
+        width: int,
+        source_url: str = None,
+        source_filename: str = None,
+        copy_file=False,
+    ):
         """
         Initializes the Image object.
             If the filename is not found it is either taken from source_filename or
@@ -83,7 +91,9 @@ class LVISImage(Image):
 
         if self.source_filename is not None:
             if self.copy_file:
-                if os.path.isfile(self.source_filename) and not os.path.isfile(self.filename):
+                if os.path.isfile(self.source_filename) and not os.path.isfile(
+                    self.filename
+                ):
                     logging.info(f"Copy {self.source_filename} to {self.filename}")
                     shutil.copyfile(self.source_filename, self.filename)
             else:
@@ -93,17 +103,25 @@ class LVISImage(Image):
             logging.info(f"Downloading {self.source_url}")
             img_data = requests.get(self.source_url).content
             os.makedirs(os.path.dirname(image_filename), exist_ok=True)
-            with open(image_filename, 'wb') as handler:
+            with open(image_filename, "wb") as handler:
                 handler.write(img_data)
 
-        pil_image = PILImage.open(image_filename).convert('RGB')
+        pil_image = PILImage.open(image_filename).convert("RGB")
         arr = np.array(pil_image)
         return arr
 
 
 class LVISDataset(Dataset):
-
-    def __init__(self, root_path=os.path.expanduser(os.path.join("~", "data", "lvis")), whitelist: Optional[Union[str, List[str]]]=None, name="training", iterator_type: type(DatasetIter) = IndexIter, download_full_dataset=True, copy_files=False, iterator_kwargs={}):
+    def __init__(
+        self,
+        root_path=os.path.expanduser(os.path.join("~", "data", "lvis")),
+        whitelist: Optional[Union[str, List[str]]] = None,
+        name="training",
+        iterator_type: type(DatasetIter) = IndexIter,
+        download_full_dataset=True,
+        copy_files=False,
+        iterator_kwargs={},
+    ):
         """
         This method initializes the LVIS dataset. This class downloads and inflates all files.
 
@@ -124,19 +142,19 @@ class LVISDataset(Dataset):
         self._subset_files = {
             "sources": {  # original sources of the json annotations.
                 "training": "https://dl.fbaipublicfiles.com/LVIS/lvis_v1_train.json.zip",
-                "validation": "https://dl.fbaipublicfiles.com/LVIS/lvis_v1_val.json.zip"
-                },
+                "validation": "https://dl.fbaipublicfiles.com/LVIS/lvis_v1_val.json.zip",
+            },
             "files": {  # extracted file location of the annotations.
                 "training": os.path.join(self._root_path, "lvis_v1_train.json"),
-                 "validation": os.path.join(self._root_path, "lvis_v1_val.json")
+                "validation": os.path.join(self._root_path, "lvis_v1_val.json"),
             },
             "downloads": {  # downloads of the full dataset.
                 "training": "http://images.cocodataset.org/zips/train2017.zip",
-                "validation": "http://images.cocodataset.org/zips/val2017.zip"
+                "validation": "http://images.cocodataset.org/zips/val2017.zip",
             },
             "source_folders": {  # folders where the downloaded files are extracted.
                 "training": os.path.join(self._root_path, "downloads", "train2017"),
-                "validation": os.path.join(self._root_path, "downloads", "val2017")
+                "validation": os.path.join(self._root_path, "downloads", "val2017"),
             },
         }
 
@@ -149,7 +167,9 @@ class LVISDataset(Dataset):
         self._name = name  # training or validation
 
         # Category information
-        self._category_index_to_id: List[int] = []  # only white listed categories appear here
+        self._category_index_to_id: List[
+            int
+        ] = []  # only white listed categories appear here
         self._category_id_to_name: Dict[int, str] = {}
         self._category_name_to_id: Dict[str, int] = {}
 
@@ -158,14 +178,20 @@ class LVISDataset(Dataset):
         self.instances_per_image: Dict[str, float] = {}  # name: count per image
 
         # Images and Annotations
-        self._image_index_to_id: Dict[str, List[int]] = {}  # subset_name: [image_id]
-        self._images: Dict[str, Dict[int, LVISImage]] = {}  # subset_name: [image_id: image]]
-        self._annotations: Dict[str, Dict[int, LVISAnnotation]] = {} # subset_name: [annotation_id, image]
-
-        self._annotation_to_image: Dict[str, Dict[int, int]] = {}  # subset_name: [annotation_id: image_id]]
-        self._annotation_to_category: Dict[str, Dict[int, int]] = {}  # subset_name: [annotation_id: category_id]]
-        self._category_to_annotations: Dict[str, Dict[int, List[int]]] = {}  # subset_name: [category_id: [annotation]]
-        self._image_to_annotations: Dict[str, Dict[int, List[int]]] = {}  # subset_name: [image_id: [annotation_id]]
+        # subset_name: [image_id]
+        self._image_index_to_id: Dict[str, List[int]] = {}
+        # subset_name: [image_id: image]
+        self._images: Dict[str, Dict[int, LVISImage]] = {}
+        # subset_name: [annotation_id, image]
+        self._annotations: Dict[str, Dict[int, LVISAnnotation]] = {}
+        # subset_name: [annotation_id: image_id]
+        self._annotation_to_image: Dict[str, Dict[int, int]] = {}
+        # subset_name: [annotation_id: category_id]
+        self._annotation_to_category: Dict[str, Dict[int, int]] = {}
+        # subset_name: [category_id: [annotation_id]]
+        self._category_to_annotations: Dict[str, Dict[int, List[int]]] = {}
+        # subset_name: [image_id: [annotation_id]]
+        self._image_to_annotations: Dict[str, Dict[int, List[int]]] = {}
 
         # Download metadata (these are automatically cached)
         self._download_metadata()
@@ -181,11 +207,13 @@ class LVISDataset(Dataset):
 
         # Load metadata and data
         if valid:
-            logging.info(f"Using cached {self._cached_metadata} and {self._cached_data}")
+            logging.info(
+                f"Using cached {self._cached_metadata} and {self._cached_data}"
+            )
             self._load_metadata(self._cached_metadata)
             self._load_data(self._cached_data)
         else:
-            logging.info(f"Cache files have been invalidated, data is reloaded")
+            logging.info("Cache files have been invalidated, data is reloaded")
             categories_info, images_info, annotations_info = self._get_metadata()
             self._set_metadata(categories_info)
             self._set_data(images_info, annotations_info)
@@ -214,9 +242,13 @@ class LVISDataset(Dataset):
         return self._category_index_to_id.index(cat_id)
 
     def get_image_filename(self, index: int):
-        return self._images[self._name][self._image_index_to_id[self._name][index]].filename
+        return self._images[self._name][
+            self._image_index_to_id[self._name][index]
+        ].filename
 
-    def get_image_filename_in_category(self, category_index_or_name: int | str, index: int):
+    def get_image_filename_in_category(
+        self, category_index_or_name: int | str, index: int
+    ):
         if isinstance(category_index_or_name, int):
             category_id = self._category_index_to_id[category_index_or_name]
         elif isinstance(category_index_or_name, str):
@@ -253,7 +285,9 @@ class LVISDataset(Dataset):
                 masks[annot.category_id] = [annot.get_mask().astype(int)]
             else:
                 instance_id = len(masks[annot.category_id]) + 1
-                masks[annot.category_id].append(annot.get_mask().astype(int) * instance_id)
+                masks[annot.category_id].append(
+                    annot.get_mask().astype(int) * instance_id
+                )
 
         for category_id in masks.keys():
             # Merge all instances into one mask
@@ -261,7 +295,9 @@ class LVISDataset(Dataset):
 
         return masks
 
-    def get_images_by_category(self, category_index_or_name: int | str, start: int = None, end: int = None) -> List[np.ndarray]:
+    def get_images_by_category(
+        self, category_index_or_name: int | str, start: int = None, end: int = None
+    ) -> List[np.ndarray]:
         if isinstance(category_index_or_name, int):
             category_id = self._category_index_to_id[category_index_or_name]
         elif isinstance(category_index_or_name, str):
@@ -271,13 +307,20 @@ class LVISDataset(Dataset):
 
         image_ids = []
         annotations = self._category_to_annotations[self._name][category_id]
-        image_ids = [self._annotation_to_image[self._name][annotation_id] for annotation_id in annotations]
-        image_ids = list(OrderedDict.fromkeys(image_ids))  # remove redundant, preserves same order as get_masks_by_category
+        image_ids = [
+            self._annotation_to_image[self._name][annotation_id]
+            for annotation_id in annotations
+        ]
+        image_ids = list(
+            OrderedDict.fromkeys(image_ids)
+        )  # remove redundant, preserves same order as get_masks_by_category
         image_ids = image_ids[slice(start, end)]
 
         return [self._images[self._name][i].get_image() for i in image_ids]
 
-    def get_masks_by_category(self, category_index_or_name: int | str, start: int = None, end: int = None) -> List[np.ndarray]:
+    def get_masks_by_category(
+        self, category_index_or_name: int | str, start: int = None, end: int = None
+    ) -> List[np.ndarray]:
         if isinstance(category_index_or_name, int):
             category_id = self._category_index_to_id[category_index_or_name]
         elif isinstance(category_index_or_name, str):
@@ -286,16 +329,28 @@ class LVISDataset(Dataset):
             raise ValueError(f"Unknown category type: {type(category_index_or_name)}")
 
         annotations = self._category_to_annotations[self._name][category_id]
-        image_ids = [self._annotation_to_image[self._name][annotation_id] for annotation_id in annotations]
-        image_ids = list(dict.fromkeys(image_ids))  # remove redundant, preserves same order as get_images_by_category
+        image_ids = [
+            self._annotation_to_image[self._name][annotation_id]
+            for annotation_id in annotations
+        ]
+        image_ids = list(
+            dict.fromkeys(image_ids)
+        )  # remove redundant, preserves same order as get_images_by_category
         image_ids = image_ids[slice(start, end)]
 
         all_masks = []
         for image_id in image_ids:
             annotation_ids = self._image_to_annotations[self._name][image_id]
-            category_ids = [self._annotation_to_category[self._name][a_id] for a_id in annotation_ids]
+            category_ids = [
+                self._annotation_to_category[self._name][a_id]
+                for a_id in annotation_ids
+            ]
             # Only keep image annotations if the category matches
-            annotation_ids = [a_id for (a_id, c_id) in zip(annotation_ids, category_ids) if c_id == category_id]
+            annotation_ids = [
+                a_id
+                for (a_id, c_id) in zip(annotation_ids, category_ids)
+                if c_id == category_id
+            ]
             masks = []
             for instance_id, annotation_id in enumerate(annotation_ids):
                 annot = self._annotations[self._name][annotation_id]
@@ -319,7 +374,10 @@ class LVISDataset(Dataset):
             raise ValueError(f"Unknown category type: {type(category_index_or_name)}")
 
         annotations = self._category_to_annotations[self._name][category_id]
-        image_ids = [self._annotation_to_image[self._name][annotation_id] for annotation_id in annotations]
+        image_ids = [
+            self._annotation_to_image[self._name][annotation_id]
+            for annotation_id in annotations
+        ]
         image_ids = list(dict.fromkeys(image_ids))  # remove redundant
         return len(image_ids)
 
@@ -342,10 +400,17 @@ class LVISDataset(Dataset):
         self._category_name_to_id = {d["name"]: d["id"] for d in categories_info}
         self.image_count = {d["name"]: d["image_count"] for d in categories_info}
         self.instance_count = {d["name"]: d["instance_count"] for d in categories_info}
-        self.instances_per_image = {c["name"]: c["instance_count"] / c["image_count"] for c in categories_info if c["image_count"] > 0}
+        self.instances_per_image = {
+            c["name"]: c["instance_count"] / c["image_count"]
+            for c in categories_info
+            if c["image_count"] > 0
+        }
+
         if len(self._whitelist) == 0:
             self._whitelist = list(self._category_name_to_id.keys())
-        self._category_index_to_id = [self._category_name_to_id[cn] for cn in self._whitelist]
+        self._category_index_to_id = [
+            self._category_name_to_id[cn] for cn in self._whitelist
+        ]
 
     def _set_data(self, images_info, annotations_info):
         """
@@ -359,9 +424,21 @@ class LVISDataset(Dataset):
             self._image_to_annotations[name] = {}
             self._category_to_annotations[name] = {}
             for annotation_info in annotations_info[name]:
-                if self._category_id_to_name[annotation_info["category_id"]] in self._whitelist:
-                    image_id, annotation_id, category_id = annotation_info["image_id"], annotation_info["id"], annotation_info["category_id"]
-                    a = LVISAnnotation(height=0, width=0, segments=annotation_info["segmentation"], category_id=category_id)
+                if (
+                    self._category_id_to_name[annotation_info["category_id"]]
+                    in self._whitelist
+                ):
+                    image_id, annotation_id, category_id = (
+                        annotation_info["image_id"],
+                        annotation_info["id"],
+                        annotation_info["category_id"],
+                    )
+                    a = LVISAnnotation(
+                        height=0,
+                        width=0,
+                        segments=annotation_info["segmentation"],
+                        category_id=category_id,
+                    )
                     self._annotations[name][annotation_info["id"]] = a
 
                     # Create mapping between images <-> annotations <-> categories
@@ -369,9 +446,13 @@ class LVISDataset(Dataset):
                     self._annotation_to_category[name][annotation_id] = category_id
 
                     if category_id not in self._category_to_annotations[name].keys():
-                        self._category_to_annotations[name][category_id] = [annotation_id]
+                        self._category_to_annotations[name][category_id] = [
+                            annotation_id
+                        ]
                     else:
-                        self._category_to_annotations[name][category_id].append(annotation_id)
+                        self._category_to_annotations[name][category_id].append(
+                            annotation_id
+                        )
 
                     if image_id not in self._image_to_annotations[name].keys():
                         self._image_to_annotations[name][image_id] = [annotation_id]
@@ -385,9 +466,22 @@ class LVISDataset(Dataset):
                     coco_subset = os.path.dirname(image_info["coco_url"]).split("/")[-1]
                     base_name = os.path.basename(image_info["coco_url"])
                     output_filename = os.path.join(self._root_path, name, base_name)
-                    base_folder = os.path.join(*(["/"] + self._subset_files["source_folders"][name].split("/")[:-1] + [coco_subset]))
+                    base_folder = os.path.join(
+                        *(
+                            ["/"]
+                            + self._subset_files["source_folders"][name].split("/")[:-1]
+                            + [coco_subset]
+                        )
+                    )
                     source_filename = os.path.join(base_folder, base_name)
-                    i = LVISImage(output_filename, image_info["height"], image_info["width"], source_url=image_info["coco_url"], source_filename=source_filename, copy_file=self._copy_files)
+                    i = LVISImage(
+                        output_filename,
+                        image_info["height"],
+                        image_info["width"],
+                        source_url=image_info["coco_url"],
+                        source_filename=source_filename,
+                        copy_file=self._copy_files,
+                    )
                     for annotation_id in self._image_to_annotations[name][image_id]:
                         annotation = self._annotations[name][annotation_id]
                         annotation.height = image_info["height"]
@@ -404,7 +498,9 @@ class LVISDataset(Dataset):
         os.makedirs(os.path.join(self._root_path, "downloads"), exist_ok=True)
         for name, source in self._subset_files["downloads"].items():
             destination = self._subset_files["source_folders"][name]
-            dst = os.path.join(self._root_path, "downloads", os.path.basename(source))  # temp
+            dst = os.path.join(
+                self._root_path, "downloads", os.path.basename(source)
+            )  # temp
             self._download(source, dst)
             if os.path.splitext(dst)[1] == ".zip":
                 self._unzip(dst, destination)
@@ -418,7 +514,9 @@ class LVISDataset(Dataset):
         Downloads the LVIS dataset metadata
         """
         for name, source in self._subset_files["sources"].items():
-            destination = os.path.join(self._root_path, self._subset_files["files"][name])
+            destination = os.path.join(
+                self._root_path, self._subset_files["files"][name]
+            )
             dst = os.path.join(self._root_path, os.path.basename(source))  # temp
             self._download(source, dst)
             if os.path.splitext(dst)[1] == ".zip":
@@ -451,14 +549,15 @@ class LVISDataset(Dataset):
         Args:
             filename: The filename of the metadata
         """
-        with open(filename, 'wb') as f:
-            data = {"category_id_to_name": self._category_id_to_name,
-                    "category_name_to_id": self._category_name_to_id,
-                    "instance_count": self.instance_count,
-                    "image_count": self.image_count,
-                    "instances_per_image": self.instances_per_image,
-                    "category_index_to_id": self._category_index_to_id
-                    }
+        with open(filename, "wb") as f:
+            data = {
+                "category_id_to_name": self._category_id_to_name,
+                "category_name_to_id": self._category_name_to_id,
+                "instance_count": self.instance_count,
+                "image_count": self.image_count,
+                "instances_per_image": self.instances_per_image,
+                "category_index_to_id": self._category_index_to_id,
+            }
             pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
 
     def _load_metadata(self, filename):
@@ -484,14 +583,16 @@ class LVISDataset(Dataset):
         Args:
             filename: The filename of the data
         """
-        with open(filename, 'wb') as f:
-            data = {"image_index_to_id": self._image_index_to_id,
-                    "images": self._images,
-                    "annotations": self._annotations,
-                    "annotation_to_image": self._annotation_to_image,
-                    "annotation_to_category": self._annotation_to_category,
-                    "image_to_annotations": self._image_to_annotations,
-                    "category_to_annotations": self._category_to_annotations}
+        with open(filename, "wb") as f:
+            data = {
+                "image_index_to_id": self._image_index_to_id,
+                "images": self._images,
+                "annotations": self._annotations,
+                "annotation_to_image": self._annotation_to_image,
+                "annotation_to_category": self._annotation_to_category,
+                "image_to_annotations": self._image_to_annotations,
+                "category_to_annotations": self._category_to_annotations,
+            }
 
             pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
 
@@ -535,7 +636,11 @@ class LVISDataset(Dataset):
         valid = valid and identical
 
         # Check if cached files exist
-        valid = valid and os.path.isfile(self._cached_metadata) and os.path.isfile(self._cached_data)
+        valid = (
+            valid
+            and os.path.isfile(self._cached_metadata)
+            and os.path.isfile(self._cached_data)
+        )
 
         if not valid:
             if os.path.isfile(self._cached_metadata):
@@ -548,7 +653,11 @@ class LVISDataset(Dataset):
 
 def test_index_iter():
     # Use default index iterator (PyTorch style)
-    dataset = LVISDataset(whitelist=["cupcake", "sheep", "pastry", "doughnut"], download_full_dataset=True, copy_files=False)
+    dataset = LVISDataset(
+        whitelist=["cupcake", "sheep", "pastry", "doughnut"],
+        download_full_dataset=True,
+        copy_files=False,
+    )
 
     for image_index, (image, masks) in enumerate(dataset):
         # Generate and save overlays
@@ -556,24 +665,47 @@ def test_index_iter():
             overlay = color_overlay(image, mask)
             cat = dataset._category_id_to_name[category_id]
             output_folder = os.path.join(dataset.get_root_path(), "overlays", cat)
-            orig_filename = os.path.splitext(os.path.basename(dataset.get_image_filename(image_index)))[0]
+            orig_filename = os.path.splitext(
+                os.path.basename(dataset.get_image_filename(image_index))
+            )[0]
             os.makedirs(output_folder, exist_ok=True)
-            cv2.imwrite(os.path.join(output_folder, f"{orig_filename}_{cat}.jpg"), overlay)
+            cv2.imwrite(
+                os.path.join(output_folder, f"{orig_filename}_{cat}.jpg"), overlay
+            )
 
 
 def test_category_iter():
     # Use category iterator
-    dataset = LVISDataset(whitelist=["cupcake", "sheep", "pastry", "doughnut"], iterator_type=CategoryIter, download_full_dataset=True, copy_files=False)
+    dataset = LVISDataset(
+        whitelist=["teacup", "doughnut"],
+        iterator_type=CategoryIter,
+        download_full_dataset=True,
+        copy_files=False,
+    )
+    dataset = LVISDataset(
+        whitelist=["cupcake", "sheep", "pastry", "doughnut"],
+        iterator_type=CategoryIter,
+        download_full_dataset=True,
+        copy_files=False,
+    )
 
     for category_index, (images, masks) in enumerate(dataset):
         for image_index, (image, mask) in enumerate(zip(images, masks)):
             # Generate and save overlays
             overlay = color_overlay(image, mask)
-            cat = dataset._category_id_to_name[dataset._category_index_to_id[category_index]]
+            cat = dataset._category_id_to_name[
+                dataset._category_index_to_id[category_index]
+            ]
             output_folder = os.path.join(dataset.get_root_path(), "overlays", cat)
-            orig_filename = os.path.splitext(os.path.basename(dataset.get_image_filename_in_category(category_index, image_index)))[0]
+            orig_filename = os.path.splitext(
+                os.path.basename(
+                    dataset.get_image_filename_in_category(category_index, image_index)
+                )
+            )[0]
             os.makedirs(output_folder, exist_ok=True)
-            cv2.imwrite(os.path.join(output_folder, f"{orig_filename}_{cat}.jpg"), overlay)
+            cv2.imwrite(
+                os.path.join(output_folder, f"{orig_filename}_{cat}.jpg"), overlay
+            )
 
 
 if __name__ == "__main__":

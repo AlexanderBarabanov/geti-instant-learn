@@ -1,9 +1,7 @@
 from typing import List, Optional, Tuple
 
 from context_learner.processes.process_base import Process
-from context_learner.types.features import Features
-from context_learner.types.image import Image
-from context_learner.types.annotations import Annotations
+from context_learner.types import Features, Image, Annotations
 
 
 class Encoder(Process):

@@ -4,8 +4,7 @@ from typing import List
 import torch
 
 from context_learner.filters.masks.mask_filter_base import MaskFilter
-from context_learner.types.masks import Masks
-from context_learner.types.points import Points
+from context_learner.types import Masks, Points
 
 
 class ClassOverlapMaskFilter(MaskFilter):

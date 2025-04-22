@@ -1,10 +1,11 @@
 from typing import List
 
+import torch
+
 from context_learner.processes.feature_selectors.feature_selector_base import (
     FeatureSelector,
 )
-from context_learner.types.features import Features
-import torch
+from context_learner.types import Features
 
 
 class AverageFeatures(FeatureSelector):

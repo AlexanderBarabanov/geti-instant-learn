@@ -1,8 +1,7 @@
 from typing import List
 
-from context_learner.processes.process_base import Process
-from context_learner.types.masks import Masks
-from context_learner.types.annotations import Annotations
+from context_learner.processes import Process
+from context_learner.types import Annotations, Masks
 
 
 class MaskProcessor(Process):

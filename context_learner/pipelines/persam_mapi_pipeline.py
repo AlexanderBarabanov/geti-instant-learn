@@ -1,10 +1,8 @@
 from typing import List
 
-from Matcher.segment_anything import SamPredictor
+from third_party.Matcher.segment_anything import SamPredictor
 from context_learner.pipelines.pipeline_base import Pipeline
-from context_learner.types.annotations import Annotations
-from context_learner.types.image import Image
-from context_learner.types.priors import Priors
+from context_learner.types import Annotations, Image, Priors
 
 
 class PerSamMAPI(Pipeline):
@@ -21,10 +19,8 @@ class PerSamMAPI(Pipeline):
     def __init__(self, sam_predictor: SamPredictor):
         super().__init__()
 
-
     def learn(self, reference_images: List[Image], reference_priors: List[Priors]):
         pass
 
     def infer(self, target_images: List[Image]):
-
         return Annotations()

@@ -2,17 +2,13 @@ import os
 from typing import List, Optional
 
 import torch
-from context_learner.types.masks import Masks
-from context_learner.types.priors import Priors
-from dinov2.data.transforms import MaybeToTensor, make_normalize_transform
-from dinov2.models import vision_transformer
-from dinov2.models.vision_transformer import DinoVisionTransformer
-import dinov2.utils.utils as dinov2_utils
+from third_party.dinov2.data.transforms import MaybeToTensor, make_normalize_transform
+from third_party.dinov2.models import vision_transformer
+from third_party.dinov2.models.vision_transformer import DinoVisionTransformer
+import third_party.dinov2.utils.utils as dinov2_utils
 
 from context_learner.processes.encoders.encoder_base import Encoder
-from context_learner.types.features import Features
-from context_learner.types.image import Image
-from context_learner.types.state import State
+from context_learner.types import Features, Image, State, Masks, Priors
 from torchvision import transforms
 from torch.nn import functional as F
 
@@ -58,7 +54,7 @@ class DinoEncoder(Encoder):
 
     def __call__(
         self, images: List[Image], priors_per_image: Optional[List[Priors]] = None
-    ) -> tuple[List[Features], List[Masks]]:
+    ) -> tuple[List[Features], List[Masks]]:  # noqa: F821
         """
         This method creates an embedding from the images for locations inside the mask.
 

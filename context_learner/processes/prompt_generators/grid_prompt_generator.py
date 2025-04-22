@@ -5,9 +5,7 @@ import torch
 from context_learner.processes.prompt_generators.prompt_generator_base import (
     PromptGenerator,
 )
-from context_learner.types.priors import Priors, Prompt
-from context_learner.types.similarities import Similarities
-from context_learner.types.state import State
+from context_learner.types import Priors, Similarities, State
 
 
 class GridPromptGenerator(PromptGenerator):
@@ -18,6 +16,15 @@ class GridPromptGenerator(PromptGenerator):
         similarity_threshold: float = 0.65,
         num_bg_points: int = 1,
     ):
+        """
+        Generate prompts for the segmenter based on the similarities between the reference and target images.
+
+        Args:
+            state: State the pipeline state object
+            downsizing: int the downsizing factor for the grid
+            similarity_threshold: float the threshold for the similarity mask
+            num_bg_points: int the number of background points to sample
+        """
         super().__init__(state)
         self.downsizing = downsizing
         self.similarity_threshold = similarity_threshold

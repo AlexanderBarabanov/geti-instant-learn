@@ -2,8 +2,8 @@ from typing import List
 
 import torch
 
-from context_learner.filters.filter_base import Filter
-from context_learner.types.masks import Masks
+from context_learner.filters import Filter
+from context_learner.types import Masks
 
 
 class MaskFilter(Filter):
