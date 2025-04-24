@@ -544,10 +544,6 @@ def run_processing():
                         len(state_masks) < num_results_in_chunk
                         or len(state_used_points) < num_results_in_chunk
                         or len(state_priors) < num_results_in_chunk
-                        or (
-                            state_similarities is not None
-                            and len(state_similarities) < num_results_in_chunk
-                        )
                     ):
                         raise ValueError(
                             f"Pipeline state length mismatch after inference for chunk {chunk_start_idx}-{chunk_end_idx}. Expected {num_results_in_chunk}, State: masks={len(state_masks)}, points={len(state_used_points)}"
@@ -611,7 +607,10 @@ def run_processing():
                         web_prior_points = process_points_for_web(prior_obj.points)
 
                         web_similarity_maps = []
-                        if state_similarities is not None:
+                        if (
+                            state_similarities is not None
+                            and len(state_similarities) > 0
+                        ):
                             similarities_for_target = state_similarities[state_idx]
                             web_similarity_maps = process_similarity_maps_for_web(
                                 similarities_for_target

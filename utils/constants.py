@@ -15,6 +15,12 @@ MODEL_MAP = {
 }
 
 DATASETS = ["all", "PerSeg", "lvis", "lvis_validation"]
-PIPELINES = ["all", "MatcherModular", "PerSAMModular", "PerDinoModular", "PerSAMMAPI"]
+PIPELINES = [
+    "all",
+    "MatcherModular",
+    "PerSAMModular",
+    "PerDinoModular",
+    "PerSAMMAPIModular",
+]
 MAPI_ENCODER_PATH = os.path.join(DATA_PATH, "otx_models", "sam_vit_b_zsl_encoder.xml")
 MAPI_DECODER_PATH = os.path.join(DATA_PATH, "otx_models", "sam_vit_b_zsl_decoder.xml")

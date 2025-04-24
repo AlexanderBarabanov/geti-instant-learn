@@ -314,7 +314,7 @@ def main():
         for dataset_name in datasets_to_run:
             dataset = load_dataset(dataset_name, whitelist=args.class_name)
             for pipeline_name in pipelines_to_run:
-                pipeline = load_model(backbone_name, pipeline_name, args)
+                pipeline = load_model(args)
                 unique_output = os.path.join(
                     output_path, f"{dataset_name}_{backbone_name}_{pipeline_name}"
                 )
@@ -353,5 +353,5 @@ def main():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+    logging.basicConfig(stream=sys.stdout, level=logging.WARNING)
     main()

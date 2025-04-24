@@ -12,6 +12,7 @@ import cv2
 from detectron2.structures.masks import *
 import pycocotools.mask as mask_util
 
+
 class DatasetLVIS(Dataset):
     def __init__(self, datapath, fold, transform, split, shot, use_original_imgsize):
         self.split = 'val' if split in ['val', 'test'] else 'trn'

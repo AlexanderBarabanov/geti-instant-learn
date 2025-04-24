@@ -677,12 +677,6 @@ def test_index_iter():
 def test_category_iter():
     # Use category iterator
     dataset = LVISDataset(
-        whitelist=["teacup", "doughnut"],
-        iterator_type=CategoryIter,
-        download_full_dataset=True,
-        copy_files=False,
-    )
-    dataset = LVISDataset(
         whitelist=["cupcake", "sheep", "pastry", "doughnut"],
         iterator_type=CategoryIter,
         download_full_dataset=True,
@@ -709,5 +703,5 @@ def test_category_iter():
 
 
 if __name__ == "__main__":
-    # test_index_iter()
+    test_index_iter()
     test_category_iter()

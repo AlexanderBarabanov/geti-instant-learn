@@ -1,11 +1,11 @@
 from typing import List
 
 from context_learner.processes import Process
-from context_learner.types import Masks, Priors
+from context_learner.types import Masks, Priors, Image
 
 
 class Segmenter(Process):
-    def __call__(self, priors: List[Priors]) -> List[Masks]:
+    def __call__(self, images: List[Image], priors: List[Priors]) -> List[Masks]:
         """
         This method extracts priors from similarities.
 
@@ -17,8 +17,9 @@ class Segmenter(Process):
 
         Examples:
             >>> from context_learner.types.state import State
+            >>> from context_learner.types.image import Image
             >>> state = State()
             >>> segment = Segmenter(state=state)
-            >>> r = segment([Priors()])
+            >>> r = segment([Image()], [Priors()])
         """
         return [Masks()]

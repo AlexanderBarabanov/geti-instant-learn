@@ -14,11 +14,7 @@ from sklearn.manifold import TSNE
 import random
 
 from model_api.models import Prompt
-from model_api.models.visual_prompting import (
-    VisualPromptingFeatures,
-    _draw_points,
-)
-
+from model_api.models.visual_prompting import VisualPromptingFeatures
 from context_learner.types import Image, Masks, Points
 
 # Define some colors for visualization
@@ -37,6 +33,13 @@ COLORS = [
     (128, 0, 128),
 ]
 
+def _draw_points(img, x, y, size=1, color=(255, 255, 255)):
+    if size == 1:  # faster
+        img[y.astype(int), x.astype(int)] = color
+    else:  # slower
+        for x, y in zip(x, y):
+            cv2.drawMarker(img, (int(x), int(y)), color, cv2.MARKER_STAR, size)
+    return img
 
 def overlay_masks_and_points(
     image: Image, masks: Masks, points: Points, alpha: float = 0.3

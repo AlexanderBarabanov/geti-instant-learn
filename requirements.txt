@@ -9,3 +9,4 @@ pandas
 scipy
 scikit-learn
 pre-commit
+openvino-model-api
