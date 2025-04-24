@@ -50,6 +50,8 @@ class Matcher(Pipeline):
             self._state,
             sam_predictor=sam_predictor,
             apply_mask_refinement=self.args.apply_mask_refinement,
+            mask_similarity_threshold=self.args.mask_similarity_threshold,
+            skip_points_in_existing_masks=self.args.skip_points_in_existing_masks,
         )
         self.mask_processor: MaskProcessor = MasksToPolygons(self._state)
         self.class_overlap_mask_filter: MaskFilter = ClassOverlapMaskFilter(self._state)
@@ -75,6 +77,8 @@ class Matcher(Pipeline):
             s.reference_features, s.processed_reference_masks, s.target_features
         )
         s.priors = self.point_filter(s.priors)
-        s.masks, s.used_points = self.segmenter(s.target_images, s.priors)
+        s.masks, s.used_points = self.segmenter(
+            s.target_images, s.priors, s.similarities
+        )
         s.masks = self.class_overlap_mask_filter(s.masks, s.used_points)
         s.annotations = self.mask_processor(s.masks)

@@ -8,29 +8,39 @@ document.addEventListener("DOMContentLoaded", () => {
   const numBackgroundPointsInput = document.getElementById(
     "numBackgroundPointsInput",
   );
+  const similarityThresholdInput = document.getElementById(
+    "similarityThresholdInput",
+  );
+  const maskSimilarityThresholdInput = document.getElementById(
+    "maskSimilarityThresholdInput",
+  );
+  const numTargetImagesControl = document.getElementById("numTargetImagesControl");
+  const numTargetImagesInput = document.getElementById("numTargetImagesInput");
+  const numTargetImagesValueSpan = document.getElementById("numTargetImagesValue");
+  const maxTargetImagesValueSpan = document.getElementById("maxTargetImagesValue");
   const resultsContainer = document.getElementById("results-container");
-  // Progress bar elements
   const progressContainer = document.getElementById("progress-container");
   const progressBarFill = document.getElementById("progress-bar-fill");
-  const progressText = document.getElementById("progress-text"); // Optional text
-
+  const progressText = document.getElementById("progress-text");
   const MAX_CANVAS_WIDTH = 500;
-
-  // Store image objects, mask data, point data, and clickable regions
   const canvasDataStore = {};
-  // { canvasId: {
-  //      image: Image,
-  //      masks: [{..., mask_data_uri}],
-  //      points: [],
-  //      element: HTMLCanvasElement,
-  //      clickablePoints: [] // Store {x, y, radius, maskInstanceId} here
-  //   }
-  // }
   const maskImageCache = {};
+  const similarityThresholdValueSpan = document.getElementById("similarityThresholdValue");
+
+  const maskSimilarityThresholdValueSpan = document.getElementById(
+    "maskSimilarityThresholdValue",
+  );
+
+  const skipPointsCheckbox = document.getElementById("skipPointsInExistingMasks");
 
   async function fetchAndPopulateClasses (selectedDataset) {
     classNameSelect.innerHTML =
       '<option value="" disabled selected>Loading...</option>';
+    numTargetImagesControl.classList.remove("hidden");
+    numTargetImagesValueSpan.textContent = "N/A";
+    maxTargetImagesValueSpan.textContent = "";
+    numTargetImagesInput.disabled = true;
+
     try {
       const response = await fetch(
         `/api/classes?dataset=${encodeURIComponent(selectedDataset)}`,
@@ -56,24 +66,127 @@ document.addEventListener("DOMContentLoaded", () => {
         // Pre-select the first actual class (index 1, since index 0 is the disabled placeholder)
         if (classNameSelect.options.length > 1) {
           classNameSelect.selectedIndex = 1;
+          // Trigger update for the pre-selected class
+          updateTargetImageSlider(selectedDataset, classNameSelect.value);
+        } else {
+          numTargetImagesValueSpan.textContent = "N/A";
+          maxTargetImagesValueSpan.textContent = "N/A";
+          numTargetImagesInput.disabled = true;
         }
       } else {
         classNameSelect.innerHTML =
           '<option value="" disabled selected>No classes found</option>';
+        if (!classNameSelect.value) {
+          numTargetImagesValueSpan.textContent = "N/A";
+          maxTargetImagesValueSpan.textContent = "N/A";
+          numTargetImagesInput.disabled = true;
+        }
       }
     } catch (error) {
       console.error("Error fetching classes:", error);
       classNameSelect.innerHTML =
         '<option value="" disabled selected>Error loading</option>';
+      if (!classNameSelect.value) {
+        numTargetImagesValueSpan.textContent = "N/A";
+        maxTargetImagesValueSpan.textContent = "N/A";
+        numTargetImagesInput.disabled = true;
+      }
     }
   }
 
   // Event listener for dataset change
   datasetSelect.addEventListener("change", () => {
     console.log("Dataset select changed!");
+    numTargetImagesControl.classList.remove("hidden");
+    numTargetImagesValueSpan.textContent = "N/A";
+    maxTargetImagesValueSpan.textContent = "N/A";
+    numTargetImagesInput.disabled = true;
     fetchAndPopulateClasses(datasetSelect.value);
   });
+
+  // Event listener for class name change
+  classNameSelect.addEventListener("change", () => {
+    console.log("Class select changed!");
+    updateTargetImageSlider(datasetSelect.value, classNameSelect.value);
+  });
+
+  // Event listener for N-Shot change
+  nShotInput.addEventListener("change", () => {
+    console.log("N-Shot input changed!");
+    updateTargetImageSlider(datasetSelect.value, classNameSelect.value);
+  });
+
+  // Initial population
   fetchAndPopulateClasses(datasetSelect.value);
+
+  if (similarityThresholdInput && similarityThresholdValueSpan) {
+    similarityThresholdInput.addEventListener('input', (event) => {
+      similarityThresholdValueSpan.textContent = event.target.value;
+    });
+  }
+
+  if (maskSimilarityThresholdInput && maskSimilarityThresholdValueSpan) {
+    maskSimilarityThresholdInput.addEventListener('input', (event) => {
+      maskSimilarityThresholdValueSpan.textContent = event.target.value;
+    });
+    maskSimilarityThresholdValueSpan.textContent = maskSimilarityThresholdInput.value;
+  } else {
+    console.error("Mask similarity threshold slider or value span not found!");
+  }
+
+  async function updateTargetImageSlider (selectedDataset, selectedClassName) {
+    numTargetImagesControl.classList.remove("hidden");
+    numTargetImagesValueSpan.textContent = "Loading...";
+    maxTargetImagesValueSpan.textContent = "";
+    numTargetImagesInput.disabled = true;
+
+    if (!selectedDataset || !selectedClassName) {
+      // If no dataset/class selected (e.g., after dataset change), show N/A
+      numTargetImagesValueSpan.textContent = "N/A";
+      maxTargetImagesValueSpan.textContent = "N/A";
+      // Keep it disabled
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/class_info?dataset=${encodeURIComponent(selectedDataset)}&class_name=${encodeURIComponent(selectedClassName)}`,
+      );
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      const totalImages = data.total_images || 0;
+      const nShot = parseInt(nShotInput.value, 10) || 1;
+      const maxTargets = Math.max(1, totalImages - nShot); // Ensure at least 1
+
+      numTargetImagesInput.max = maxTargets;
+      // Set value to max by default, or keep existing if valid
+      let currentValue = parseInt(numTargetImagesInput.value, 10);
+      if (isNaN(currentValue) || currentValue > maxTargets || currentValue < 1) {
+        currentValue = maxTargets;
+      }
+      numTargetImagesInput.value = currentValue;
+      numTargetImagesValueSpan.textContent = currentValue;
+      maxTargetImagesValueSpan.textContent = maxTargets;
+      numTargetImagesControl.classList.remove("hidden"); // Already visible, but good practice
+      numTargetImagesInput.disabled = false; // Enable input
+    } catch (error) {
+      console.error("Error fetching class info:", error);
+      // Keep control visible but show error state
+      numTargetImagesValueSpan.textContent = "Error";
+      maxTargetImagesValueSpan.textContent = "N/A";
+      numTargetImagesInput.disabled = true;
+    }
+  }
+
+  if (numTargetImagesInput && numTargetImagesValueSpan) {
+    numTargetImagesInput.addEventListener('input', (event) => {
+      numTargetImagesValueSpan.textContent = event.target.value;
+    });
+  } else {
+    console.error("Target image slider or value span not found!");
+  }
 
   processButton.addEventListener("click", async () => {
     const pipeline = pipelineSelect.value;
@@ -81,9 +194,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const dataset = datasetSelect.value;
     const className = classNameSelect.value;
     const nShot = parseInt(nShotInput.value, 10);
+    const numTargetImages = parseInt(numTargetImagesInput.value, 10);
     const numBackgroundPoints = parseInt(numBackgroundPointsInput.value, 10);
+    const similarityThreshold = parseFloat(similarityThresholdInput.value);
+    const maskSimilarityThreshold = parseFloat(maskSimilarityThresholdInput.value);
+    const skipPoints = skipPointsCheckbox?.checked ?? false;
 
-    if (!className || isNaN(nShot) || nShot < 1) {
+    if (!className || isNaN(nShot) || nShot < 1 || isNaN(similarityThreshold) || isNaN(maskSimilarityThreshold) || isNaN(numTargetImages) || numTargetImages < 1) {
       // Use progress text for errors before starting
       progressContainer.classList.remove("hidden");
       progressText.textContent = "Invalid input.";
@@ -104,19 +221,18 @@ document.addEventListener("DOMContentLoaded", () => {
             Processing...
         `;
     resultsContainer.innerHTML = "";
-    // Show and reset progress bar
     progressContainer.classList.remove("hidden");
     progressBarFill.style.width = "0%";
-    progressBarFill.classList.remove("bg-red-600"); // Ensure it's blue
+    progressBarFill.classList.remove("bg-red-600");
     progressBarFill.classList.add("bg-blue-600");
-    progressText.textContent = "Initializing..."; // Initial text
+    progressText.textContent = "Initializing...";
     Object.keys(canvasDataStore).forEach((key) => delete canvasDataStore[key]);
     Object.keys(maskImageCache).forEach((key) => delete maskImageCache[key]);
 
     // --- Fetch and Process Streamed Response --- 
     let totalTargets = 0;
     let resultsCount = 0;
-    let errorOccurred = false; // Flag to track errors
+    let errorOccurred = false;
 
     try {
       const response = await fetch("/api/process", {
@@ -129,8 +245,12 @@ document.addEventListener("DOMContentLoaded", () => {
           dataset: dataset,
           class_name: className,
           n_shot: nShot,
+          num_target_images: numTargetImages,
           num_background_points: numBackgroundPoints,
           sam_name: samName,
+          similarity_threshold: similarityThreshold,
+          mask_similarity_threshold: maskSimilarityThreshold,
+          skip_points_in_existing_masks: skipPoints,
         }),
       });
 
@@ -173,20 +293,17 @@ document.addEventListener("DOMContentLoaded", () => {
               console.log("Parsed data chunk:", dataChunk);
 
               if (isFirstChunk && dataChunk.total_targets !== undefined) {
-                // --- Handle Total Count --- 
                 totalTargets = parseInt(dataChunk.total_targets, 10) || 0;
                 console.log("Received total targets:", totalTargets);
                 progressText.textContent = `Processing 0 / ${totalTargets}...`;
                 isFirstChunk = false; // Move to processing results
               } else if (dataChunk.error) {
-                // --- Handle Backend Error Chunk ---
                 console.error("Backend processing error:", dataChunk.error);
                 progressText.textContent = `Error: ${dataChunk.error}`;
                 progressBarFill.classList.remove("bg-blue-600");
                 progressBarFill.classList.add("bg-red-600");
                 errorOccurred = true;
               } else if (dataChunk.target_results) {
-                // --- Handle Results Chunk --- 
                 if (errorOccurred) continue;
 
                 const receivedCount = dataChunk.target_results.length;
@@ -209,16 +326,16 @@ document.addEventListener("DOMContentLoaded", () => {
               progressBarFill.classList.remove("bg-blue-600");
               progressBarFill.classList.add("bg-red-600");
               errorOccurred = true;
-              break; // Exit inner loop on parse error
+              break;
             }
           }
         }
-        if (errorOccurred) break; // Exit outer loop if parse error occurred
+        if (errorOccurred) break;
       }
       // --- End Stream Reading Logic --- 
 
       if (!errorOccurred) {
-        if (resultsCount === 0 && totalTargets === 0 && !isFirstChunk) { // Check if total was received but no results
+        if (resultsCount === 0 && totalTargets === 0 && !isFirstChunk) {
           progressText.textContent = "Processing complete. No results returned.";
         } else if (resultsCount === totalTargets) {
           progressBarFill.style.width = `100%`;
@@ -226,16 +343,15 @@ document.addEventListener("DOMContentLoaded", () => {
         } else if (resultsCount < totalTargets) {
           progressText.textContent = `Processing incomplete (${resultsCount} / ${totalTargets}). Stream ended unexpectedly.`;
           progressBarFill.classList.remove("bg-blue-600");
-          progressBarFill.classList.add("bg-yellow-500"); // Indicate warning
+          progressBarFill.classList.add("bg-yellow-500");
         }
       }
 
     } catch (error) {
       console.error("Error fetching or processing data:", error);
-      // Show error in progress text area
       progressContainer.classList.remove("hidden");
       progressText.textContent = `Error: ${error.message}`;
-      progressBarFill.style.width = "100%"; // Fill bar on error
+      progressBarFill.style.width = "100%";
       progressBarFill.classList.remove("bg-blue-600");
       progressBarFill.classList.add("bg-red-600");
       errorOccurred = true;
@@ -251,7 +367,7 @@ document.addEventListener("DOMContentLoaded", () => {
     targetResults.forEach((result, indexOffset) => {
       // Calculate a unique index based on how many results are already displayed
       const existingResultsCount = resultsContainer.children.length;
-      const uniqueIndex = existingResultsCount + indexOffset; // Simple way to get unique index
+      const uniqueIndex = existingResultsCount + indexOffset;
 
       const targetItemDiv = document.createElement("div");
       targetItemDiv.classList.add(
@@ -264,12 +380,12 @@ document.addEventListener("DOMContentLoaded", () => {
         "flex-col",
         "gap-4",
       );
-      targetItemDiv.id = `target-item-${uniqueIndex}`; // Use unique ID
+      targetItemDiv.id = `target-item-${uniqueIndex}`;
 
       const canvasContainer = document.createElement("div");
       canvasContainer.classList.add("flex-shrink-0");
 
-      const canvasId = `canvas-${uniqueIndex}`; // Use unique ID for canvas
+      const canvasId = `canvas-${uniqueIndex}`;
       const canvas = document.createElement("canvas");
       canvas.id = canvasId;
       canvas.classList.add(
@@ -364,12 +480,13 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!clickedButton || !pointModeGroup.contains(clickedButton)) return;
 
         const newMode = clickedButton.dataset.pointMode;
-        const currentMode = canvasDataStore[canvasId].pointMode;
+        const currentData = canvasDataStore[canvasId];
+        if (!currentData) return;
+        const currentMode = currentData.pointMode;
 
         if (newMode !== currentMode) {
-          canvasDataStore[canvasId].pointMode = newMode;
+          currentData.pointMode = newMode;
 
-          // Update styles
           const buttons = pointModeGroup.querySelectorAll("button");
           buttons.forEach((button) => {
             button.classList.remove(
@@ -454,14 +571,13 @@ document.addEventListener("DOMContentLoaded", () => {
       maskButtonContainer.appendChild(unselectAllButton);
       maskControlsDiv.appendChild(maskButtonContainer);
 
-      // Container for the actual checkboxes
       const maskCheckboxesContainer = document.createElement("div");
       maskCheckboxesContainer.id = `mask-checkboxes-${canvasId}`;
       maskCheckboxesContainer.classList.add(
         "space-y-1",
         "overflow-y-auto",
         "max-h-40",
-      ); // Spacing between checkboxes
+      );
       maskControlsDiv.appendChild(maskCheckboxesContainer);
 
       controlsContainer.appendChild(maskControlsDiv);
@@ -485,10 +601,10 @@ document.addEventListener("DOMContentLoaded", () => {
         scaleY: 1,
         originalWidth: 0,
         originalHeight: 0,
-        similarityMaps: result.similarity_maps || [] // Store available maps
+        similarityMaps: result.similarity_maps || []
       };
 
-      // --- Similarity Map Display (Applying Tailwind) ---
+      // Similarity Map Display 
       console.log(
         `[Canvas ${canvasId}] Checking for similarity maps:`,
         result.similarity_maps,
@@ -511,8 +627,7 @@ document.addEventListener("DOMContentLoaded", () => {
           "md:grid-cols-4",
           "lg:grid-cols-5",
           "gap-2",
-        ); // Adjusted grid cols and gap
-
+        );
         simMaps.forEach((mapData, mapIndex) => {
           const mapDiv = document.createElement("div");
 
@@ -525,40 +640,22 @@ document.addEventListener("DOMContentLoaded", () => {
             "border",
             "border-gray-300",
             "rounded",
-          ); // Fill width, auto height
+          );
           mapImg.dataset.canvasId = canvasId;
           mapImg.dataset.mapUri = mapData.map_data_uri;
 
           const uriLength = mapData.map_data_uri
             ? mapData.map_data_uri.length
             : 0;
-          console.log(
-            `[Canvas ${canvasId}] Setting sim map ${mapIndex} src (length: ${uriLength}): ${mapData.map_data_uri ? mapData.map_data_uri.substring(0, 80) + "..." : "null/empty"}`,
-          );
 
-          mapImg.onerror = () => {
-            // Add error handler for sim map images
-            console.error(
-              `[Canvas ${canvasId}] Failed to load similarity map image ${mapIndex} from data URI (length: ${uriLength}).`,
-            );
-            // Optionally show an error placeholder, or just leave the div empty/hide it
-            mapDiv.innerHTML = `<div class="w-full aspect-square bg-gray-100 flex items-center justify-center border border-red-300 rounded text-red-600 text-xs p-1">Error loading map</div>`;
-          };
-
-          mapDiv.appendChild(mapImg); // Append image directly to mapDiv
+          mapDiv.appendChild(mapImg);
           simMapGrid.appendChild(mapDiv);
         });
 
         simMapContainer.appendChild(simMapGrid);
-        // Make sure controlsContainer exists before appending
         const controlsContainer = targetItemDiv.querySelector('.item-controls');
-        if (controlsContainer) {
-          controlsContainer.appendChild(simMapContainer);
-        } else {
-          console.error("Could not find controls container for sim maps", targetItemDiv);
-        }
+        controlsContainer.appendChild(simMapContainer);
       }
-
       canvas.addEventListener("click", handleCanvasClick);
 
       // Create checkboxes and add listeners
@@ -575,9 +672,8 @@ document.addEventListener("DOMContentLoaded", () => {
           checkbox.type = "checkbox";
           checkbox.id = checkboxId;
           checkbox.value = mask.instance_id;
-          checkbox.checked = true; // Default to visible
-          checkbox.dataset.canvasId = canvasId; // Link checkbox to canvas
-          // Apply Tailwind classes to checkbox
+          checkbox.checked = true;
+          checkbox.dataset.canvasId = canvasId;
           checkbox.classList.add(
             "h-4",
             "w-4",
@@ -588,12 +684,12 @@ document.addEventListener("DOMContentLoaded", () => {
           );
 
           label.htmlFor = checkboxId;
-          label.textContent = `Mask ${maskIndex + 1}`; // Keep text
-          label.classList.add("ml-2", "block", "text-sm"); // Basic label styling
+          label.textContent = `Mask ${maskIndex + 1}`;
+          label.classList.add("ml-2", "block", "text-sm");
 
           maskDiv.appendChild(checkbox);
           maskDiv.appendChild(label);
-          maskCheckboxesContainer.appendChild(maskDiv); // Append the container div
+          maskCheckboxesContainer.appendChild(maskDiv);
 
           // Add listener to redraw when checkbox changes
           checkbox.addEventListener("change", (event) => {
@@ -605,19 +701,15 @@ document.addEventListener("DOMContentLoaded", () => {
         maskCheckboxesContainer.innerHTML += "<i>No masks found</i>";
       }
 
-      // Preload mask images using data URIs
       preloadMaskImages(canvasId);
 
-      // Load base image onto canvas using data URI
       const img = new Image();
       img.onload = () => {
-        // Store original dimensions
         const naturalWidth = img.naturalWidth;
         const naturalHeight = img.naturalHeight;
         canvasDataStore[canvasId].originalWidth = naturalWidth;
         canvasDataStore[canvasId].originalHeight = naturalHeight;
 
-        // Calculate scaled dimensions
         let targetWidth = naturalWidth;
         let targetHeight = naturalHeight;
 
@@ -630,7 +722,6 @@ document.addEventListener("DOMContentLoaded", () => {
         canvas.width = targetWidth;
         canvas.height = targetHeight;
 
-        // Store scaling factors
         canvasDataStore[canvasId].scaleX = targetWidth / naturalWidth;
         canvasDataStore[canvasId].scaleY = targetHeight / naturalHeight;
 
@@ -646,7 +737,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ctx.font = "16px sans-serif";
         ctx.fillText("Error loading image", 10, 50);
       };
-      img.src = result.image_data_uri; // Use data URI directly
+      img.src = result.image_data_uri;
     });
   }
 
@@ -657,56 +748,37 @@ document.addEventListener("DOMContentLoaded", () => {
     data.masks.forEach((mask) => {
       const uri = mask.mask_data_uri;
       if (uri && !maskImageCache[uri]) {
-        // Check if URI exists
         const maskImg = new Image();
         maskImg.onload = () => {
-          maskImageCache[uri] = maskImg; // Store loaded image in cache
+          maskImageCache[uri] = maskImg;
         };
         maskImg.onerror = () => {
           console.error(`Failed to preload mask image from data URI`);
-          maskImageCache[uri] = null; // Mark as failed
+          maskImageCache[uri] = null;
         };
-        maskImageCache[uri] = "loading"; // Mark as loading
-        maskImg.src = uri; // Use data URI directly
+        maskImageCache[uri] = "loading";
+        maskImg.src = uri;
       }
     });
   }
 
-  function drawStar (ctx, x, y, outerRadius, innerRadius, points) {
-    ctx.beginPath();
-    ctx.moveTo(x, y - outerRadius);
-    for (let i = 0; i < points; i++) {
-      let angle = (Math.PI / points) * (2 * i + 1.5);
-      ctx.lineTo(
-        x + outerRadius * Math.cos(angle),
-        y + outerRadius * Math.sin(angle),
-      );
-      angle = (Math.PI / points) * (2 * i + 2.5);
-      ctx.lineTo(
-        x + innerRadius * Math.cos(angle),
-        y + innerRadius * Math.sin(angle),
-      );
-    }
-    ctx.closePath();
-  }
-
   function redrawCanvas (canvasId) {
     const data = canvasDataStore[canvasId];
-    if (!data || !data.image) {
-      return;
-    }
+    if (!data || !data.image) return;
 
-    const mode = data.pointMode || "used";
-    const scaleX = data.scaleX || 1;
-    const scaleY = data.scaleY || 1;
     const canvas = data.element;
     const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const img = data.image;
+    const scaleX = data.scaleX || 1;
+    const scaleY = data.scaleY || 1;
     const baseSize = Math.max(3, Math.min(canvas.width, canvas.height) * 0.01);
     const squareSize = baseSize * 1.5;
-    ctx.drawImage(data.image, 0, 0, canvas.width, canvas.height);
+    const pointRadius = baseSize * 1.2;
+    const clickRadius = pointRadius * 1.5;
 
-    // Draw selected masks
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
     const maskCheckboxesContainer = document.getElementById(
       `mask-checkboxes-${canvasId}`,
     );
@@ -725,44 +797,44 @@ document.addEventListener("DOMContentLoaded", () => {
     data.masks.forEach((mask) => {
       if (visibleMaskIds.has(mask.instance_id)) {
         const maskImg = maskImageCache[mask.mask_data_uri];
-        if (maskImg && maskImg.complete) {
+        if (maskImg && maskImg !== 'loading' && maskImg.complete) {
           ctx.globalAlpha = 0.5;
           ctx.drawImage(maskImg, 0, 0, canvas.width, canvas.height);
           ctx.globalAlpha = 1.0;
-        } else if (!maskImg) {
-          console.warn(
-            `Mask image not preloaded or failed for ${mask.instance_id}`,
-          );
+        } else if (!maskImg || maskImg === 'loading') {
+        } else {
+          console.error(`Failed mask image encountered: ${mask.instance_id}`);
         }
       }
     });
-
-    let pointsToDraw = [];
-    if (mode === "all") {
-      pointsToDraw = data.points.all || [];
-    } else {
-      pointsToDraw = data.points.used || [];
-    }
-
     data.clickablePoints = [];
 
+    // Define point colors and styles (Restore original definitions)
     const OUTLINE_COLOR = "rgba(255, 255, 255, 0.8)";
     const OUTLINE_WIDTH = 1.5;
-    const FOREGROUND_USED_COLOR = "rgba(50, 205, 50, 1)";
-    const FOREGROUND_ALL_COLOR = "rgba(135, 206, 250, 1)";
-    const BACKGROUND_COLOR = "rgba(255, 0, 0, 1)";
+    const usedForegroundPointColor = "rgba(50, 205, 50, 1)"; // Lime Green for Used Foreground
+    const allForegroundPointColor = "rgba(135, 206, 250, 1)"; // Light Sky Blue for All Foreground
+    const backgroundPointColor = "rgba(255, 0, 0, 1)"; // Red for Background
 
-    const pointRadius = baseSize * 1.2;
-    const clickRadius = pointRadius * 1.5;
+    // Draw points based on the current toggle state
+    const showAllPoints = data.pointMode === "all";
+    const allPoints = (data.points && data.points.all) ? data.points.all : [];
+    const usedPoints = (data.points && data.points.used) ? data.points.used : [];
+    const pointsToDraw = showAllPoints ? allPoints : usedPoints;
+    let foregroundPointIndex = -1; // Index relative to only foreground points in usedPoints
 
+    // First, draw all points from the selected list (either all or used)
     pointsToDraw.forEach((point) => {
       const drawX = point.x * scaleX;
       const drawY = point.y * scaleY;
       const label = point.label;
 
+      if (usedPoints.includes(point) && label === 1) {
+        foregroundPointIndex++;
+      }
+
       if (label === 0) {
-        // Draw Background points as solid RED squares with white outline
-        ctx.fillStyle = BACKGROUND_COLOR;
+        ctx.fillStyle = backgroundPointColor;
         ctx.strokeStyle = OUTLINE_COLOR;
         ctx.lineWidth = OUTLINE_WIDTH;
         ctx.beginPath();
@@ -776,42 +848,69 @@ document.addEventListener("DOMContentLoaded", () => {
         ctx.stroke();
       } else {
         // Foreground points (label > 0)
-        if (mode === "used") {
-          // Draw Used Foreground points as solid GREEN circles with white outline
-          ctx.fillStyle = FOREGROUND_USED_COLOR;
-          ctx.strokeStyle = OUTLINE_COLOR;
-          ctx.lineWidth = OUTLINE_WIDTH;
-          ctx.beginPath();
-          ctx.arc(drawX, drawY, pointRadius, 0, 2 * Math.PI);
-          ctx.fill();
-          ctx.stroke();
+        let fillColor;
+        if (showAllPoints) {
+          // Showing all points -> use light blue
+          fillColor = allForegroundPointColor;
         } else {
-          // Draw All Foreground points as filled Light Blue circles with white outline
-          ctx.fillStyle = FOREGROUND_ALL_COLOR;
-          ctx.strokeStyle = OUTLINE_COLOR;
-          ctx.lineWidth = OUTLINE_WIDTH;
-          ctx.beginPath();
-          ctx.arc(drawX, drawY, pointRadius, 0, 2 * Math.PI);
-          ctx.fill();
-          ctx.stroke();
+          // Showing only used points -> use green
+          fillColor = usedForegroundPointColor;
         }
+
+        // Restore: Draw Foreground points as filled circles with white outline
+        ctx.fillStyle = fillColor;
+        ctx.strokeStyle = OUTLINE_COLOR;
+        ctx.lineWidth = OUTLINE_WIDTH;
+        ctx.beginPath();
+        ctx.arc(drawX, drawY, pointRadius, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
       }
 
-      // Store point info for potential clicks using ORIGINAL coordinates
-      data.clickablePoints.push({
-        x: point.x,
-        y: point.y,
-        radius: clickRadius,
-        info: point,
-      });
+      if (label === 1 && usedPoints.includes(point)) {
+        data.clickablePoints.push({
+          x: drawX,
+          y: drawY,
+          radius: clickRadius,
+          maskIndex: foregroundPointIndex
+        });
+      }
     });
+
+    if (showAllPoints) {
+      foregroundPointIndex = -1;
+      usedPoints.forEach((point) => {
+        if (point.label === 1) {
+          foregroundPointIndex++; // Increment here as well
+          const drawX = point.x * scaleX;
+          const drawY = point.y * scaleY;
+
+          ctx.fillStyle = usedForegroundPointColor;
+          ctx.strokeStyle = OUTLINE_COLOR;
+          ctx.lineWidth = OUTLINE_WIDTH;
+          ctx.beginPath();
+          ctx.arc(drawX, drawY, pointRadius, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.stroke();
+
+          if (!data.clickablePoints.some(cp => cp.maskIndex === foregroundPointIndex)) {
+            data.clickablePoints.push({
+              x: drawX,
+              y: drawY,
+              radius: clickRadius,
+              maskIndex: foregroundPointIndex
+            });
+          }
+        }
+      });
+    }
   }
 
   function handleCanvasClick (event) {
     const canvas = event.target;
     const canvasId = canvas.id;
     const data = canvasDataStore[canvasId];
-    if (!data) return;
+    if (!data || !data.clickablePoints) return;
 
     const rect = canvas.getBoundingClientRect();
     const clickScaleX = canvas.width / rect.width;
@@ -819,58 +918,36 @@ document.addEventListener("DOMContentLoaded", () => {
     const clickX = (event.clientX - rect.left) * clickScaleX;
     const clickY = (event.clientY - rect.top) * clickScaleY;
 
-    // Retrieve canvas scaling factors
-    // These are the factors needed to scale original point coords to displayed size
-    const canvasScaleX = data.scaleX || 1;
-    const canvasScaleY = data.scaleY || 1;
-
-    let clickedOnPoint = false;
-
-    // Check if the click hit any stored foreground point areas
-    // Iterate in reverse to prioritize points drawn on top if overlap occurs
     for (let i = data.clickablePoints.length - 1; i >= 0; i--) {
       const pt = data.clickablePoints[i];
 
-      const scaledPtX = pt.x * canvasScaleX;
-      const scaledPtY = pt.y * canvasScaleY;
       const distance = Math.sqrt(
-        Math.pow(clickX - scaledPtX, 2) + Math.pow(clickY - scaledPtY, 2),
+        Math.pow(clickX - pt.x, 2) + Math.pow(clickY - pt.y, 2),
       );
 
-      // Check if click is near a foreground point (label > 0)
-      if (distance <= pt.radius && pt.info.label > 0) {
+      // Check if click is within the point's clickable radius and it has a valid maskIndex
+      if (distance <= pt.radius && pt.maskIndex !== undefined && pt.maskIndex >= 0) {
         clickedOnPoint = true;
 
-        // --- Find the mask associated with the clicked point ---
-        const currentMode = data.pointMode || "used";
-        const pointsList =
-          currentMode === "all" ? data.points.all : data.points.used;
+        const targetMaskIndex = pt.maskIndex;
 
-        let pointIndex = -1;
-        pointIndex = pointsList.findIndex((p) => p === pt.info);
-
-        // Only foreground points (label > 0) should trigger mask toggling
-        // And only if we are in 'used' mode and found a valid index
-        if (
-          pt.info.label > 0 &&
-          pointIndex !== -1 &&
-          data.masks &&
-          pointIndex < data.masks.length &&
-          currentMode === "used"
-        ) {
-          const targetInstanceId = data.masks[pointIndex].instance_id;
+        if (data.masks && targetMaskIndex < data.masks.length) {
+          const targetMask = data.masks[targetMaskIndex];
+          const targetInstanceId = targetMask.instance_id;
           const checkboxId = `${canvasId}-mask-${targetInstanceId}`;
           const checkbox = document.getElementById(checkboxId);
+
           if (checkbox) {
             checkbox.checked = !checkbox.checked;
-            redrawCanvas(canvasId);
+            redrawCanvas(canvasId); // Redraw to show/hide the mask
+          } else {
+            console.warn(`Could not find checkbox with ID: ${checkboxId} for mask index ${targetMaskIndex}`);
           }
         } else {
-          console.warn(
-            `No mask found for clicked point's index: ${pointIndex}`,
-          );
+          console.warn(`Invalid mask index (${targetMaskIndex}) or mask list missing for canvas ${canvasId}`);
         }
-        break; // Stop checking other points once one is found
+
+        break;
       }
     }
   }

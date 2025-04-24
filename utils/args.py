@@ -39,6 +39,18 @@ def get_arguments(arg_list=None):
         help="Threshold for segmenting the image",
     )
     parser.add_argument(
+        "--mask_similarity_threshold",
+        type=float,
+        default=0.45,
+        help="Threshold for filtering masks based on average similarity",
+    )
+    parser.add_argument(
+        "--skip_points_in_existing_masks",
+        type=bool,
+        default=True,
+        help="Skip foreground points that fall within already generated masks for the same class",
+    )
+    parser.add_argument(
         "--num_foreground_points",
         type=int,
         default=40,

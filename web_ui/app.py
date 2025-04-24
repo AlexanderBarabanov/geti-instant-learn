@@ -10,7 +10,6 @@ from flask import (
     Response,
     stream_with_context,
 )
-import sys
 import json
 
 from context_learner.types import Image, Masks, Priors, Points, Similarities
@@ -34,25 +33,8 @@ python -m web_ui.app
 app = Flask(__name__, static_folder="static", template_folder="templates")
 default_args = get_arguments([])
 print("Loading initial predictor and pipeline...")
-try:
-    current_pipeline_instance = load_model(default_args)
-    current_pipeline_name = default_args.pipeline
-    print(
-        f"Initialized with default pipeline: {current_pipeline_name} and backbone: {default_args.sam_name}"
-    )
-except ValueError as e:
-    print(
-        f"ERROR: Could not initialize default pipeline '{default_args.pipeline}' with backbone '{default_args.sam_name}': {e}. Check utils.models.load_model, utils.constants",
-        file=sys.stderr,
-    )
-    current_pipeline_instance = None
-    current_pipeline_name = None
-except Exception as e:
-    print(
-        f"FATAL: Unexpected error initializing default pipeline {default_args.pipeline}: {e}",
-        file=sys.stderr,
-    )
-    raise
+current_pipeline_instance = load_model(default_args)
+current_pipeline_name = default_args.pipeline
 
 
 def prepare_image_for_web(image_np):
@@ -116,48 +98,29 @@ def prepare_mask_image_for_web(mask_np):
 def process_points_for_web(points_obj: Points):
     """Converts Points object to a JSON-serializable list."""
     processed_points = []
-    if not points_obj or not hasattr(points_obj, "data"):
-        return processed_points
-
     for class_id, list_of_tensors in points_obj.data.items():
         for tensor in list_of_tensors:
             points_list = tensor.cpu().tolist()
             for point_data in points_list:
-                # Ensure we have at least x, y, score, label
-                if len(point_data) >= 4:
-                    x = point_data[0]
-                    y = point_data[1]
-                    score = point_data[2]
-                    label = int(point_data[3])
-                    processed_points.append(
-                        {
-                            "class_id": class_id,
-                            "x": x,
-                            "y": y,
-                            "score": score,
-                            "label": label,
-                        }
-                    )
-                elif len(point_data) >= 2:
-                    x = point_data[0]
-                    y = point_data[1]
-                    score = point_data[2] if len(point_data) > 2 else None
-                    processed_points.append(
-                        {
-                            "class_id": class_id,
-                            "x": x,
-                            "y": y,
-                            "score": score,
-                            "label": 1,
-                        }
-                    )
+                x = point_data[0]
+                y = point_data[1]
+                score = point_data[2]
+                label = int(point_data[3])
+                processed_points.append(
+                    {
+                        "class_id": class_id,
+                        "x": x,
+                        "y": y,
+                        "score": score,
+                        "label": label,
+                    }
+                )
     return processed_points
 
 
 def process_similarity_maps_for_web(similarities_obj: Similarities):
     """Converts Similarity object maps to JSON-serializable list of data URIs."""
     processed_maps = []
-    # Revert to checking original structure: hasattr data and data is not None
     if (
         not similarities_obj
         or not hasattr(similarities_obj, "data")
@@ -165,32 +128,16 @@ def process_similarity_maps_for_web(similarities_obj: Similarities):
     ):
         return processed_maps
 
-    # Revert to iterating over items, assuming data is a dict {class_id: tensor}
-    if not isinstance(similarities_obj.data, dict):
-        app.logger.error(
-            f"process_similarity_maps_for_web: Expected similarities_obj.data to be a dict, got {type(similarities_obj.data)}"
-        )
-        return processed_maps
-
     for class_id, sim_map_tensor in similarities_obj.data.items():
         try:
-            if not isinstance(sim_map_tensor, torch.Tensor):
-                app.logger.warning(
-                    f"Item for class {class_id} is not a tensor, skipping."
-                )
-                continue
-
             sim_map_tensor_cpu = sim_map_tensor.cpu()
 
-            # Original logic to handle tensor dimensions and potential multiple instances
             if sim_map_tensor_cpu.ndim == 3:  # Shape [N, H, W]
                 num_instances = sim_map_tensor_cpu.shape[0]
                 tensor_to_process = sim_map_tensor_cpu
             elif sim_map_tensor_cpu.ndim == 2:  # Shape [H, W]
                 num_instances = 1
-                tensor_to_process = sim_map_tensor_cpu.unsqueeze(
-                    0
-                )  # Add batch dim for loop consistency
+                tensor_to_process = sim_map_tensor_cpu.unsqueeze(0)
             else:
                 # Try squeezing first in case of extra dims like [1, 1, H, W]
                 squeezed_tensor = sim_map_tensor_cpu.squeeze()
@@ -208,33 +155,25 @@ def process_similarity_maps_for_web(similarities_obj: Similarities):
 
             for idx in range(num_instances):
                 sim_map_np = tensor_to_process[idx].numpy()
-
-                # Check for empty tensor again after indexing
                 if sim_map_np.size == 0:
                     app.logger.warning(
                         f"Sim map for class {class_id}, instance {idx} is empty, skipping."
                     )
                     continue
 
-                # Normalize map (handle potential non 0-1 ranges)
                 # Assume sim_map_np is already in [0, 1] range, scale to [0, 255]
                 normalized_map = (sim_map_np * 255).astype(np.uint8)
-
                 # Invert the map so high similarity (high value) -> red in JET
                 inverted_normalized_map = 255 - normalized_map
-
-                # Apply colormap
                 colored_map = cv2.applyColorMap(
                     inverted_normalized_map, cv2.COLORMAP_JET
                 )
-                # Pass to the validated prepare_image_for_web function
                 map_uri = prepare_image_for_web(colored_map)
 
                 processed_maps.append(
                     {
-                        # "class_id": class_id,
-                        "point_index": idx,  # Use instance index as point index
-                        "map_data_uri": map_uri,  # Use 'map_data_uri' key for JS
+                        "point_index": idx,
+                        "map_data_uri": map_uri,
                     }
                 )
         except Exception as e:
@@ -249,8 +188,6 @@ def process_similarity_maps_for_web(similarities_obj: Similarities):
 @app.route("/")
 def index():
     """Serves the main HTML page."""
-    # Pass model, pipeline, and dataset names to the template
-    # Exclude 'all' from lists intended for UI selection
     ui_pipelines = [p for p in PIPELINES if p.lower() != "all"]
     ui_datasets = [d for d in DATASETS if d.lower() != "all"]
     return render_template(
@@ -267,7 +204,6 @@ def get_classes():
     dataset_name = request.args.get("dataset", "PerSeg")
     try:
         full_dataset = load_dataset(dataset_name)
-        # Get unique class names using the new method
         unique_classes = full_dataset.get_categories()
         return jsonify({"classes": unique_classes})
     except FileNotFoundError:
@@ -280,65 +216,292 @@ def get_classes():
         return jsonify({"error": "Could not retrieve class list."}), 500
 
 
+@app.route("/api/class_info")
+def get_class_info():
+    """Returns the total number of images for a given class in a dataset."""
+    dataset_name = request.args.get("dataset")
+    class_name = request.args.get("class_name")
+
+    if not dataset_name or not class_name:
+        return jsonify({"error": "Missing dataset or class_name parameter"}), 400
+
+    try:
+        full_dataset = load_dataset(dataset_name)
+        # Assuming dataset object has a method to get image count per class
+        count = full_dataset.get_instance_count_per_category(class_name)
+        return jsonify({"total_images": count})
+
+    except Exception as e:
+        app.logger.error(
+            f"Error getting image count for {class_name} in {dataset_name}: {e}",
+            exc_info=True,
+        )
+        return jsonify({"error": "Could not retrieve image count."}), 500
+
+
+def _parse_request_and_check_reload(request_data, current_args, current_pipeline_name):
+    """
+    Parses relevant values from request data and determines if a pipeline reload is needed.
+
+    Args:
+        request_data (dict): The JSON data from the incoming request.
+        current_args (SimpleNamespace): The current arguments namespace used by the pipeline.
+        current_pipeline_name (str): The name of the currently loaded pipeline.
+
+    Returns:
+        tuple: A tuple containing:
+            - bool: reload_needed - True if any relevant parameter changed, False otherwise.
+            - dict: requested_values - A dictionary containing the values parsed from the request.
+    """
+    requested_values = {
+        "pipeline": request_data.get("pipeline", current_args.pipeline),
+        "num_background_points": int(
+            request_data.get(
+                "num_background_points", current_args.num_background_points
+            )
+        ),
+        "sam_name": request_data.get("sam_name", current_args.sam_name),
+        "similarity_threshold": float(
+            request_data.get("similarity_threshold", current_args.similarity_threshold)
+        ),
+        "mask_similarity_threshold": float(
+            request_data.get(
+                "mask_similarity_threshold",
+                current_args.mask_similarity_threshold,
+            )
+        ),
+        "skip_points_in_existing_masks": bool(
+            request_data.get(
+                "skip_points_in_existing_masks",
+                getattr(current_args, "skip_points_in_existing_masks", False),
+            )
+        ),
+        "num_target_images": request_data.get("num_target_images", None),
+    }
+
+    reload_needed = False
+    if requested_values["pipeline"] != current_pipeline_name:
+        reload_needed = True
+        print(
+            f"Pipeline name changed: {current_pipeline_name} -> {requested_values['pipeline']}"
+        )
+    if requested_values["sam_name"] != current_args.sam_name:
+        reload_needed = True
+        print(
+            f"Backbone (sam_name) changed: {current_args.sam_name} -> {requested_values['sam_name']}"
+        )
+    if requested_values["num_background_points"] != current_args.num_background_points:
+        reload_needed = True
+        print(
+            f"Background points changed: {current_args.num_background_points} -> {requested_values['num_background_points']}"
+        )
+    if requested_values["similarity_threshold"] != current_args.similarity_threshold:
+        reload_needed = True
+        print(
+            f"Similarity threshold changed: {current_args.similarity_threshold} -> {requested_values['similarity_threshold']}"
+        )
+    if (
+        requested_values["mask_similarity_threshold"]
+        != current_args.mask_similarity_threshold
+    ):
+        reload_needed = True
+        print(
+            f"Mask similarity threshold changed: {current_args.mask_similarity_threshold} -> {requested_values['mask_similarity_threshold']}"
+        )
+    current_skip_val = getattr(current_args, "skip_points_in_existing_masks", False)
+    if requested_values["skip_points_in_existing_masks"] != current_skip_val:
+        reload_needed = True
+        print(
+            f"Skip covered points changed: {current_skip_val} -> {requested_values['skip_points_in_existing_masks']}"
+        )
+
+    return reload_needed, requested_values
+
+
+def _reload_pipeline_if_needed(reload_needed, requested_values):
+    """
+    Reloads the pipeline if necessary based on the requested values.
+
+    Updates the global `current_pipeline_instance`, `current_pipeline_name`, and `default_args`.
+    Handles exceptions during reload and reverts `default_args` if loading fails.
+
+    Args:
+        reload_needed (bool): Whether a reload is required.
+        requested_values (dict): Dictionary of parameters parsed from the request.
+
+    Raises:
+        Exception: Propagates exceptions from `load_model` if the reload fails.
+    """
+    global default_args, current_pipeline_instance, current_pipeline_name
+
+    if reload_needed:
+        print("Reloading pipeline due to parameter changes...")
+        default_args.pipeline = requested_values["pipeline"]
+        default_args.sam_name = requested_values["sam_name"]
+        default_args.num_background_points = requested_values["num_background_points"]
+        default_args.similarity_threshold = requested_values["similarity_threshold"]
+        default_args.mask_similarity_threshold = requested_values[
+            "mask_similarity_threshold"
+        ]
+        default_args.skip_points_in_existing_masks = requested_values[
+            "skip_points_in_existing_masks"
+        ]
+        default_args.num_target_images = requested_values["num_target_images"]
+
+        print(f"Attempting to reload with updated args: {vars(default_args)}")
+        reloaded_pipeline_instance = load_model(default_args)
+
+        current_pipeline_instance = reloaded_pipeline_instance
+        current_pipeline_name = requested_values["pipeline"]
+        print(
+            f"Pipeline reloaded successfully to: {current_pipeline_name} with backbone: {default_args.sam_name}"
+        )
+
+    return current_pipeline_instance, default_args, current_pipeline_name
+
+
+def _load_and_prepare_data(
+    dataset_name, class_name_filter, n_shot, num_target_images=None
+):
+    """
+    Loads the specified dataset, validates parameters, and prepares reference data.
+
+    Args:
+        dataset_name (str): Name of the dataset to load.
+        class_name_filter (str): The class name to filter data by.
+        n_shot (int): The number of reference shots.
+        num_target_images (int, optional): The number of target images to limit.
+
+    Returns:
+        tuple: A tuple containing:
+            - list[Image]: reference_images
+            - list[Priors]: reference_priors
+            - range: target_indices
+            - Dataset: full_dataset instance
+
+    Raises:
+        FileNotFoundError: If dataset files are not found.
+        KeyError: If the class name is not found in the dataset.
+        ValueError: If inputs are invalid (e.g., empty class name, not enough samples).
+        Exception: For other dataset loading or processing errors.
+    """
+    if not class_name_filter:
+        raise ValueError("Class name filter cannot be empty")
+
+    try:
+        full_dataset = load_dataset(dataset_name)
+    except FileNotFoundError as e:
+        app.logger.error(
+            f"Dataset '{dataset_name}' files not found during processing.",
+            exc_info=True,
+        )
+        raise  # Propagate the error
+    except Exception as e:
+        app.logger.error(f"Failed to load dataset '{dataset_name}': {e}", exc_info=True)
+        raise ValueError(f"Could not load dataset '{dataset_name}'.") from e
+
+    try:
+        image_count_for_category = full_dataset.get_image_count_per_category(
+            class_name_filter
+        )
+    except KeyError:
+        raise KeyError(
+            f"Class name '{class_name_filter}' not found in dataset '{dataset_name}'"
+        )
+    except Exception as e:
+        app.logger.error(
+            f"Error accessing category data for '{class_name_filter}': {e}",
+            exc_info=True,
+        )
+        raise RuntimeError("Error retrieving category information.") from e
+
+    if image_count_for_category == 0:
+        raise ValueError(
+            f"No data found for class '{class_name_filter}' in dataset '{dataset_name}'"
+        )
+
+    if image_count_for_category <= n_shot:
+        raise ValueError(
+            f"Not enough samples ({image_count_for_category}) for class '{class_name_filter}' to provide {n_shot} reference shots and at least one target."
+        )
+
+    reference_indices = range(n_shot)
+    target_indices = range(n_shot, image_count_for_category)
+
+    reference_images = []
+    reference_priors = []
+
+    for i in reference_indices:
+        try:
+            image_list = full_dataset.get_images_by_category(
+                class_name_filter, start=i, end=i + 1
+            )
+            masks_list = full_dataset.get_masks_by_category(
+                class_name_filter, start=i, end=i + 1
+            )
+            if not image_list or not masks_list:
+                raise ValueError(f"Missing image or mask for reference index {i}")
+            image_np = image_list[0]
+            mask_np = masks_list[0]
+            if mask_np.dtype != np.uint8:
+                mask_np = (mask_np > 0).astype(np.uint8)
+            ref_image_obj = Image(image_np)
+            reference_images.append(ref_image_obj)
+            masks = Masks()
+            masks.add(mask_np, class_id=0)
+            reference_priors.append(Priors(masks=masks))
+        except Exception as e:
+            app.logger.error(
+                f"Error processing reference {i} for class {class_name_filter}: {e}",
+                exc_info=True,
+            )
+            raise RuntimeError(
+                f"Error processing reference images for '{class_name_filter}'."
+            ) from e
+
+    # Limit target images based on input
+    if num_target_images is not None and num_target_images >= 1:
+        num_target_images = int(num_target_images)
+        if len(target_indices) > num_target_images:
+            app.logger.info(
+                f"Limiting target images from {len(target_indices)} to {num_target_images}"
+            )
+            target_indices = target_indices[:num_target_images]
+        elif num_target_images > len(target_indices):
+            app.logger.warning(
+                f"Requested num_target_images ({num_target_images}) is greater than available ({len(target_indices)}). Using all available."
+            )
+
+    if not target_indices:
+        app.logger.warning(
+            f"No target images found for class '{class_name_filter}' in dataset '{dataset_name}'"
+        )
+
+    return reference_images, reference_priors, target_indices, full_dataset
+
+
 @app.route("/api/process", methods=["POST"])
 def run_processing():
-    """Runs the pipeline and streams results back chunk by chunk."""
+    """
+    Main endpoint to run the visual prompting pipeline and stream results.
 
-    # --- Setup and Pipeline Loading (mostly unchanged) ---
+    Handles request parsing, pipeline reloading, data preparation, learning,
+    and streaming inference results.
+    """
+    global default_args, current_pipeline_instance, current_pipeline_name
+
     try:
-        global default_args
-        data = request.json
-        requested_pipeline_name = data.get("pipeline", default_args.pipeline)
-        num_background_points = int(
-            data.get("num_background_points", default_args.num_background_points)
+        request_data = request.json
+        reload_needed, requested_values = _parse_request_and_check_reload(
+            request_data, default_args, current_pipeline_name
         )
-        requested_sam_name = data.get("sam_name", default_args.sam_name)
 
-        global current_pipeline_instance, current_pipeline_name
-
-        # --- Determine if pipeline needs reload ---
-        reload_needed = False
-        if requested_pipeline_name != current_pipeline_name:
-            reload_needed = True
-            print(
-                f"Pipeline name changed: {current_pipeline_name} -> {requested_pipeline_name}"
+        try:
+            current_pipeline_instance, default_args, current_pipeline_name = (
+                _reload_pipeline_if_needed(reload_needed, requested_values)
             )
-        if requested_sam_name != default_args.sam_name:
-            reload_needed = True
-            print(
-                f"Backbone (sam_name) changed: {default_args.sam_name} -> {requested_sam_name}"
-            )
-        if num_background_points != default_args.num_background_points:
-            reload_needed = True
-            print(
-                f"Background points changed: {default_args.num_background_points} -> {num_background_points}"
-            )
-
-        if reload_needed:
-            print(
-                f"Reloading pipeline with args: sam_name={requested_sam_name}, pipeline={requested_pipeline_name}, bg_points={num_background_points}"
-            )
-            default_args.sam_name = requested_sam_name
-            default_args.num_background_points = num_background_points
-            default_args.pipeline = requested_pipeline_name
-            try:
-                current_pipeline_instance = load_model(default_args)
-                current_pipeline_name = default_args.pipeline
-                print(
-                    f"Pipeline reloaded to: {current_pipeline_name} with backbone: {default_args.sam_name}"
-                )
-            except ValueError as e:
-                error_msg = str(e)
-                app.logger.error(error_msg)
-                # Return error immediately if reload fails
-                return jsonify({"error": error_msg}), 400
-            except Exception as e:
-                error_msg = (
-                    f"Failed to switch pipeline to {requested_pipeline_name}: {str(e)}"
-                )
-                app.logger.error(error_msg, exc_info=True)
-                # Return error immediately if reload fails
-                return jsonify({"error": error_msg}), 500
+        except Exception as e:
+            return jsonify({"error": f"Failed to apply settings: {e}"}), 500
 
         if current_pipeline_instance is None:
             app.logger.error(
@@ -349,142 +512,68 @@ def run_processing():
             ), 500
 
         selected_pipeline = current_pipeline_instance
-
-        # --- Dataset Loading and Input Prep (mostly unchanged) ---
-        dataset_name = data.get("dataset", "PerSeg")
-        class_name_filter = data.get("class_name", "can")
-        n_shot = int(data.get("n_shot", 1))
-
+        dataset_name = request_data.get("dataset", "PerSeg")
+        class_name_filter = request_data.get("class_name", "can")
+        n_shot = int(request_data.get("n_shot", 1))
         try:
-            full_dataset = load_dataset(dataset_name)
-        except FileNotFoundError:
-            app.logger.error(
-                f"Dataset '{dataset_name}' files not found during processing.",
-                exc_info=True,
+            (
+                reference_images,
+                reference_priors,
+                target_indices,
+                full_dataset,
+            ) = _load_and_prepare_data(
+                dataset_name,
+                class_name_filter,
+                n_shot,
+                requested_values["num_target_images"],
             )
-            return jsonify({"error": f"Dataset '{dataset_name}' files not found."}), 404
+        except (FileNotFoundError, KeyError, ValueError, RuntimeError) as e:
+            app.logger.error(f"Data preparation error: {e}", exc_info=True)
+            return jsonify({"error": str(e)}), 400  # Use 400 for client-related errors
         except Exception as e:
-            app.logger.error(
-                f"Failed to load dataset '{dataset_name}': {e}", exc_info=True
-            )
-            return jsonify({"error": f"Could not load dataset '{dataset_name}'."}), 500
-
-        if not class_name_filter:
-            return jsonify({"error": "Class name filter cannot be empty"}), 400
+            app.logger.error(f"Unexpected data preparation error: {e}", exc_info=True)
+            return jsonify({"error": "Failed to prepare data."}), 500
 
         try:
-            # Use class_name_filter (string) instead of category_id for consistency
-            image_count_for_category = full_dataset.get_image_count_per_category(
-                class_name_filter
-            )
-        except KeyError:
-            return jsonify(
-                {
-                    "error": f"Class name '{class_name_filter}' not found in dataset '{dataset_name}'"
-                }
-            ), 404
-        except Exception as e:
-            app.logger.error(
-                f"Error accessing category data for '{class_name_filter}': {e}",
-                exc_info=True,
-            )
-            return jsonify({"error": "Error retrieving category information."}), 500
-
-        if image_count_for_category == 0:
-            return jsonify(
-                {
-                    "error": f"No data found for class '{class_name_filter}' in dataset '{dataset_name}'"
-                }
-            ), 404
-
-        if image_count_for_category <= n_shot:
-            return jsonify(
-                {
-                    "error": f"Not enough samples ({image_count_for_category}) for class '{class_name_filter}' to provide {n_shot} reference shots and at least one target."
-                }
-            ), 400
-
-        reference_indices = range(n_shot)
-        target_indices = range(n_shot, image_count_for_category)
-
-        reference_images = []
-        reference_priors = []
-        selected_pipeline.reset_state()
-
-        # --- Process References (unchanged error handling needed) ---
-        for i in reference_indices:
-            try:
-                image_list = full_dataset.get_images_by_category(
-                    class_name_filter, start=i, end=i + 1
-                )
-                masks_list = full_dataset.get_masks_by_category(
-                    class_name_filter, start=i, end=i + 1
-                )
-                if not image_list or not masks_list:
-                    raise ValueError("Missing image or mask")
-                image_np = image_list[0]
-                mask_np = masks_list[0]
-                if mask_np.dtype != np.uint8:
-                    mask_np = (mask_np > 0).astype(np.uint8)
-                ref_image_obj = Image(image_np)
-                reference_images.append(ref_image_obj)
-                masks = Masks()
-                masks.add(mask_np, class_id=0)
-                reference_priors.append(Priors(masks=masks))
-            except Exception as e:
-                app.logger.error(
-                    f"Error processing reference {i} for class {class_name_filter}: {e}",
-                    exc_info=True,
-                )
-                return jsonify(
-                    {
-                        "error": f"Error processing reference images for '{class_name_filter}'."
-                    }
-                ), 500
-
-        # --- Run Pipeline Inference (single call) ---
-        try:
+            selected_pipeline.reset_state()
             selected_pipeline.learn(
                 reference_images=reference_images, reference_priors=reference_priors
             )
         except Exception as e:
-            app.logger.error(f"Error during pipeline execution: {e}", exc_info=True)
-            # Return error immediately if pipeline fails
-            return jsonify({"error": "Pipeline execution failed."}), 500
+            app.logger.error(f"Error during pipeline learn step: {e}", exc_info=True)
+            return jsonify({"error": "Pipeline learn step failed."}), 500
 
-        # --- Stream Inference and Result Processing ---
-        def stream_inference_and_results():
-            nonlocal target_indices, full_dataset, selected_pipeline, class_name_filter  # Ensure access
+        def stream_inference_and_results(
+            target_indices_stream,
+            full_dataset_stream,
+            pipeline_stream,
+            class_name_filter_stream,
+        ):
+            """Generator function to process targets in chunks and yield results."""
             CHUNK_SIZE = 5
-            target_indices_list = list(
-                target_indices
-            )  # Convert range to list for slicing
+            target_indices_list = list(target_indices_stream)
             total_targets = len(target_indices_list)
 
-            # --- Yield total count first ---
             try:
                 yield json.dumps({"total_targets": total_targets}) + "\n"
             except Exception as e:
                 app.logger.error(f"Error yielding total count: {e}", exc_info=True)
-                # If we can't even yield the total, something is wrong
                 yield (
                     json.dumps({"error": "Failed to initiate result streaming."}) + "\n"
                 )
                 return
 
-            # Process targets in chunks
             for chunk_start_idx in range(0, total_targets, CHUNK_SIZE):
                 chunk_end_idx = min(chunk_start_idx + CHUNK_SIZE, total_targets)
                 current_chunk_indices = target_indices_list[
                     chunk_start_idx:chunk_end_idx
                 ]
 
-                # Prepare target images for the current chunk
                 chunk_target_image_objects = []
                 try:
                     for i in current_chunk_indices:
-                        image_list = full_dataset.get_images_by_category(
-                            class_name_filter, start=i, end=i + 1
+                        image_list = full_dataset_stream.get_images_by_category(
+                            class_name_filter_stream, start=i, end=i + 1
                         )
                         if not image_list:
                             raise ValueError(f"No image found for target index {i}")
@@ -503,14 +592,13 @@ def run_processing():
                         )
                         + "\n"
                     )
-                    continue  # Skip to next chunk
+                    continue
 
                 if not chunk_target_image_objects:
-                    continue  # Skip if chunk is empty for some reason
+                    continue
 
-                # --- Run Inference for the current chunk ---
                 try:
-                    selected_pipeline.infer(chunk_target_image_objects)
+                    pipeline_stream.infer(chunk_target_image_objects)
                 except Exception as e:
                     app.logger.error(
                         f"Error during pipeline inference for chunk {chunk_start_idx}-{chunk_end_idx}: {e}",
@@ -524,38 +612,30 @@ def run_processing():
                         )
                         + "\n"
                     )
-                    continue  # Skip to next chunk
+                    continue
 
-                # --- Process and Yield Results for the current chunk ---
                 results_chunk = []
                 try:
-                    # Assuming infer updates state, and we need results for the *last* `len(chunk_target_image_objects)` items
                     num_results_in_chunk = len(chunk_target_image_objects)
-                    state_masks = selected_pipeline._state.masks
-                    state_used_points = selected_pipeline._state.used_points
-                    state_priors = selected_pipeline._state.priors
+                    state_masks = pipeline_stream._state.masks
+                    state_used_points = pipeline_stream._state.used_points
+                    state_priors = pipeline_stream._state.priors
                     state_similarities = getattr(
-                        selected_pipeline._state, "similarities", None
+                        pipeline_stream._state, "similarities", None
                     )
 
-                    # Validate state length - simple check assumes state reflects *only* last inference
-                    # More complex logic needed if state accumulates across infer calls.
                     if (
                         len(state_masks) < num_results_in_chunk
                         or len(state_used_points) < num_results_in_chunk
                         or len(state_priors) < num_results_in_chunk
                     ):
                         raise ValueError(
-                            f"Pipeline state length mismatch after inference for chunk {chunk_start_idx}-{chunk_end_idx}. Expected {num_results_in_chunk}, State: masks={len(state_masks)}, points={len(state_used_points)}"
+                            f"Pipeline state length mismatch after inference for chunk {chunk_start_idx}-{chunk_end_idx}."
                         )
 
-                    # Process the results for this chunk (assuming they are the last N in state)
                     for j in range(num_results_in_chunk):
-                        # Index into the chunk objects and the *end* of the state lists
                         chunk_idx = j
-                        state_idx = (
-                            -num_results_in_chunk + j
-                        )  # Index from the end of state lists
+                        state_idx = -num_results_in_chunk + j
 
                         target_img_obj = chunk_target_image_objects[chunk_idx]
                         masks_obj = state_masks[state_idx]
@@ -564,7 +644,6 @@ def run_processing():
 
                         img_data_uri = prepare_image_for_web(target_img_obj.data)
 
-                        # Process masks (same logic as before)
                         processed_mask_data_uris = []
                         instance_counter = 0
                         target_img_h, target_img_w = target_img_obj.data.shape[:2]
@@ -586,6 +665,7 @@ def run_processing():
                                         mask_np = (mask_np > 0.5).astype(np.uint8)
                                     else:
                                         mask_np = (mask_np > 0).astype(np.uint8)
+
                                     if mask_np.shape != (target_img_h, target_img_w):
                                         mask_np = cv2.resize(
                                             mask_np,
@@ -639,31 +719,32 @@ def run_processing():
                         )
                         + "\n"
                     )
-                    continue  # Skip to next chunk
+                    continue
 
-                # Yield the processed chunk
                 if results_chunk:
                     yield json.dumps({"target_results": results_chunk}) + "\n"
 
-        # Return the streaming response using the new generator
         return Response(
-            stream_with_context(stream_inference_and_results()),
+            stream_with_context(
+                stream_inference_and_results(
+                    target_indices, full_dataset, selected_pipeline, class_name_filter
+                )
+            ),
             mimetype="application/json",
         )
 
-    except FileNotFoundError as e:  # Catch errors before streaming starts
-        app.logger.error(f"File not found error before streaming: {e}", exc_info=True)
+    except FileNotFoundError as e:
+        app.logger.error(f"File not found error: {e}", exc_info=True)
         return jsonify({"error": f"Server error: File not found - {e.filename}"}), 500
     except ImportError as e:
-        app.logger.error(f"Import error before streaming: {e}", exc_info=True)
+        app.logger.error(f"Import error: {e}", exc_info=True)
         return jsonify({"error": f"Server configuration error: {e.name}"}), 500
     except Exception as e:
         app.logger.error(
-            f"An unexpected error occurred before streaming: {e}", exc_info=True
+            f"An unexpected error occurred in run_processing: {e}", exc_info=True
         )
-        # This catches errors during setup, loading, learn phase etc.
         return jsonify(
-            {"error": f"An unexpected error occurred: {type(e).__name__}"}
+            {"error": f"An unexpected server error occurred: {type(e).__name__}"}
         ), 500
 
 

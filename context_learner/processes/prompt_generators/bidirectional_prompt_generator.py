@@ -49,14 +49,26 @@ class BidirectionalPromptGenerator(PromptGenerator):
             )
 
             for class_id, mask in reference_masks.data.items():
+                # Construct local similarity map. This can later be used to filter out masks.
+                local_mean_reference_feature = reference_features.get_local_features(
+                    class_id
+                )[0].mean(dim=0, keepdim=True)
+                local_mean_reference_feature = (
+                    local_mean_reference_feature
+                    / local_mean_reference_feature.norm(dim=-1, keepdim=True)
+                )
+                local_similarity_map = (
+                    local_mean_reference_feature @ target_features.global_features.T
+                )
+                local_similarity_map = self._resize_similarity_map(
+                    local_similarity_map, self._state.target_images[i].size
+                )
+                similarities.add(local_similarity_map, class_id)
+
                 # Select background points based on similarity to averaged local feature
                 averaged_feature_sim_map, bg_target_indices, bg_similarity_scores = (
                     self._select_background_points(similarity_map, mask)
                 )
-                averaged_feature_sim_map = self._resize_similarity_map(
-                    averaged_feature_sim_map, self._state.target_images[i].size
-                )
-                similarities.add(averaged_feature_sim_map, class_id)
 
                 # Perform foreground matching
                 matched_indices, similarity_scores, _ = self._perform_matching(

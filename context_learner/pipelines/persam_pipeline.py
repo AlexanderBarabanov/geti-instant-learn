@@ -1,6 +1,8 @@
 import argparse
 from typing import List
 
+from context_learner.filters.priors.max_point_filter import MaxPointFilter
+from context_learner.filters.priors.prior_filter_base import PriorFilter
 from third_party.Matcher.segment_anything import SamPredictor
 from context_learner.filters.masks import MaskFilter
 from context_learner.filters.masks import ClassOverlapMaskFilter
@@ -46,10 +48,14 @@ class PerSam(Pipeline):
             similarity_threshold=self.args.similarity_threshold,
             num_bg_points=self.args.num_background_points,
         )
+        self.point_filter: PriorFilter = MaxPointFilter(
+            self._state, max_num_points=self.args.num_foreground_points
+        )
         self.segmenter: Segmenter = SamDecoder(
             self._state,
             sam_predictor=sam_predictor,
             apply_mask_refinement=self.args.apply_mask_refinement,
+            skip_points_in_existing_masks=self.args.skip_points_in_existing_masks,
         )
         self.mask_processor: MaskProcessor = MasksToPolygons(self._state)
         self.class_overlap_mask_filter: MaskFilter = ClassOverlapMaskFilter(self._state)
@@ -75,6 +81,7 @@ class PerSam(Pipeline):
             s.reference_features, s.target_features
         )
         s.priors = self.prompt_generator(s.similarities)
+        s.priors = self.point_filter(s.priors)
         s.masks, s.used_points = self.segmenter(s.target_images, s.priors)
         s.masks = self.class_overlap_mask_filter(s.masks, s.used_points)
         s.annotations = self.mask_processor(s.masks)

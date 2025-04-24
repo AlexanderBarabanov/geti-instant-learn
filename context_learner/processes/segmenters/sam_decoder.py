@@ -1,9 +1,15 @@
-from typing import List
+from itertools import zip_longest
+from typing import List, Optional
 import numpy as np
 import torch
+import torch.nn.functional as F
+import matplotlib.pyplot as plt
+from collections import defaultdict
+import os
 
 from context_learner.processes.segmenters.segmenter_base import Segmenter
 from context_learner.types import Image, Masks, Priors, Points, State
+from context_learner.types.similarities import Similarities
 from third_party.PersonalizeSAM.per_segment_anything.predictor import SamPredictor
 
 
@@ -14,29 +20,44 @@ class SamDecoder(Segmenter):
         sam_predictor: SamPredictor,
         apply_mask_refinement: bool = False,
         target_guided_attention: bool = False,
+        mask_similarity_threshold: float = 0.45,
+        skip_points_in_existing_masks: bool = True,
     ):
         """
-        Initialize the SamDecoder.
+        This Segmenter uses SAM to create masks based on points.
+        The resulting masks are then filtered based on the average similarity of that mask.
 
         Args:
             state: State the pipeline state object
             sam_predictor: SamPredictor the SAM predictor
             apply_mask_refinement: bool whether to apply mask refinement
             target_guided_attention: bool whether to use target guided attention, TODO: not implemented yet
+            mask_similarity_threshold: float the threshold for the average similarity of a mask
+            skip_points_in_existing_masks: bool whether to skip points that fall within already generated masks for the same class
         """
         super().__init__(state)
         self.predictor = sam_predictor
         self.apply_mask_refinement = apply_mask_refinement
         self.target_guided_attention = target_guided_attention
+        print(f"==> Using mask similarity threshold: {mask_similarity_threshold}")
+        self.mask_similarity_threshold = mask_similarity_threshold
+        self.skip_points_in_existing_masks = skip_points_in_existing_masks
+        # Store similarity scores for analysis
+        self.similarity_scores = defaultdict(list)
+        self.image_counter = 0
 
     def __call__(
-        self, images: List[Image], priors: List[Priors]
+        self,
+        images: List[Image],
+        priors: List[Priors],
+        similarities: Optional[List[Similarities]] = [],
     ) -> tuple[List[Masks], List[Points]]:
         """Create masks from priors using SAM.
 
         Args:
             images: List of target images.
             priors: A list of priors, one for each target image.
+            similarities: A list of similarities, one for each target image.
 
         Returns:
             A tuple of a list of masks, one for each class in each target image,
@@ -45,16 +66,28 @@ class SamDecoder(Segmenter):
         masks_per_image: List[Masks] = []
         points_per_image: List[Points] = []
 
-        for image, priors_per_image in zip(images, priors):
+        for i, (image, priors_per_image, similarities_per_image) in enumerate(
+            iterable=zip_longest(images, priors, similarities, fillvalue=None)
+        ):
             masks, points_used = self._predict_by_individual_point(
-                image, priors_per_image.points
+                image,
+                priors_per_image.points,
+                similarities_per_image,
+                image_id=self.image_counter + i,
             )
             masks_per_image.append(masks)
             points_per_image.append(points_used)
+
+        self.image_counter += len(images)
+
         return masks_per_image, points_per_image
 
     def _predict_by_individual_point(
-        self, image: Image, points: Points
+        self,
+        image: Image,
+        points: Points,
+        similarities: Optional[Similarities] = None,
+        image_id: int = 0,
     ) -> tuple[Masks, Points]:
         """
         Predict masks from a list of points.
@@ -62,6 +95,8 @@ class SamDecoder(Segmenter):
         Args:
             image: The image to predict masks from.
             points: The points to predict masks from.
+            similarities: Optional similarities.
+            image_id: ID to identify which image is being processed.
 
         Returns:
             A tuple of generated masks and actual points used.
@@ -86,14 +121,16 @@ class SamDecoder(Segmenter):
                     # remove points with very low confidence
                     if score in [-1.0, 0.0]:
                         continue
+
                     # filter out points that lie inside a previously found mask
-                    is_done = False
-                    for mask in all_masks.get(class_id):
-                        if mask[int(y), int(x)]:
-                            is_done = True
-                            break
-                    if is_done:
-                        continue
+                    if self.skip_points_in_existing_masks:
+                        is_covered = False
+                        for mask in all_masks.get(class_id):
+                            if mask[int(y), int(x)]:
+                                is_covered = True
+                                break
+                        if is_covered:
+                            continue
 
                     point_coords = np.concatenate(
                         (
@@ -107,7 +144,6 @@ class SamDecoder(Segmenter):
                         [label] + [0] * len(background_points), dtype=np.float32
                     )
 
-                    # Use predict torch here instead of predict
                     masks, scores, low_res_logits, high_res_logits = (
                         self.predictor.predict(
                             point_coords=point_coords,
@@ -124,6 +160,12 @@ class SamDecoder(Segmenter):
                             low_res_logits, point_coords, point_labels
                         )
 
+                    # Filter the mask based on average similarity
+                    if similarities is not None and not self._filter_mask(
+                        final_mask, similarities.data[class_id], image_id, class_id
+                    ):
+                        continue
+
                     all_masks.add(final_mask, class_id)
                     points_used.append([x, y, score, label])
 
@@ -132,6 +174,51 @@ class SamDecoder(Segmenter):
                 all_used_points.add(torch.tensor(np.array(points_used)), class_id)
 
         return all_masks, all_used_points
+
+    def _filter_mask(
+        self,
+        mask: np.ndarray,
+        similarities: torch.Tensor,
+        image_id: int = 0,
+        class_id: int = 0,
+    ) -> bool:
+        """
+        Filter the mask based on the average similarity with the reference masks.
+
+        Args:
+            mask: The mask to filter
+            similarities: The similarity tensor
+            image_id: ID to identify which image this mask belongs to
+            class_id: The class ID of this mask
+
+        Returns:
+            True if the mask should be kept, False otherwise
+        """
+        # For odd sized images, SAM longest-side resize operation can result in different shape than sim map
+        if mask.shape != similarities.shape[1:]:
+            mask_tensor = torch.from_numpy(mask).float().unsqueeze(0).unsqueeze(0)
+            mask_tensor = (
+                F.interpolate(
+                    mask_tensor,
+                    size=(similarities.shape[1], similarities.shape[2]),
+                    mode="nearest",
+                )
+                .squeeze(0)
+                .squeeze(0)
+                .bool()
+                .cpu()
+                .numpy()
+            )
+            mask = mask_tensor
+
+        mask_similarity = similarities[0, mask]
+        average_similarity = mask_similarity.mean()
+
+        # Store the score for analysis
+        key = f"image_{image_id}_class_{class_id}"
+        self.similarity_scores[key].append(float(average_similarity))
+
+        return average_similarity > self.mask_similarity_threshold
 
     def refine_masks(
         self, logits: torch.Tensor, point_coords: np.ndarray, point_labels: np.ndarray
@@ -177,3 +264,54 @@ class SamDecoder(Segmenter):
         final_mask = masks[best_idx]
         final_score = scores[best_idx]
         return final_mask, masks, final_score
+
+    def reset_similarity_scores(self):
+        """Reset the stored similarity scores."""
+        self.similarity_scores = defaultdict(list)
+        self.image_counter = 0
+
+    def plot_similarity_distributions(
+        self,
+        save_path: Optional[str] = "similarity_distributions",
+        combined_plot: bool = False,
+    ):
+        """
+        Plot the distribution of similarity scores for each image.
+
+        Args:
+            save_path: Optional path to save the plot to
+            combined_plot: If True, creates a single plot with all scores grouped by class
+        """
+        if not self.similarity_scores:
+            return
+
+        class_scores_combined = defaultdict(list)
+        for key, scores in self.similarity_scores.items():
+            _, class_id = key.split("_class_")
+            class_scores_combined[class_id].extend(scores)
+
+        fig, ax = plt.subplots(figsize=(14, 8))
+
+        for class_id, scores in sorted(
+            class_scores_combined.items(), key=lambda x: x[0]
+        ):
+            ax.hist(scores, alpha=0.7, bins=20, label=f"Class {class_id}")
+
+        ax.axvline(
+            x=self.mask_similarity_threshold,
+            color="r",
+            linestyle="--",
+            label=f"Threshold ({self.mask_similarity_threshold})",
+        )
+        ax.set_title("Combined Similarity Score Distribution - All Images")
+        ax.set_xlabel("Average Similarity Score")
+        ax.set_ylabel("Frequency")
+        ax.legend()
+        base, ext = (
+            os.path.splitext(save_path) if "." in save_path else (save_path, ".png")
+        )
+        combined_save_path = f"{base}_combined{ext}"
+        plt.savefig(combined_save_path)
+        plt.tight_layout()
+        plt.show()
+        plt.close(fig)
