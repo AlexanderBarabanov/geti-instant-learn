@@ -2,10 +2,7 @@ matplotlib
 tqdm
 numpy
 opencv-python
-gradio
-umap-learn
 flask
-pandas
 scipy
 scikit-learn
 pre-commit

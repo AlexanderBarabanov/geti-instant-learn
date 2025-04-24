@@ -156,7 +156,6 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 pip install -r requirements.txt
 
 # Install local/third-party packages
-pip install -e third_party/model_api/model_api/python
 pip install -e third_party/dinov2
 pip install -e third_party/efficientvit
 
