@@ -1,3 +1,6 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
 import math
 from typing import Tuple, List, Dict
 from typing import Tuple, List, Dict

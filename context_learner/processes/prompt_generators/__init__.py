@@ -1,3 +1,6 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
 from context_learner.processes.prompt_generators.bidirectional_prompt_generator import (
     BidirectionalPromptGenerator,
 )

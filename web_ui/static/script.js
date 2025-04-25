@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2025 Intel Corporation
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 document.addEventListener("DOMContentLoaded", () => {
   const processButton = document.getElementById("runButton");
   const pipelineSelect = document.getElementById("pipelineSelect");

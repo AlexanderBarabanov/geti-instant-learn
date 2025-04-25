@@ -1,3 +1,6 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
 # Import all type classes
 from context_learner.types.annotations import Annotations
 from context_learner.types.data import Data

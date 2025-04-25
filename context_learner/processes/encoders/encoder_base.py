@@ -1,3 +1,6 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
 from typing import List, Optional, Tuple
 
 from context_learner.processes.process_base import Process

@@ -1,3 +1,6 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
 from typing import List
 
 from context_learner.processes.similarity_matchers.similarity_matcher_base import (

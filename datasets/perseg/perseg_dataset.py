@@ -1,3 +1,6 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
 from datasets.dataset_base import Dataset, Annotation, Image, DatasetIter
 import os
 from typing import List, Dict, Type

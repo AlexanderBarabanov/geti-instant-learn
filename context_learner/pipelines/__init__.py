@@ -1,3 +1,6 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
 from .matcher_pipeline import Matcher
 from .perdino_pipeline import PerDino
 from .persam_pipeline import PerSam

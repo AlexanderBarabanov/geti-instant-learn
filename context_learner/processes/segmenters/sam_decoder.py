@@ -1,3 +1,6 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
 from itertools import zip_longest
 from typing import List, Optional
 import numpy as np
