@@ -69,6 +69,8 @@ class SamDecoder(Segmenter):
         for i, (image, priors_per_image, similarities_per_image) in enumerate(
             iterable=zip_longest(images, priors, similarities, fillvalue=None)
         ):
+            if priors_per_image is None:
+                continue
             masks, points_used = self._predict_by_individual_point(
                 image,
                 priors_per_image.points,
@@ -144,19 +146,17 @@ class SamDecoder(Segmenter):
                         [label] + [0] * len(background_points), dtype=np.float32
                     )
 
-                    masks, scores, low_res_logits, high_res_logits = (
-                        self.predictor.predict(
-                            point_coords=point_coords,
-                            point_labels=point_labels,
-                            multimask_output=False,
-                            # TODO target guided attention and target-semantic prompting
-                        )
+                    masks, mask_scores, low_res_logits, *_ = self.predictor.predict(
+                        point_coords=point_coords,
+                        point_labels=point_labels,
+                        multimask_output=False,
+                        # TODO target guided attention and target-semantic prompting
                     )
 
                     if not self.apply_mask_refinement:
-                        final_mask = masks[np.argmax(scores)]
+                        final_mask = masks[np.argmax(mask_scores)]
                     else:
-                        final_mask = self.refine_masks(
+                        final_mask, _, _ = self.refine_masks(
                             low_res_logits, point_coords, point_labels
                         )
 

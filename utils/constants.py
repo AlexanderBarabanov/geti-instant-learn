@@ -11,7 +11,6 @@ MODEL_MAP = {
         "efficientvit-sam-l0",
         os.path.join(DATA_PATH, "efficientvit_sam_l0.pt"),
     ],  # 512x512 input resolution
-    "MobileSAM-MAPI": ["", ""],
 }
 
 DATASETS = ["all", "PerSeg", "lvis", "lvis_validation"]
