@@ -30,11 +30,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const MAX_CANVAS_WIDTH = 500;
   const canvasDataStore = {};
   const maskImageCache = {};
+  const groundTruthMaskImageCache = {};
   const similarityThresholdValueSpan = document.getElementById("similarityThresholdValue");
 
   const maskSimilarityThresholdValueSpan = document.getElementById(
     "maskSimilarityThresholdValue",
   );
+
+  const referenceContainer = document.getElementById("reference-container");
 
   const skipPointsCheckbox = document.getElementById("skipPointsInExistingMasks");
 
@@ -60,9 +63,11 @@ document.addEventListener("DOMContentLoaded", () => {
       classNameSelect.innerHTML =
         '<option value="" disabled selected>Select Class...</option>';
       if (data.classes && data.classes.length > 0) {
+        const sortedClasses = data.classes.sort();
+
         classNameSelect.innerHTML =
           '<option value="" disabled>Select Class...</option>';
-        data.classes.forEach((className) => {
+        sortedClasses.forEach((className) => {
           const option = document.createElement("option");
           option.value = className;
           option.textContent = className;
@@ -233,6 +238,8 @@ document.addEventListener("DOMContentLoaded", () => {
     progressText.textContent = "Initializing...";
     Object.keys(canvasDataStore).forEach((key) => delete canvasDataStore[key]);
     Object.keys(maskImageCache).forEach((key) => delete maskImageCache[key]);
+    Object.keys(groundTruthMaskImageCache).forEach((key) => delete groundTruthMaskImageCache[key]);
+    if (referenceContainer) referenceContainer.innerHTML = '';
 
     // --- Fetch and Process Streamed Response --- 
     let totalTargets = 0;
@@ -297,11 +304,18 @@ document.addEventListener("DOMContentLoaded", () => {
               const dataChunk = JSON.parse(line);
               console.log("Parsed data chunk:", dataChunk);
 
-              if (isFirstChunk && dataChunk.total_targets !== undefined) {
-                totalTargets = parseInt(dataChunk.total_targets, 10) || 0;
-                console.log("Received total targets:", totalTargets);
-                progressText.textContent = `Processing 0 / ${totalTargets}...`;
-                isFirstChunk = false; // Move to processing results
+              if (isFirstChunk) {
+                // The first chunk contains total_targets and reference_data
+                if (dataChunk.total_targets !== undefined) {
+                  totalTargets = parseInt(dataChunk.total_targets, 10) || 0;
+                  console.log("Received total targets:", totalTargets);
+                  progressText.textContent = `Processing 0 / ${totalTargets}...`;
+                }
+                if (dataChunk.reference_data) {
+                  console.log("Received reference data:", dataChunk.reference_data);
+                  displayReferenceData(dataChunk.reference_data);
+                }
+                isFirstChunk = false; // Move to processing results/errors after first chunk
               } else if (dataChunk.error) {
                 console.error("Backend processing error:", dataChunk.error);
                 progressText.textContent = `Error: ${dataChunk.error}`;
@@ -327,7 +341,7 @@ document.addEventListener("DOMContentLoaded", () => {
               }
             } catch (e) {
               console.error("Error parsing JSON chunk:", e, "Chunk:", line);
-              progressText.textContent = "Error reading results stream.";
+              progressText.textContent = `Error parsing chunk: ${line.substring(0, 50)}...`;
               progressBarFill.classList.remove("bg-blue-600");
               progressBarFill.classList.add("bg-red-600");
               errorOccurred = true;
@@ -367,6 +381,52 @@ document.addEventListener("DOMContentLoaded", () => {
       processButton.innerHTML = originalButtonText;
     }
   });
+
+  function displayReferenceData (referenceData) {
+    if (!referenceContainer) return;
+    referenceContainer.innerHTML = ''; // Clear previous content
+
+    if (!referenceData || referenceData.length === 0) {
+      referenceContainer.innerHTML = '<p class="text-sm text-gray-500">No reference samples provided.</p>';
+      return;
+    }
+
+    const header = document.createElement('h3');
+    header.classList.add('text-xl', 'font-semibold', 'mb-3', 'text-gray-800');
+    header.textContent = `Reference Samples (N=${referenceData.length}):`;
+    referenceContainer.appendChild(header);
+
+    const gridContainer = document.createElement('div');
+    gridContainer.classList.add('grid', 'grid-cols-[repeat(auto-fill,minmax(150px,1fr))]', 'gap-4'); // Responsive grid
+
+    referenceData.forEach((refItem, index) => {
+      const itemDiv = document.createElement('div');
+      itemDiv.classList.add('reference-item', 'relative', 'border', 'border-gray-200', 'rounded-md', 'overflow-hidden', 'shadow-sm');
+
+      const img = document.createElement('img');
+      img.src = refItem.image_data_uri;
+      img.alt = `Reference Image ${index + 1}`;
+      img.classList.add('block', 'w-full', 'h-auto');
+      itemDiv.appendChild(img);
+
+      if (refItem.mask_data_uri) {
+        const maskImg = document.createElement('img');
+        maskImg.src = refItem.mask_data_uri;
+        maskImg.alt = `Reference Mask ${index + 1}`;
+        maskImg.classList.add('absolute', 'top-0', 'left-0', 'w-full', 'h-full', 'opacity-50', 'pointer-events-none'); // Overlay style
+        itemDiv.appendChild(maskImg);
+      }
+
+      const label = document.createElement('span');
+      label.textContent = `Ref ${index + 1}`;
+      label.classList.add('absolute', 'bottom-1', 'right-1', 'bg-black', 'bg-opacity-50', 'text-white', 'text-xs', 'px-1.5', 'py-0.5', 'rounded');
+      itemDiv.appendChild(label);
+
+      gridContainer.appendChild(itemDiv);
+    });
+
+    referenceContainer.appendChild(gridContainer);
+  }
 
   function displayResults (targetResults) {
     targetResults.forEach((result, indexOffset) => {
@@ -509,8 +569,45 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
 
+      // --- Ground Truth Toggle --- 
+      const gtToggleDiv = document.createElement("div");
+      gtToggleDiv.classList.add("gt-toggle-control", "mt-4", "flex", "items-center");
+
+      const gtCheckbox = document.createElement("input");
+      gtCheckbox.type = "checkbox";
+      gtCheckbox.id = `gt-toggle-${canvasId}`;
+      gtCheckbox.dataset.canvasId = canvasId;
+      gtCheckbox.classList.add(
+        "h-4",
+        "w-4",
+        "text-green-600",
+        "border-gray-300",
+        "rounded",
+        "focus:ring-green-500",
+      );
+      gtCheckbox.checked = false;
+
+      const gtLabel = document.createElement("label");
+      gtLabel.htmlFor = gtCheckbox.id;
+      gtLabel.textContent = "Show Ground Truth Mask (Green)";
+      gtLabel.classList.add("ml-2", "block", "text-sm", "text-gray-700");
+
+      gtToggleDiv.appendChild(gtCheckbox);
+      gtToggleDiv.appendChild(gtLabel);
+      controlsContainer.appendChild(gtToggleDiv);
+
+      // Event listener for GT toggle
+      gtCheckbox.addEventListener("change", (event) => {
+        const targetCanvasId = event.target.dataset.canvasId;
+        if (canvasDataStore[targetCanvasId]) {
+          canvasDataStore[targetCanvasId].showGroundTruth = event.target.checked;
+          redrawCanvas(targetCanvasId);
+        }
+      });
+      // --- End Ground Truth Toggle ---
+
       const maskControlsDiv = document.createElement("div");
-      maskControlsDiv.classList.add("mask-controls", "space-y-2");
+      maskControlsDiv.classList.add("mask-controls", "space-y-2", "mt-4");
       maskControlsDiv.innerHTML =
         '<strong class="block text-sm font-medium text-gray-700 mb-1">Masks:</strong>';
 
@@ -606,7 +703,9 @@ document.addEventListener("DOMContentLoaded", () => {
         scaleY: 1,
         originalWidth: 0,
         originalHeight: 0,
-        similarityMaps: result.similarity_maps || []
+        similarityMaps: result.similarity_maps || [],
+        ground_truth_mask_uri: result.gt_mask_uri || null, // Store GT Mask URI
+        showGroundTruth: false // State for GT visibility
       };
 
       // Similarity Map Display 
@@ -707,6 +806,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       preloadMaskImages(canvasId);
+      preloadGroundTruthMaskImage(canvasId);
 
       const img = new Image();
       img.onload = () => {
@@ -767,6 +867,26 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function preloadGroundTruthMaskImage (canvasId) {
+    const data = canvasDataStore[canvasId];
+    if (!data || !data.ground_truth_mask_uri) return;
+
+    const uri = data.ground_truth_mask_uri;
+    if (uri && !groundTruthMaskImageCache[uri]) {
+      const gtMaskImg = new Image();
+      gtMaskImg.onload = () => {
+        groundTruthMaskImageCache[uri] = gtMaskImg;
+        console.log(`[Canvas ${canvasId}] Preloaded GT mask.`);
+      };
+      gtMaskImg.onerror = () => {
+        console.error(`[Canvas ${canvasId}] Failed to preload GT mask image from data URI`);
+        groundTruthMaskImageCache[uri] = null; // Mark as failed
+      };
+      groundTruthMaskImageCache[uri] = "loading"; // Mark as loading
+      gtMaskImg.src = uri;
+    }
+  }
+
   function redrawCanvas (canvasId) {
     const data = canvasDataStore[canvasId];
     if (!data || !data.image) return;
@@ -812,6 +932,18 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     });
+
+    if (data.showGroundTruth && data.ground_truth_mask_uri) {
+      const gtMaskImg = groundTruthMaskImageCache[data.ground_truth_mask_uri];
+      if (gtMaskImg && gtMaskImg !== 'loading' && gtMaskImg.complete) {
+        ctx.globalAlpha = 0.6;
+        ctx.drawImage(gtMaskImg, 0, 0, canvas.width, canvas.height);
+        ctx.globalAlpha = 1.0;
+      } else {
+        console.error(`[Canvas ${canvasId}] Failed GT mask image encountered.`);
+      }
+    }
+
     data.clickablePoints = [];
 
     // Define point colors and styles (Restore original definitions)

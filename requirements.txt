@@ -7,3 +7,6 @@ scipy
 scikit-learn
 pre-commit
 openvino-model-api
+umap
+pycocotools
+requests

@@ -1,51 +1,47 @@
-# Copyright (C) 2025 Intel Corporation
-# SPDX-License-Identifier: Apache-2.0
+"""This is the main file for the web UI.
 
-import cv2
-import numpy as np
-import torch
-import base64
-from flask import (
-    Flask,
-    request,
-    jsonify,
-    render_template,
-    Response,
-    stream_with_context,
-)
-import json
-
-from context_learner.types import Image, Masks, Priors, Points, Similarities
-from utils.args import get_arguments
-from utils.data import load_dataset
-from utils.models import load_model
-from utils.constants import MODEL_MAP, PIPELINES, DATASETS
-
-
-"""
-This is the main file for the web UI.
 It is a Flask application that allows you to run several Visual Prompting pipelines and see the results.
-
 The web UI is served at http://localhost:5050
 
 The web UI can be started by running:
 python -m web_ui.app
 """
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
 
+import base64
+import json
+
+import cv2
+import numpy as np
+import torch
+from flask import (
+    Flask,
+    Response,
+    jsonify,
+    render_template,
+    request,
+    stream_with_context,
+)
+
+from visionprompt.context_learner.types import Image, Masks, Points, Priors, Similarities
+from visionprompt.utils.args import get_arguments
+from visionprompt.utils.constants import DATASETS, MODEL_MAP, PIPELINES
+from visionprompt.utils.data import load_dataset
+from visionprompt.utils.models import load_pipeline
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 default_args = get_arguments([])
 print("Loading initial predictor and pipeline...")
-current_pipeline_instance = load_model(default_args)
+current_pipeline_instance = load_pipeline(default_args)
 current_pipeline_name = default_args.pipeline
 
 
 def prepare_image_for_web(image_np):
     """Encodes an image (assumed RGB) as Base64 PNG data URI."""
-
     if not isinstance(image_np, np.ndarray):
         app.logger.error(
-            f"prepare_image_for_web: Input is not a numpy array! Type: {type(image_np)}"
+            f"prepare_image_for_web: Input is not a numpy array! Type: {type(image_np)}",
         )
         raise TypeError("Input must be a numpy array")
 
@@ -55,7 +51,7 @@ def prepare_image_for_web(image_np):
         image_bgr = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
     else:
         raise ValueError(
-            f"Input array must be RGB (H, W, 3), got shape {image_np.shape}"
+            f"Input array must be RGB (H, W, 3), got shape {image_np.shape}",
         )
 
     # Ensure dtype is uint8 for imencode
@@ -68,7 +64,7 @@ def prepare_image_for_web(image_np):
         if not is_success:
             app.logger.error("prepare_image_for_web: cv2.imencode failed!")
             raise ValueError("Could not encode image to PNG")
-    except Exception as e:
+    except Exception:
         raise
 
     png_as_text = base64.b64encode(buffer).decode("utf-8")
@@ -98,6 +94,29 @@ def prepare_mask_image_for_web(mask_np):
     return f"data:image/png;base64,{png_as_text}"
 
 
+def prepare_gt_mask_image_for_web(mask_np):
+    """Encodes a single-channel mask as a transparent Base64 PNG data URI (Green)."""
+    if mask_np.dtype != np.uint8:
+        mask_np = mask_np.astype(np.uint8)
+
+    h, w = mask_np.shape
+    bgra_mask = np.zeros((h, w, 4), dtype=np.uint8)
+
+    # Set GREEN color for mask pixels (B=0, G=255, R=0)
+    bgra_mask[mask_np > 0, 0] = 0  # Blue
+    bgra_mask[mask_np > 0, 1] = 255  # Green
+    bgra_mask[mask_np > 0, 2] = 0  # Red
+    # Set alpha channel (A=255 for mask, A=0 for background)
+    bgra_mask[mask_np > 0, 3] = 255
+
+    is_success, buffer = cv2.imencode(".png", bgra_mask)
+    if not is_success:
+        raise ValueError("Could not encode ground truth mask image to PNG")
+
+    png_as_text = base64.b64encode(buffer).decode("utf-8")
+    return f"data:image/png;base64,{png_as_text}"
+
+
 def process_points_for_web(points_obj: Points):
     """Converts Points object to a JSON-serializable list."""
     processed_points = []
@@ -116,7 +135,7 @@ def process_points_for_web(points_obj: Points):
                         "y": y,
                         "score": score,
                         "label": label,
-                    }
+                    },
                 )
     return processed_points
 
@@ -124,11 +143,7 @@ def process_points_for_web(points_obj: Points):
 def process_similarity_maps_for_web(similarities_obj: Similarities):
     """Converts Similarity object maps to JSON-serializable list of data URIs."""
     processed_maps = []
-    if (
-        not similarities_obj
-        or not hasattr(similarities_obj, "data")
-        or not similarities_obj.data
-    ):
+    if not similarities_obj or not hasattr(similarities_obj, "data") or not similarities_obj.data:
         return processed_maps
 
     for class_id, sim_map_tensor in similarities_obj.data.items():
@@ -152,7 +167,7 @@ def process_similarity_maps_for_web(similarities_obj: Similarities):
                     tensor_to_process = squeezed_tensor.unsqueeze(0)
                 else:
                     app.logger.warning(
-                        f"Unexpected sim map shape {sim_map_tensor_cpu.shape} after squeeze for class {class_id}, skipping."
+                        f"Unexpected sim map shape {sim_map_tensor_cpu.shape} after squeeze for class {class_id}, skipping.",
                     )
                     continue
 
@@ -160,7 +175,7 @@ def process_similarity_maps_for_web(similarities_obj: Similarities):
                 sim_map_np = tensor_to_process[idx].numpy()
                 if sim_map_np.size == 0:
                     app.logger.warning(
-                        f"Sim map for class {class_id}, instance {idx} is empty, skipping."
+                        f"Sim map for class {class_id}, instance {idx} is empty, skipping.",
                     )
                     continue
 
@@ -169,7 +184,8 @@ def process_similarity_maps_for_web(similarities_obj: Similarities):
                 # Invert the map so high similarity (high value) -> red in JET
                 inverted_normalized_map = 255 - normalized_map
                 colored_map = cv2.applyColorMap(
-                    inverted_normalized_map, cv2.COLORMAP_JET
+                    inverted_normalized_map,
+                    cv2.COLORMAP_JET,
                 )
                 map_uri = prepare_image_for_web(colored_map)
 
@@ -177,7 +193,7 @@ def process_similarity_maps_for_web(similarities_obj: Similarities):
                     {
                         "point_index": idx,
                         "map_data_uri": map_uri,
-                    }
+                    },
                 )
         except Exception as e:
             app.logger.error(
@@ -214,7 +230,8 @@ def get_classes():
         return jsonify({"error": f"Dataset '{dataset_name}' files not found."}), 404
     except Exception as e:
         app.logger.error(
-            f"Error getting classes for {dataset_name}: {e}", exc_info=True
+            f"Error getting classes for {dataset_name}: {e}",
+            exc_info=True,
         )
         return jsonify({"error": "Could not retrieve class list."}), 500
 
@@ -243,8 +260,7 @@ def get_class_info():
 
 
 def _parse_request_and_check_reload(request_data, current_args, current_pipeline_name):
-    """
-    Parses relevant values from request data and determines if a pipeline reload is needed.
+    """Parses relevant values from request data and determines if a pipeline reload is needed.
 
     Args:
         request_data (dict): The JSON data from the incoming request.
@@ -260,24 +276,25 @@ def _parse_request_and_check_reload(request_data, current_args, current_pipeline
         "pipeline": request_data.get("pipeline", current_args.pipeline),
         "num_background_points": int(
             request_data.get(
-                "num_background_points", current_args.num_background_points
-            )
+                "num_background_points",
+                current_args.num_background_points,
+            ),
         ),
         "sam_name": request_data.get("sam_name", current_args.sam_name),
         "similarity_threshold": float(
-            request_data.get("similarity_threshold", current_args.similarity_threshold)
+            request_data.get("similarity_threshold", current_args.similarity_threshold),
         ),
         "mask_similarity_threshold": float(
             request_data.get(
                 "mask_similarity_threshold",
                 current_args.mask_similarity_threshold,
-            )
+            ),
         ),
         "skip_points_in_existing_masks": bool(
             request_data.get(
                 "skip_points_in_existing_masks",
                 getattr(current_args, "skip_points_in_existing_masks", False),
-            )
+            ),
         ),
         "num_target_images": request_data.get("num_target_images", None),
     }
@@ -286,44 +303,40 @@ def _parse_request_and_check_reload(request_data, current_args, current_pipeline
     if requested_values["pipeline"] != current_pipeline_name:
         reload_needed = True
         print(
-            f"Pipeline name changed: {current_pipeline_name} -> {requested_values['pipeline']}"
+            f"Pipeline name changed: {current_pipeline_name} -> {requested_values['pipeline']}",
         )
     if requested_values["sam_name"] != current_args.sam_name:
         reload_needed = True
         print(
-            f"Backbone (sam_name) changed: {current_args.sam_name} -> {requested_values['sam_name']}"
+            f"Backbone (sam_name) changed: {current_args.sam_name} -> {requested_values['sam_name']}",
         )
     if requested_values["num_background_points"] != current_args.num_background_points:
         reload_needed = True
         print(
-            f"Background points changed: {current_args.num_background_points} -> {requested_values['num_background_points']}"
+            f"Background points changed: {current_args.num_background_points} -> {requested_values['num_background_points']}",
         )
     if requested_values["similarity_threshold"] != current_args.similarity_threshold:
         reload_needed = True
         print(
-            f"Similarity threshold changed: {current_args.similarity_threshold} -> {requested_values['similarity_threshold']}"
+            f"Similarity threshold changed: {current_args.similarity_threshold} -> {requested_values['similarity_threshold']}",
         )
-    if (
-        requested_values["mask_similarity_threshold"]
-        != current_args.mask_similarity_threshold
-    ):
+    if requested_values["mask_similarity_threshold"] != current_args.mask_similarity_threshold:
         reload_needed = True
         print(
-            f"Mask similarity threshold changed: {current_args.mask_similarity_threshold} -> {requested_values['mask_similarity_threshold']}"
+            f"Mask similarity threshold changed: {current_args.mask_similarity_threshold} -> {requested_values['mask_similarity_threshold']}",
         )
     current_skip_val = getattr(current_args, "skip_points_in_existing_masks", False)
     if requested_values["skip_points_in_existing_masks"] != current_skip_val:
         reload_needed = True
         print(
-            f"Skip covered points changed: {current_skip_val} -> {requested_values['skip_points_in_existing_masks']}"
+            f"Skip covered points changed: {current_skip_val} -> {requested_values['skip_points_in_existing_masks']}",
         )
 
     return reload_needed, requested_values
 
 
 def _reload_pipeline_if_needed(reload_needed, requested_values):
-    """
-    Reloads the pipeline if necessary based on the requested values.
+    """Reloads the pipeline if necessary based on the requested values.
 
     Updates the global `current_pipeline_instance`, `current_pipeline_name`, and `default_args`.
     Handles exceptions during reload and reverts `default_args` if loading fails.
@@ -343,31 +356,29 @@ def _reload_pipeline_if_needed(reload_needed, requested_values):
         default_args.sam_name = requested_values["sam_name"]
         default_args.num_background_points = requested_values["num_background_points"]
         default_args.similarity_threshold = requested_values["similarity_threshold"]
-        default_args.mask_similarity_threshold = requested_values[
-            "mask_similarity_threshold"
-        ]
-        default_args.skip_points_in_existing_masks = requested_values[
-            "skip_points_in_existing_masks"
-        ]
+        default_args.mask_similarity_threshold = requested_values["mask_similarity_threshold"]
+        default_args.skip_points_in_existing_masks = requested_values["skip_points_in_existing_masks"]
         default_args.num_target_images = requested_values["num_target_images"]
 
         print(f"Attempting to reload with updated args: {vars(default_args)}")
-        reloaded_pipeline_instance = load_model(default_args)
+        reloaded_pipeline_instance = load_pipeline(default_args)
 
         current_pipeline_instance = reloaded_pipeline_instance
         current_pipeline_name = requested_values["pipeline"]
         print(
-            f"Pipeline reloaded successfully to: {current_pipeline_name} with backbone: {default_args.sam_name}"
+            f"Pipeline reloaded successfully to: {current_pipeline_name} with backbone: {default_args.sam_name}",
         )
 
     return current_pipeline_instance, default_args, current_pipeline_name
 
 
 def _load_and_prepare_data(
-    dataset_name, class_name_filter, n_shot, num_target_images=None
+    dataset_name,
+    class_name_filter,
+    n_shot,
+    num_target_images=None,
 ):
-    """
-    Loads the specified dataset, validates parameters, and prepares reference data.
+    """Loads the specified dataset, validates parameters, and prepares reference data.
 
     Args:
         dataset_name (str): Name of the dataset to load.
@@ -393,7 +404,7 @@ def _load_and_prepare_data(
 
     try:
         full_dataset = load_dataset(dataset_name)
-    except FileNotFoundError as e:
+    except FileNotFoundError:
         app.logger.error(
             f"Dataset '{dataset_name}' files not found during processing.",
             exc_info=True,
@@ -405,11 +416,11 @@ def _load_and_prepare_data(
 
     try:
         image_count_for_category = full_dataset.get_image_count_per_category(
-            class_name_filter
+            class_name_filter,
         )
     except KeyError:
         raise KeyError(
-            f"Class name '{class_name_filter}' not found in dataset '{dataset_name}'"
+            f"Class name '{class_name_filter}' not found in dataset '{dataset_name}'",
         )
     except Exception as e:
         app.logger.error(
@@ -420,12 +431,12 @@ def _load_and_prepare_data(
 
     if image_count_for_category == 0:
         raise ValueError(
-            f"No data found for class '{class_name_filter}' in dataset '{dataset_name}'"
+            f"No data found for class '{class_name_filter}' in dataset '{dataset_name}'",
         )
 
     if image_count_for_category <= n_shot:
         raise ValueError(
-            f"Not enough samples ({image_count_for_category}) for class '{class_name_filter}' to provide {n_shot} reference shots and at least one target."
+            f"Not enough samples ({image_count_for_category}) for class '{class_name_filter}' to provide {n_shot} reference shots and at least one target.",
         )
 
     reference_indices = range(n_shot)
@@ -437,10 +448,14 @@ def _load_and_prepare_data(
     for i in reference_indices:
         try:
             image_list = full_dataset.get_images_by_category(
-                class_name_filter, start=i, end=i + 1
+                class_name_filter,
+                start=i,
+                end=i + 1,
             )
             masks_list = full_dataset.get_masks_by_category(
-                class_name_filter, start=i, end=i + 1
+                class_name_filter,
+                start=i,
+                end=i + 1,
             )
             if not image_list or not masks_list:
                 raise ValueError(f"Missing image or mask for reference index {i}")
@@ -459,7 +474,7 @@ def _load_and_prepare_data(
                 exc_info=True,
             )
             raise RuntimeError(
-                f"Error processing reference images for '{class_name_filter}'."
+                f"Error processing reference images for '{class_name_filter}'.",
             ) from e
 
     # Limit target images based on input
@@ -467,17 +482,17 @@ def _load_and_prepare_data(
         num_target_images = int(num_target_images)
         if len(target_indices) > num_target_images:
             app.logger.info(
-                f"Limiting target images from {len(target_indices)} to {num_target_images}"
+                f"Limiting target images from {len(target_indices)} to {num_target_images}",
             )
             target_indices = target_indices[:num_target_images]
         elif num_target_images > len(target_indices):
             app.logger.warning(
-                f"Requested num_target_images ({num_target_images}) is greater than available ({len(target_indices)}). Using all available."
+                f"Requested num_target_images ({num_target_images}) is greater than available ({len(target_indices)}). Using all available.",
             )
 
     if not target_indices:
         app.logger.warning(
-            f"No target images found for class '{class_name_filter}' in dataset '{dataset_name}'"
+            f"No target images found for class '{class_name_filter}' in dataset '{dataset_name}'",
         )
 
     return reference_images, reference_priors, target_indices, full_dataset
@@ -485,33 +500,35 @@ def _load_and_prepare_data(
 
 @app.route("/api/process", methods=["POST"])
 def run_processing():
-    """
-    Main endpoint to run the visual prompting pipeline and stream results.
+    """Main endpoint to run the visual prompting pipeline and stream results.
 
     Handles request parsing, pipeline reloading, data preparation, learning,
     and streaming inference results.
     """
     global default_args, current_pipeline_instance, current_pipeline_name
 
-    try:
+    try:  # noqa: PLR1702
         request_data = request.json
         reload_needed, requested_values = _parse_request_and_check_reload(
-            request_data, default_args, current_pipeline_name
+            request_data,
+            default_args,
+            current_pipeline_name,
         )
 
         try:
-            current_pipeline_instance, default_args, current_pipeline_name = (
-                _reload_pipeline_if_needed(reload_needed, requested_values)
+            current_pipeline_instance, default_args, current_pipeline_name = _reload_pipeline_if_needed(
+                reload_needed,
+                requested_values,
             )
         except Exception as e:
             return jsonify({"error": f"Failed to apply settings: {e}"}), 500
 
         if current_pipeline_instance is None:
             app.logger.error(
-                f"Pipeline instance for '{current_pipeline_name}' is not loaded."
+                f"Pipeline instance for '{current_pipeline_name}' is not loaded.",
             )
             return jsonify(
-                {"error": f"Pipeline '{current_pipeline_name}' could not be loaded."}
+                {"error": f"Pipeline '{current_pipeline_name}' could not be loaded."},
             ), 500
 
         selected_pipeline = current_pipeline_instance
@@ -540,17 +557,42 @@ def run_processing():
         try:
             selected_pipeline.reset_state()
             selected_pipeline.learn(
-                reference_images=reference_images, reference_priors=reference_priors
+                reference_images=reference_images,
+                reference_priors=reference_priors,
             )
         except Exception as e:
             app.logger.error(f"Error during pipeline learn step: {e}", exc_info=True)
             return jsonify({"error": "Pipeline learn step failed."}), 500
+
+        # --- Prepare Reference Data for Frontend ---
+        prepared_reference_data = []
+        try:
+            for i, (ref_img, ref_prior) in enumerate(zip(reference_images, reference_priors, strict=False)):
+                ref_img_uri = prepare_image_for_web(ref_img.data)
+                ref_mask_uri = None
+                mask_tensor_list = next(iter(ref_prior.masks.data.values()), [])
+                mask_tensor = mask_tensor_list[0]
+                mask_np = mask_tensor.cpu().numpy()
+                if mask_np.dtype != np.uint8:
+                    mask_np = (mask_np > 0).astype(np.uint8)
+                # Use the green mask function for reference GT masks
+                ref_mask_uri = prepare_gt_mask_image_for_web(mask_np)
+
+                prepared_reference_data.append({
+                    "image_data_uri": ref_img_uri,
+                    "mask_data_uri": ref_mask_uri,
+                })
+        except Exception as e:
+            app.logger.error(f"Error preparing reference data for frontend: {e}", exc_info=True)
+            prepared_reference_data = []
+        # --- End Prepare Reference Data ---
 
         def stream_inference_and_results(
             target_indices_stream,
             full_dataset_stream,
             pipeline_stream,
             class_name_filter_stream,
+            reference_data_to_send,  # Add reference data as argument
         ):
             """Generator function to process targets in chunks and yield results."""
             CHUNK_SIZE = 5
@@ -558,25 +600,25 @@ def run_processing():
             total_targets = len(target_indices_list)
 
             try:
-                yield json.dumps({"total_targets": total_targets}) + "\n"
+                # Send initial message with total count AND reference data
+                initial_message = {"total_targets": total_targets, "reference_data": reference_data_to_send}
+                yield json.dumps(initial_message) + "\n"
             except Exception as e:
-                app.logger.error(f"Error yielding total count: {e}", exc_info=True)
-                yield (
-                    json.dumps({"error": "Failed to initiate result streaming."}) + "\n"
-                )
+                app.logger.error(f"Error yielding initial message: {e}", exc_info=True)
+                yield (json.dumps({"error": "Failed to initiate result streaming."}) + "\n")
                 return
 
             for chunk_start_idx in range(0, total_targets, CHUNK_SIZE):
                 chunk_end_idx = min(chunk_start_idx + CHUNK_SIZE, total_targets)
-                current_chunk_indices = target_indices_list[
-                    chunk_start_idx:chunk_end_idx
-                ]
+                current_chunk_indices = target_indices_list[chunk_start_idx:chunk_end_idx]
 
                 chunk_target_image_objects = []
                 try:
                     for i in current_chunk_indices:
                         image_list = full_dataset_stream.get_images_by_category(
-                            class_name_filter_stream, start=i, end=i + 1
+                            class_name_filter_stream,
+                            start=i,
+                            end=i + 1,
                         )
                         if not image_list:
                             raise ValueError(f"No image found for target index {i}")
@@ -590,8 +632,8 @@ def run_processing():
                     yield (
                         json.dumps(
                             {
-                                "error": f"Error preparing images for chunk starting at index {target_indices_list[chunk_start_idx]}."
-                            }
+                                "error": f"Error preparing images for chunk starting at index {target_indices_list[chunk_start_idx]}.",
+                            },
                         )
                         + "\n"
                     )
@@ -610,8 +652,8 @@ def run_processing():
                     yield (
                         json.dumps(
                             {
-                                "error": f"Pipeline inference failed for chunk starting at index {target_indices_list[chunk_start_idx]}."
-                            }
+                                "error": f"Pipeline inference failed for chunk starting at index {target_indices_list[chunk_start_idx]}.",
+                            },
                         )
                         + "\n"
                     )
@@ -624,7 +666,9 @@ def run_processing():
                     state_used_points = pipeline_stream._state.used_points
                     state_priors = pipeline_stream._state.priors
                     state_similarities = getattr(
-                        pipeline_stream._state, "similarities", None
+                        pipeline_stream._state,
+                        "similarities",
+                        None,
                     )
 
                     if (
@@ -633,12 +677,13 @@ def run_processing():
                         or len(state_priors) < num_results_in_chunk
                     ):
                         raise ValueError(
-                            f"Pipeline state length mismatch after inference for chunk {chunk_start_idx}-{chunk_end_idx}."
+                            f"Pipeline state length mismatch after inference for chunk {chunk_start_idx}-{chunk_end_idx}.",
                         )
 
                     for j in range(num_results_in_chunk):
                         chunk_idx = j
                         state_idx = -num_results_in_chunk + j
+                        original_target_index = current_chunk_indices[chunk_idx]  # Get original index
 
                         target_img_obj = chunk_target_image_objects[chunk_idx]
                         masks_obj = state_masks[state_idx]
@@ -656,10 +701,7 @@ def run_processing():
                                     mask_np = mask_tensor.cpu().numpy()
                                     if mask_np.ndim > 2:
                                         mask_np = np.squeeze(mask_np)
-                                    if (
-                                        mask_np.dtype == bool
-                                        or mask_np.dtype == np.bool_
-                                    ):
+                                    if mask_np.dtype == bool or mask_np.dtype == np.bool_:
                                         mask_np = mask_np.astype(np.uint8)
                                     elif mask_np.dtype in [
                                         torch.float32,
@@ -682,7 +724,7 @@ def run_processing():
                                             "class_id": class_id,
                                             "instance_id": instance_id,
                                             "mask_data_uri": mask_data_uri,
-                                        }
+                                        },
                                     )
                                     instance_counter += 1
 
@@ -690,14 +732,32 @@ def run_processing():
                         web_prior_points = process_points_for_web(prior_obj.points)
 
                         web_similarity_maps = []
-                        if (
-                            state_similarities is not None
-                            and len(state_similarities) > 0
-                        ):
+                        if state_similarities is not None and len(state_similarities) > 0:
                             similarities_for_target = state_similarities[state_idx]
                             web_similarity_maps = process_similarity_maps_for_web(
-                                similarities_for_target
+                                similarities_for_target,
                             )
+
+                        # Fetch corresponding ground truth masks for this chunk
+                        chunk_gt_masks = []
+                        for i in current_chunk_indices:
+                            gt_masks_list = full_dataset_stream.get_masks_by_category(
+                                class_name_filter_stream,
+                                start=i,
+                                end=i + 1,
+                            )
+                            if not gt_masks_list:
+                                app.logger.warning(f"No ground truth mask found for target index {i}")
+                                chunk_gt_masks.append(None)  # Add placeholder if not found
+                            else:
+                                gt_mask_np = gt_masks_list[0]
+                                if gt_mask_np.dtype != np.uint8:
+                                    gt_mask_np = (gt_mask_np > 0).astype(np.uint8)
+                                chunk_gt_masks.append(gt_mask_np)
+
+                        gt_mask_uri = None
+                        if chunk_gt_masks[chunk_idx] is not None:
+                            gt_mask_uri = prepare_gt_mask_image_for_web(chunk_gt_masks[chunk_idx])
 
                         results_chunk.append(
                             {
@@ -706,7 +766,8 @@ def run_processing():
                                 "used_points": web_used_points,
                                 "prior_points": web_prior_points,
                                 "similarity_maps": web_similarity_maps,
-                            }
+                                "gt_mask_uri": gt_mask_uri,
+                            },
                         )
 
                 except Exception as e:
@@ -717,8 +778,8 @@ def run_processing():
                     yield (
                         json.dumps(
                             {
-                                "error": f"Error processing results for chunk starting at index {target_indices_list[chunk_start_idx]}."
-                            }
+                                "error": f"Error processing results for chunk starting at index {target_indices_list[chunk_start_idx]}.",
+                            },
                         )
                         + "\n"
                     )
@@ -730,8 +791,12 @@ def run_processing():
         return Response(
             stream_with_context(
                 stream_inference_and_results(
-                    target_indices, full_dataset, selected_pipeline, class_name_filter
-                )
+                    target_indices,
+                    full_dataset,
+                    selected_pipeline,
+                    class_name_filter,
+                    prepared_reference_data,  # Pass prepared data here
+                ),
             ),
             mimetype="application/json",
         )
@@ -744,12 +809,13 @@ def run_processing():
         return jsonify({"error": f"Server configuration error: {e.name}"}), 500
     except Exception as e:
         app.logger.error(
-            f"An unexpected error occurred in run_processing: {e}", exc_info=True
+            f"An unexpected error occurred in run_processing: {e}",
+            exc_info=True,
         )
         return jsonify(
-            {"error": f"An unexpected server error occurred: {type(e).__name__}"}
+            {"error": f"An unexpected server error occurred: {type(e).__name__}"},
         ), 500
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", debug=True, port=5051)
+    app.run(host="0.0.0.0", debug=True, port=5050)

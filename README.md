@@ -4,13 +4,13 @@
 
 ---
 
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE) <!-- Add other relevant badges if you have them -->
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE) [![Python Version](https://img.shields.io/badge/python-%3E%3D3.10-blue.svg)](https://www.python.org/downloads/) [![version](https://img.shields.io/badge/version-0.1.0-lightgrey.svg)](pyproject.toml)
 
 This project provides a robust platform for experimenting with various visual prompting techniques. Its core strength lies in a highly **modular pipeline design**, allowing researchers and developers to easily combine, swap, and extend different components such as backbone networks, feature extractors, matching algorithms, and mask generators.
 
 ## What is Visual Prompting?
 
-Imagine you need to locate and precisely outline every instance of a specific object in hundreds of images—perhaps "kettles" in kitchen photos or "tumors" in medical scans. Traditional approaches would require either:
+Imagine you need to locate and precisely outline every instance of a specific object in hundreds of images—perhaps "kettles" in kitchen photos or "tumors" in medical scans. Traditional approaches typically require either:
 
 1. Training a dedicated model on thousands of labeled examples of that specific object, or
 2. Manually segmenting each image (extremely time-consuming and labor-intensive)
@@ -35,23 +35,39 @@ This repository explores algorithms that make visual prompting more effective, e
 - 💻 **Interactive Web UI:** Visually inspect similarity maps, generated masks, and points for qualitative analysis and debugging. Easily switch between configurations.
 - 🔌 **Easy Integration:** Designed for straightforward addition of new algorithms, backbones, or datasets.
 
+## Installation
+
+Create a new environment and install dependencies. We recommend using `uv` for faster environment creation.
+
+```bash
+# Create environment
+uv venv --python 3.11
+source .venv/bin/activate
+
+# Install visionprompt
+uv pip install -e .
+
+# Optional: Install xFormers for faster inference
+uv pip install -e ".[extras]"
+```
+
 ## Modular Pipeline Example
 
 The power of this repository lies in its modularity. You can easily modify pipelines by changing which components are instantiated within their class definition.
 
-For instance, here is the complete definition for the `PerSam` pipeline from `context_learner/pipelines/persam_pipeline.py`. It shows how different processing components are instantiated within the `__init__` method to define the pipeline's behavior. 
+For instance, here is the complete definition for the `PerSam` pipeline from [`context_learner/pipelines/persam_pipeline.py`](src/visionprompt/context_learner/pipelines/persam_pipeline.py). It shows how different processing components are instantiated within the `__init__` method to define the pipeline's behavior. 
 
 ```python
-# context_learner/pipelines/persam_pipeline.py
+# src/visionprompt/context_learner/pipelines/persam_pipeline.py
 
 
 class PerSam(Pipeline):
     """
-    This is the PerSam algorithm pipeline. Its based on the paper "Personalize Segment Anything Model with One Shot"
+    This is the PerSam algorithm pipeline. It is based on the paper "Personalize Segment Anything Model with One Shot"
     https://arxiv.org/abs/2305.03048
 
     It matches reference objects to target images by comparing their features extracted by SAM and using Cosine Similarity.
-    A grid prompt generator is used to generate prompts for the segmenter and to allow for multi object target images.
+    A grid prompt generator is used to generate prompts for the segmenter and to support multi-object target images.
     """
 
     def __init__(self, sam_predictor: SamPredictor, args: argparse.Namespace):
@@ -130,54 +146,124 @@ pipeline.learn(reference_images, reference_priors)
 annotations = pipeline.infer(target_images)
 ```
 
-## Installation
+## Component Overview
 
-Create a new environment and install dependencies. We recommend using `mamba` for faster environment creation.
+The following diagram shows the main components of the pipeline and their relationships.
 
-```bash
-# Create environment (using mamba)
-mamba create -n visualprompting python=3.11 -y
-mamba activate visualprompting
+```mermaid
+classDiagram
+    class Pipeline {
+        +State _state
+        +argparse.Namespace args
+        +learn(List~Image~, List~Priors~) None
+        +infer(List~Image~) List~Annotations~
+        +get_state() State
+        +reset_state() None
+    }
 
-# Or using conda
-# conda create -n visualprompting python=3.11 -y
-# conda activate visualprompting
+    class Process {
+        +State _state
+        +__call__(*args) Any
+    }
 
-# Or using venv
-# python -m venv .venv
-# source .venv/bin/activate # On Linux/macOS
-# .venv\Scripts\activate # On Windows
+    class State {
+        +List~Image~ reference_images
+        +List~Priors~ reference_priors
+        +List~Features~ reference_features
+        +List~Masks~ processed_reference_masks
+        +List~Image~ target_images
+        +List~Features~ target_features
+        +List~Similarities~ similarities
+        +List~Priors~ priors
+        +List~Masks~ masks
+        +List~Annotations~ annotations
+        +List~Points~ used_points
+    }
 
-# Install PyTorch (adjust cuXXX version if needed for your system)
-# Check https://pytorch.org/get-started/locally/ for the correct command
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
+    class Encoder~Process~ {
+        <<Interface>>
+        +__call__(List~Image~, List~Priors~) (List~Features~, List~Masks~)
+    }
+    class FeatureSelector~Process~ {
+        <<Interface>>
+        +__call__(List~Features~) List~Features~
+    }
+    class SimilarityMatcher~Process~ {
+        <<Interface>>
+        +__call__(List~Features~, List~Features~) List~Similarities~
+    }
+    class PromptGenerator~Process~ {
+        <<Interface>>
+        +__call__(List~Similarities~) List~Priors~
+    }
+    class Segmenter~Process~ {
+        <<Interface>>
+        +__call__(List~Image~, List~Priors~) (List~Masks~, List~Points~)
+    }
+    class MaskProcessor~Process~ {
+        <<Interface>>
+         +__call__(List~Masks~) List~Annotations~
+    }
+    class MaskFilter~Process~ {
+       <<Interface>>
+        +__call__(List~Masks~, List~Points~) List~Masks~
+    }
+     class PriorFilter~Process~ {
+       <<Interface>>
+        +__call__(List~Priors~) List~Priors~
+    }
 
-# Install core dependencies
-pip install -r requirements.txt
 
-# Install local/third-party packages
-pip install -e third_party/dinov2
-pip install -e third_party/efficientvit
+    Pipeline --> State : uses
+    Process --> State : uses
 
-# (Optional) Install xFormers for efficient attention (adjust CUDA version if needed)
-pip install -U xformers --index-url https://download.pytorch.org/whl/cu126
-```
 
-### Model Weights
+    class PerSam {
+        +SamPredictor sam_predictor
+    }
 
-Download the required model weights.
+    Pipeline <|-- PerSam
 
-```bash
-# Create a directory for data/weights (e.g., in your home directory)
-mkdir -p ~/data/
-cd ~/data/
+    PerSam o--> Encoder : uses
+    PerSam o--> FeatureSelector : uses
+    PerSam o--> SimilarityMatcher : uses
+    PerSam o--> PromptGenerator : uses
+    PerSam o--> PriorFilter : uses
+    PerSam o--> Segmenter : uses
+    PerSam o--> MaskProcessor : uses
+    PerSam o--> MaskFilter : uses
 
-# Download SAM-H model weights
-wget https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth
-# Download MobileSAM (SAM-T) model weights
-wget https://github.com/ChaoningZhang/MobileSAM/raw/refs/heads/master/weights/mobile_sam.pt
-# Download EfficientViT-SAM-L0 model weights
-wget https://huggingface.co/mit-han-lab/efficientvit-sam/resolve/main/efficientvit_sam_l0.pt
+
+    class SamEncoder
+    class ClusterFeatures
+    class AverageFeatures
+    class CosineSimilarity
+    class GridPromptGenerator
+    class MaxPointFilter
+    class SamDecoder
+    class MasksToPolygons
+    class ClassOverlapMaskFilter
+
+
+    Encoder <|-- SamEncoder
+    FeatureSelector <|-- ClusterFeatures
+    FeatureSelector <|-- AverageFeatures
+    SimilarityMatcher <|-- CosineSimilarity
+    PromptGenerator <|-- GridPromptGenerator
+    PriorFilter <|-- MaxPointFilter
+    Segmenter <|-- SamDecoder
+    MaskProcessor <|-- MasksToPolygons
+    MaskFilter <|-- ClassOverlapMaskFilter
+
+    SamEncoder --|> Process
+    ClusterFeatures --|> Process
+    AverageFeatures --|> Process
+    CosineSimilarity --|> Process
+    GridPromptGenerator --|> Process
+    MaxPointFilter --|> Process
+    SamDecoder --|> Process
+    MasksToPolygons --|> Process
+    ClassOverlapMaskFilter --|> Process
 ```
 
 ## User Interface
@@ -187,14 +273,13 @@ A web-based user interface is available for interactive exploration and qualitat
 ```bash
 python -m web_ui.app
 ```
-
 The UI allows selecting different pipelines, datasets, and images to inspect outputs like similarity maps, masks, and points.
 
-![Vision Prompt UI](figs/VisionPromptUI.png)
+![Vision Prompt UI](docs/figs/VisionPromptUI.png)
 
 ## Evaluate on Datasets
 
-Use the main evaluation script `main.py` to benchmark performance.
+Use the main evaluation script [`main.py`](main.py) to benchmark performance.
 
 **Basic Usage:**
 
@@ -218,7 +303,7 @@ python main.py --class_name cat
 python main.py --dataset_name PerSeg --pipeline MatcherModular --n_shot 3 --sam_name MobileSAM --class_name can
 ```
 
-See `utils/args.py` or run `python main.py --help` for all available command-line options. Results (metrics and visualizations) are typically saved to `~/outputs/`.
+See [`src/visionprompt/utils/args.py`](src/visionprompt/utils/args.py) or run `python main.py --help` for all available command-line options. Results (metrics and visualizations) are typically saved to `~/outputs/`.
 
 ## Acknowledgements
 
@@ -236,3 +321,4 @@ This project builds upon and utilizes code from several excellent open-source re
 ## License
 
 This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
+
