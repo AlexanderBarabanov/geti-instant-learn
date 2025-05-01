@@ -33,7 +33,7 @@ from visionprompt.utils.models import load_pipeline
 app = Flask(__name__, static_folder="static", template_folder="templates")
 default_args = get_arguments([])
 print("Loading initial predictor and pipeline...")
-current_pipeline_instance = load_pipeline(default_args)
+current_pipeline_instance = load_pipeline(default_args.sam_name, default_args.pipeline, default_args)
 current_pipeline_name = default_args.pipeline
 
 
@@ -361,7 +361,7 @@ def _reload_pipeline_if_needed(reload_needed, requested_values):
         default_args.num_target_images = requested_values["num_target_images"]
 
         print(f"Attempting to reload with updated args: {vars(default_args)}")
-        reloaded_pipeline_instance = load_pipeline(default_args)
+        reloaded_pipeline_instance = load_pipeline(default_args.sam_name, default_args.pipeline, default_args)
 
         current_pipeline_instance = reloaded_pipeline_instance
         current_pipeline_name = requested_values["pipeline"]

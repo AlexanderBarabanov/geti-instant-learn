@@ -20,6 +20,16 @@ MODEL_MAP = {
         "local_filename": "efficientvit_sam_l0.pt",
         "download_url": "https://huggingface.co/mit-han-lab/efficientvit-sam/resolve/main/efficientvit_sam_l0.pt",
     },
+    "SAM-HQ": {  # 1024x1024 input resolution
+        "registry_name": "vit_h",
+        "local_filename": "sam_hq_vit_h.pth",
+        "download_url": "https://huggingface.co/lkeab/hq-sam/resolve/main/sam_hq_vit_h.pth",
+    },
+    "SAM-HQ-tiny": {  # 1024x1024 input resolution
+        "registry_name": "vit_tiny",
+        "local_filename": "sam_hq_vit_tiny.pth",
+        "download_url": "https://huggingface.co/lkeab/hq-sam/resolve/main/sam_hq_vit_tiny.pth",
+    },
 }
 
 DATASETS = ["all", "PerSeg", "lvis", "lvis_validation"]

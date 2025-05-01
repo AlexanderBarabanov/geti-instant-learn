@@ -19,9 +19,9 @@ from visionprompt.context_learner.processes.visualizations import ExportMaskVisu
 from visionprompt.context_learner.types import Image, Masks, Priors
 from visionprompt.datasets import BatchedSingleCategoryIter, Dataset
 from visionprompt.utils.args import get_arguments
-from visionprompt.utils.constants import DATASETS, MODEL_MAP, PIPELINES
 from visionprompt.utils.data import load_dataset
 from visionprompt.utils.models import load_pipeline
+from visionprompt.utils.utils import parse_experiment_args
 
 
 def handle_output_path(output_path: str, overwrite: bool) -> str:
@@ -330,25 +330,33 @@ def main() -> None:
     output_path = Path("~").expanduser() / "outputs"
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # Determine which models, datasets and pipelines to process
-    datasets_to_run = DATASETS if args.dataset_name == "all" else [args.dataset_name]
-    pipelines_to_run = PIPELINES if args.pipeline == "all" else [args.pipeline]
-    backbones_to_run = MODEL_MAP.keys() if args.sam_name == "all" else [args.sam_name]
-
     # Create data frame with results
     all_results = []
     avg_result_dataframe = None
+    datasets_to_run, pipelines_to_run, backbones_to_run = parse_experiment_args(args)
     datasets_str = "-".join(datasets_to_run)
     pipelines_str = "-".join(pipelines_to_run)
     backbones_str = "-".join(backbones_to_run)
 
-    # Process each combination
     for backbone_name in backbones_to_run:
         for dataset_name in datasets_to_run:
             dataset = load_dataset(dataset_name, whitelist=args.class_name)
-            for pipeline_name in pipelines_to_run:
-                pipeline = load_pipeline(args)
-                unique_output_path = output_path / f"{dataset_name}_{backbone_name}_{pipeline_name}"
+            for pidx, pipeline_name in enumerate(pipelines_to_run):
+                if pipeline_name == "PerSAMModular" and backbone_name == "EfficientViT-SAM":
+                    print(f"Skipping {backbone_name} {pipeline_name} because it is not supported")
+                    continue
+                if pipeline_name == "PerSAMMAPIModular" and pidx > 0:
+                    print("Skipping because PerSAMMAPIModular is independent of the backbone")
+                    continue
+
+                pipeline = load_pipeline(backbone_name, pipeline_name, args)
+
+                if args.experiment_name:
+                    unique_output_path = (
+                        output_path / args.experiment_name / f"{dataset_name}_{backbone_name}_{pipeline_name}"
+                    )
+                else:
+                    unique_output_path = output_path / f"{dataset_name}_{backbone_name}_{pipeline_name}"
 
                 all_metrics_df = predict_on_dataset(
                     args,
@@ -364,24 +372,22 @@ def main() -> None:
                 )
                 all_results.append(all_metrics_df)
 
-                # Save and print (intermediate) results
-                all_result_dataframe = pd.concat(all_results, ignore_index=True)
-                all_results_dataframe_filename = (
-                    output_path
-                    / f"models-{backbones_str}_datasets-{datasets_str}_algorithms-{pipelines_str}_all_results.csv"
-                )
-                all_result_dataframe.to_csv(str(all_results_dataframe_filename))
+    all_result_dataframe = pd.concat(all_results, ignore_index=True)
+    all_results_dataframe_filename = (
+        output_path / f"models-{backbones_str}_datasets-{datasets_str}_algorithms-{pipelines_str}_all_results.csv"
+    )
+    all_result_dataframe.to_csv(str(all_results_dataframe_filename))
+    print(f"Saved all results to: {all_results_dataframe_filename}")
 
-                avg_results_dataframe_filename = (
-                    output_path
-                    / f"models-{backbones_str}_datasets-{datasets_str}_algorithms-{pipelines_str}_avg_results.csv"
-                )
-                avg_result_dataframe = all_result_dataframe.groupby(
-                    ["dataset_name", "pipeline_name", "backbone_name"],
-                ).mean(numeric_only=True)
-                avg_result_dataframe.to_csv(str(avg_results_dataframe_filename))
-
-    print(f"\n\n Results: {avg_result_dataframe}")
+    avg_results_dataframe_filename = (
+        output_path / f"models-{backbones_str}_datasets-{datasets_str}_algorithms-{pipelines_str}_avg_results.csv"
+    )
+    avg_result_dataframe = all_result_dataframe.groupby(
+        ["dataset_name", "pipeline_name", "backbone_name"],
+    ).mean(numeric_only=True)
+    avg_result_dataframe.to_csv(str(avg_results_dataframe_filename))
+    print(f"Saved average results to: {avg_results_dataframe_filename}")
+    print(f"\n\n Final Average Results:\n {avg_result_dataframe}")
 
 
 if __name__ == "__main__":

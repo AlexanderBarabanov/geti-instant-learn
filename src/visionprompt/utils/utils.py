@@ -1,6 +1,7 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+import argparse
 import colorsys
 import random
 
@@ -17,6 +18,7 @@ from sklearn.manifold import TSNE
 from torch.nn import functional as F
 
 from visionprompt.context_learner.types import Image, Masks, Points
+from visionprompt.utils.constants import DATASETS, MODEL_MAP, PIPELINES
 
 # Define some colors for visualization
 COLORS = [
@@ -669,3 +671,36 @@ def sample_points(
         sample_list.append(sample)
         label_list.append(label)
     return sample_list, label_list
+
+
+def parse_experiment_args(args: argparse.Namespace) -> tuple[list[str], list[str], list[str]]:
+    """Parse experiment arguments.
+
+    Args:
+        args: Arguments
+
+    Returns:
+        tuple containing:
+            - datasets_to_run: List of datasets to run
+            - pipelines_to_run: List of pipelines to run
+            - backbones_to_run: List of backbones to run
+    """
+    if args.dataset_name == "all":
+        valid_datasets = [d for d in DATASETS if d != "all"]
+    else:
+        datasets_to_run = [d.strip() for d in args.dataset_name.split(",")]
+        valid_datasets = [d for d in datasets_to_run if d in DATASETS]
+
+    if args.pipeline == "all":
+        valid_pipelines = [p for p in PIPELINES if p != "all"]
+    else:
+        pipelines_to_run = [p.strip() for p in args.pipeline.split(",")]
+        valid_pipelines = [p for p in pipelines_to_run if p in PIPELINES]
+
+    if args.sam_name == "all":
+        valid_backbones = [b for b in list(MODEL_MAP.keys()) if b != "all"]
+    else:
+        backbones_to_run = [b.strip() for b in args.sam_name.split(",")]
+        valid_backbones = [b for b in backbones_to_run if b in MODEL_MAP]
+
+    return valid_datasets, valid_pipelines, valid_backbones

@@ -5,6 +5,17 @@ import argparse
 
 from visionprompt.utils.constants import DATASETS, MODEL_MAP, PIPELINES
 
+# Generate help strings with choices
+AVAILABLE_MODELS = ", ".join(MODEL_MAP.keys())
+AVAILABLE_PIPELINES = ", ".join(PIPELINES)
+AVAILABLE_DATASETS = ", ".join(DATASETS)
+
+HELP_SAM_NAME = (
+    f"Backbone segmentation model name or comma-separated list. Use 'all' to run all. Available: [{AVAILABLE_MODELS}]"
+)
+HELP_PIPELINE = f"Pipeline name or comma-separated list. Use 'all' to run all. Available: [{AVAILABLE_PIPELINES}]"
+HELP_DATASET_NAME = f"Dataset name or comma-separated list. Use 'all' to run all. Available: [{AVAILABLE_DATASETS}]"
+
 
 def get_arguments(arg_list: list[str] | None = None) -> argparse.Namespace:
     """Get arguments.
@@ -16,20 +27,15 @@ def get_arguments(arg_list: list[str] | None = None) -> argparse.Namespace:
         Arguments
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sam_name", type=str, default="SAM", choices=MODEL_MAP.keys())
-    parser.add_argument(
-        "--pipeline",
-        type=str,
-        default="MatcherModular",
-        choices=PIPELINES,
-    )
+    parser.add_argument("--sam_name", type=str, default="SAM", help=HELP_SAM_NAME)
+    parser.add_argument("--pipeline", type=str, default="MatcherModular", help=HELP_PIPELINE)
     parser.add_argument(
         "--n_shot",
         type=int,
         default=1,
         help="Number of prior images to use as references",
     )
-    parser.add_argument("--dataset_name", type=str, default="lvis", choices=DATASETS)
+    parser.add_argument("--dataset_name", type=str, default="lvis", help=HELP_DATASET_NAME)
     parser.add_argument("--save", action="store_true", help="Save results to disk")
     parser.add_argument(
         "--apply_mask_refinement",
@@ -46,6 +52,12 @@ def get_arguments(arg_list: list[str] | None = None) -> argparse.Namespace:
         "--overwrite",
         action="store_true",
         help="Overwrite existing output data",
+    )
+    parser.add_argument(
+        "--experiment_name",
+        type=str,
+        default=None,
+        help="If passed, will save all",
     )
     parser.add_argument(
         "--num_clusters",

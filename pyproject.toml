@@ -40,6 +40,7 @@ dependencies = [
     "torch",
     "torchvision",
     "efficientvit",
+    "segment-anything-hq",
 ]
 
 [tool.uv.sources]
