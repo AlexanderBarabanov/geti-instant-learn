@@ -374,13 +374,17 @@ def main() -> None:
 
     all_result_dataframe = pd.concat(all_results, ignore_index=True)
     all_results_dataframe_filename = (
-        output_path / f"models-{backbones_str}_datasets-{datasets_str}_algorithms-{pipelines_str}_all_results.csv"
+        output_path
+        / args.experiment_name
+        / f"models-{backbones_str}_datasets-{datasets_str}_algorithms-{pipelines_str}_all_results.csv"
     )
     all_result_dataframe.to_csv(str(all_results_dataframe_filename))
     print(f"Saved all results to: {all_results_dataframe_filename}")
 
     avg_results_dataframe_filename = (
-        output_path / f"models-{backbones_str}_datasets-{datasets_str}_algorithms-{pipelines_str}_avg_results.csv"
+        output_path
+        / args.experiment_name
+        / f"models-{backbones_str}_datasets-{datasets_str}_algorithms-{pipelines_str}_avg_results.csv"
     )
     avg_result_dataframe = all_result_dataframe.groupby(
         ["dataset_name", "pipeline_name", "backbone_name"],

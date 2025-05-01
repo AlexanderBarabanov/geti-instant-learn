@@ -48,7 +48,8 @@ def load_pipeline(backbone_name: str, pipeline_name: str, args: Namespace) -> Pi
         raise ValueError(msg)
 
     model_info = MODEL_MAP[backbone_name]
-    _check_model_weights(backbone_name)
+    check_model_weights(backbone_name)
+    check_model_weights("DINO")
 
     registry_name = model_info["registry_name"]
     local_filename = model_info["local_filename"]
@@ -89,24 +90,24 @@ def load_pipeline(backbone_name: str, pipeline_name: str, args: Namespace) -> Pi
     raise NotImplementedError(msg)
 
 
-def _check_model_weights(sam_name: str) -> None:
+def check_model_weights(model_name: str) -> None:
     """Check if model weights exist locally, download if necessary."""
-    if sam_name not in MODEL_MAP:
-        print(f"Warning: Model '{sam_name}' not found in MODEL_MAP for weight checking.")
+    if model_name not in MODEL_MAP:
+        print(f"Warning: Model '{model_name}' not found in MODEL_MAP for weight checking.")
         return
 
-    model_info = MODEL_MAP[sam_name]
+    model_info = MODEL_MAP[model_name]
     local_filename = model_info["local_filename"]
     download_url = model_info["download_url"]
 
     if not local_filename or not download_url:
-        print(f"Warning: Missing 'local_filename' or 'download_url' for {sam_name} in MODEL_MAP.")
+        print(f"Warning: Missing 'local_filename' or 'download_url' for {model_name} in MODEL_MAP.")
         return
 
     target_path = DATA_PATH.joinpath(local_filename)
 
     if not target_path.exists():
-        print(f"Model weights for {sam_name} not found at {target_path}, downloading...")
+        print(f"Model weights for {model_name} not found at {target_path}, downloading...")
         _download_file(download_url, target_path)
 
 
