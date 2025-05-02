@@ -30,11 +30,6 @@ MODEL_MAP = {
         "local_filename": "sam_hq_vit_tiny.pth",
         "download_url": "https://huggingface.co/lkeab/hq-sam/resolve/main/sam_hq_vit_tiny.pth",
     },
-    "DINO": {
-        "registry_name": "dinov2_vitl14",
-        "local_filename": "dinov2_vitl14_pretrain.pth",
-        "download_url": "https://dl.fbaipublicfiles.com/dinov2/dinov2_vitl14/dinov2_vitl14_pretrain.pth",
-    },
 }
 DINO_WEIGHTS = {
     "registry_name": "dinov2_vitl14",
