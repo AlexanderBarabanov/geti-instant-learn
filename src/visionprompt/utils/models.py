@@ -49,7 +49,6 @@ def load_pipeline(backbone_name: str, pipeline_name: str, args: Namespace) -> Pi
 
     model_info = MODEL_MAP[backbone_name]
     check_model_weights(backbone_name)
-    check_model_weights("DINO")
 
     registry_name = model_info["registry_name"]
     local_filename = model_info["local_filename"]

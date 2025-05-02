@@ -1,9 +1,19 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+import sys
 from pathlib import Path
 
+import requests
 import torch
+from rich.progress import (
+    BarColumn,
+    DownloadColumn,
+    Progress,
+    TextColumn,
+    TimeRemainingColumn,
+    TransferSpeedColumn,
+)
 from torch.nn import functional as F
 from torchvision import transforms
 
@@ -13,6 +23,7 @@ from visionprompt.context_learner.types import Features, Image, Masks, Priors, S
 from visionprompt.third_party.dinov2.data.transforms import MaybeToTensor, make_normalize_transform
 from visionprompt.third_party.dinov2.models import vision_transformer
 from visionprompt.third_party.dinov2.models.vision_transformer import DinoVisionTransformer
+from visionprompt.utils.constants import DINO_WEIGHTS
 
 
 class DinoEncoder(Encoder):
@@ -123,8 +134,52 @@ class DinoEncoder(Encoder):
             proj_bias=True,
             ffn_bias=True,
         )
-        path = Path("~/data/dinov2_vitl14_pretrain.pth").expanduser()
+        path = Path("~/data").expanduser() / DINO_WEIGHTS["local_filename"]
+        url = DINO_WEIGHTS["download_url"]
+        _download_weights(path, url)
         dinov2_utils.load_pretrained_weights(dinov2, str(path), "teacher")
         dinov2.eval()
         dinov2.to(device="cuda")
         return dinov2
+
+
+def _download_weights(path: Path, url: str) -> None:
+    """This method downloads the DINO weights."""
+    if not path.exists():  # noqa: PLR1702
+        progress = Progress(
+            TextColumn("[bold blue]{task.fields[filename]}", justify="right"),
+            BarColumn(bar_width=None),
+            "[progress.percentage]{task.percentage:>3.1f}%",
+            " • ",
+            DownloadColumn(),
+            " • ",
+            TransferSpeedColumn(),
+            " • ",
+            TimeRemainingColumn(),
+            transient=True,
+            disable=not sys.stderr.isatty(),
+        )
+        disable_progress = not sys.stderr.isatty()
+        try:
+            with requests.get(url, stream=True, timeout=10) as r:
+                r.raise_for_status()
+                total_size = int(r.headers.get("content-length", 0))
+                print(f"Downloading {path.name} ({total_size / (1024 * 1024):.2f} MB) from {url}...")
+                with progress:
+                    task_id = progress.add_task("download", total=total_size, filename=path.name)
+                    with path.open("wb") as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            if chunk:
+                                f.write(chunk)
+                                progress.update(task_id, advance=len(chunk))
+
+                if not disable_progress and total_size > 0:
+                    progress.update(task_id, completed=total_size)
+        except Exception as e:
+            print(f"\nAn unexpected error occurred during download: {e}")
+            if path.exists():
+                try:
+                    path.unlink()
+                except OSError as unlink_e:
+                    print(f"Error removing file {path} after error: {unlink_e}")
+            raise

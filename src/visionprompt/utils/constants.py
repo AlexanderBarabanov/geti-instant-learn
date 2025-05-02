@@ -36,6 +36,12 @@ MODEL_MAP = {
         "download_url": "https://dl.fbaipublicfiles.com/dinov2/dinov2_vitl14/dinov2_vitl14_pretrain.pth",
     },
 }
+DINO_WEIGHTS = {
+    "registry_name": "dinov2_vitl14",
+    "local_filename": "dinov2_vitl14_pretrain.pth",
+    "download_url": "https://dl.fbaipublicfiles.com/dinov2/dinov2_vitl14/dinov2_vitl14_pretrain.pth",
+}
+
 
 DATASETS = ["all", "PerSeg", "lvis", "lvis_validation"]
 PIPELINES = [

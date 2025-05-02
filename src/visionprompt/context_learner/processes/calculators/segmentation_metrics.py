@@ -45,25 +45,37 @@ class SegmentationMetrics(Calculator):
             "accuracy": [],
         }
         for cat_name, confusion in self.confusion.items():
-            diag = np.diag(confusion)
-            up = np.triu(confusion, k=1)
-            lo = np.tril(confusion, k=1)
-            tn = diag[0]
-            tp = diag[1:].sum()
-            fn = up.sum()
-            fp = lo.sum()
-            precision = tp / (tp + fp)
-            recall = tp / (tp + fn)
-            accuracy = (tp + tn) / (tp + fp + fn + tn)
-            f1score = 2 * ((precision * recall) / (precision + recall))
-            jaccard = tp / (fn + fp - tp)
+            if confusion.shape != (2, 2):
+                print(f"Warning: Confusion matrix for {cat_name} is not 2x2 ({confusion.shape}). Skipping metrics.")
+                continue
+
+            tn = confusion[0, 0]  # True Negative (BG correctly predicted)
+            fp = confusion[0, 1]  # False Positive (BG predicted as FG)
+            fn = confusion[1, 0]  # False Negative (FG predicted as BG)
+            tp = confusion[1, 1]  # True Positive (FG correctly predicted)
+
+            # Add epsilon for numerical stability
+            epsilon = 1e-6
+
+            # Correct Metrics Calculations
+            precision = tp / (tp + fp + epsilon)
+            recall = tp / (tp + fn + epsilon)
+            accuracy = (tp + tn) / (tp + tn + fp + fn + epsilon)
+            f1score = 2 * (precision * recall) / (precision + recall + epsilon)
+
+            # Correct Jaccard (IoU)
+            union = tp + fp + fn
+            jaccard = tp / (union + epsilon)
             iou = jaccard
+
+            # Dice is equivalent to F1
             dice = f1score
+
             d["category"].append(cat_name)
-            d["true_positives"].append(tp)
-            d["true_negatives"].append(tn)
-            d["false_positives"].append(fp)
-            d["false_negatives"].append(fn)
+            d["true_positives"].append(int(tp))
+            d["true_negatives"].append(int(tn))
+            d["false_positives"].append(int(fp))
+            d["false_negatives"].append(int(fn))
             d["precision"].append(precision)
             d["recall"].append(recall)
             d["f1score"].append(f1score)

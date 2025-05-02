@@ -373,6 +373,8 @@ def main() -> None:
                 all_results.append(all_metrics_df)
 
     all_result_dataframe = pd.concat(all_results, ignore_index=True)
+    if args.experiment_name:
+        output_path = output_path / args.experiment_name
     all_results_dataframe_filename = (
         output_path
         / args.experiment_name
