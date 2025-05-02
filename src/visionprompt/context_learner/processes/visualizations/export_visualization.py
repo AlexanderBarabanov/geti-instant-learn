@@ -80,13 +80,6 @@ class ExportMaskVisualization(Visualization):
         names: list[str],
         points: list[Points] | None = None,
     ):
-        # Use points from the state if they are not passed
-        if points is None:
-            points = [None] * len(images)
-            for i in range(len(points)):
-                if len(self._state.used_points) > 0 and len(self._state.used_points[i].data.keys()) > 0:
-                    points[i] = self._state.used_points[i]
-
         # Generate overlay
         for i in range(len(images)):
             # Get correct datas
@@ -105,7 +98,7 @@ class ExportMaskVisualization(Visualization):
 
             for class_id in masks_per_class.class_ids():
                 mask_np = masks_per_class.to_numpy(class_id)
-                if points[i] is not None:
+                if points is not None and i < len(points) and points[i] is not None:
                     current_points = points[i].data[class_id][0]
                     yxs, scores, types = (
                         current_points.cpu().numpy()[:, :2],

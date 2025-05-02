@@ -215,6 +215,7 @@ def predict_on_dataset(
                 # Iterate over all batches
                 for batch_index, (images, masks) in enumerate(batches):
                     target_images = [Image(image) for image in images]
+                    pipeline.reset_state(reset_references=False)
                     start_time = time.time()
                     pipeline.infer(target_images=target_images)
                     time_sum += time.time() - start_time
@@ -252,6 +253,7 @@ def predict_on_dataset(
                         images=pipeline._state.target_images,
                         masks=pipeline._state.masks,
                         names=export_paths,
+                        points=pipeline._state.used_points,
                     )
                     visualizer(
                         images=pipeline._state.target_images,

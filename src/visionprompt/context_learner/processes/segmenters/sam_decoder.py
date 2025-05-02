@@ -113,10 +113,12 @@ class SamDecoder(Segmenter):
         all_used_points = Points()
 
         self.predictor.set_image(image.data)
-        for class_id, points_per_map in points.data.items():
+        for class_id, points_per_map in points.data.items():  # noqa: PLR1702
             # iterate over each point list of each similarity map
             for points in points_per_map:
                 if len(points) == 0:
+                    # no points for this class, add empty "used_points" for this class
+                    all_used_points.add(torch.tensor(np.array([])), class_id)
                     continue
 
                 points_used = []

@@ -18,12 +18,13 @@ class Pipeline:
         """Get the state of the pipeline."""
         return self._state
 
-    def reset_state(self) -> None:
+    def reset_state(self, reset_references: bool = True) -> None:
         """Reset the state of the pipeline."""
-        self._state.reference_images.clear()
-        self._state.reference_priors.clear()
-        self._state.reference_features.clear()
-        self._state.processed_reference_masks.clear()
+        if reset_references:
+            self._state.reference_images.clear()
+            self._state.reference_priors.clear()
+            self._state.reference_features.clear()
+            self._state.processed_reference_masks.clear()
         self._state.target_images.clear()
         self._state.target_features.clear()
         self._state.similarities.clear()

@@ -643,6 +643,7 @@ def run_processing():
                     continue
 
                 try:
+                    pipeline_stream.reset_state(reset_references=False)
                     pipeline_stream.infer(chunk_target_image_objects)
                 except Exception as e:
                     app.logger.error(
