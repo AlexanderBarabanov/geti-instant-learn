@@ -180,8 +180,8 @@ def predict_on_dataset(
                 )
 
                 # Learn using the priors (currently only use the first masks)
-                priors = [Priors(masks=priors_masks[0])]
-                pipeline.learn(reference_images=priors_images, reference_priors=priors)
+                reference_priors = [Priors(masks=priors_masks[i]) for i in range(len(priors_masks))]
+                pipeline.learn(reference_images=priors_images, reference_priors=reference_priors)
                 progress.update(priors_task, advance=1)
 
                 # Save priors
