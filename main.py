@@ -380,6 +380,7 @@ def main() -> None:
         / args.experiment_name
         / f"models-{backbones_str}_datasets-{datasets_str}_algorithms-{pipelines_str}_all_results.csv"
     )
+    all_results_dataframe_filename.parent.mkdir(parents=True, exist_ok=True)
     all_result_dataframe.to_csv(str(all_results_dataframe_filename))
     print(f"Saved all results to: {all_results_dataframe_filename}")
 
@@ -388,6 +389,7 @@ def main() -> None:
         / args.experiment_name
         / f"models-{backbones_str}_datasets-{datasets_str}_algorithms-{pipelines_str}_avg_results.csv"
     )
+    avg_results_dataframe_filename.parent.mkdir(parents=True, exist_ok=True)
     avg_result_dataframe = all_result_dataframe.groupby(
         ["dataset_name", "pipeline_name", "backbone_name"],
     ).mean(numeric_only=True)
