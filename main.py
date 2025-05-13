@@ -546,7 +546,7 @@ def main() -> None:
                     backbone_name=backbone_name,
                     number_of_priors_tests=args.num_priors,
                     number_of_batches=args.num_batches,
-                    dataset_filenames=args.dataset_filenames.split(","),
+                    dataset_filenames=args.dataset_filenames.split(",") if args.dataset_filenames else None,
                 )
                 all_results.append(all_metrics_df)
 
