@@ -133,6 +133,7 @@ lint.select = [
 
 lint.ignore = [
     # pydocstyle
+    "D100", # Missing docstring in public module
     "D107", # Missing docstring in __init__
 
     # pylint
@@ -229,10 +230,7 @@ src = ["src"]
 convention = "google"
 
 [tool.ruff.lint.flake8-copyright]
-notice-rgx = '''
-# Copyright \(C\) (\d{4}(-\d{4})?) Intel Corporation
-# SPDX-License-Identifier: Apache-2\.0
-'''
+notice-rgx = '# Copyright \(C\) (\d{4}(-\d{4})?) Intel Corporation\r?\n# SPDX-License-Identifier: Apache-2\.0'
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # MYPY CONFIGURATION.                                                         #
