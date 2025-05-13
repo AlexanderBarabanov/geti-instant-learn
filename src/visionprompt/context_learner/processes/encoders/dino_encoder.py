@@ -105,9 +105,9 @@ class DinoEncoder(Encoder):
                 indices = pooled_mask.flatten().bool()
                 local_features = features.global_features[indices]
                 if local_features.shape[0] == 0:
-                    print("The reference mask is too small to detect any features")
-                else:
-                    features.add_local_features(local_features=local_features, class_id=class_id)
+                    e = f"The reference mask is too small to detect any features for class {class_id}"
+                    raise ValueError(e)
+                features.add_local_features(local_features=local_features, class_id=class_id)
         return features, resized_masks
 
     @torch.no_grad()

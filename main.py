@@ -399,8 +399,13 @@ def predict_on_dataset(
 
                 # Learn using the priors (currently only use the first masks)
                 reference_priors = [Priors(masks=priors_masks2[i]) for i in range(len(priors_masks2))]
-                pipeline.learn(reference_images=priors_images2, reference_priors=reference_priors)
-                progress.update(priors_task, advance=1)
+                try:
+                    pipeline.learn(reference_images=priors_images2, reference_priors=reference_priors)
+                    progress.update(priors_task, advance=1)
+                except ValueError as e:
+                    print(e)
+                    progress.update(priors_task, advance=1)
+                    continue
 
                 # Save priors
                 priors_export_paths = [
