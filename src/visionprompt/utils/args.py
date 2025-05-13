@@ -36,6 +36,10 @@ def get_arguments(arg_list: list[str] | None = None) -> argparse.Namespace:
         help="Number of prior images to use as references",
     )
     parser.add_argument("--dataset_name", type=str, default="lvis", help=HELP_DATASET_NAME)
+    parser.add_argument("--dataset_filenames", type=str, help="Only perform inference on these "
+                                                              "files from the dataset (This "
+                                                              "argument in incompatible with "
+                                                              "multiple datasets)")
     parser.add_argument("--save", action="store_true", help="Save results to disk")
     parser.add_argument(
         "--apply_mask_refinement",
@@ -94,6 +98,25 @@ def get_arguments(arg_list: list[str] | None = None) -> argparse.Namespace:
         type=int,
         default=2,
         help="Number of background points to sample",
+    )
+    parser.add_argument(
+        "--num_priors",
+        type=int,
+        default=1,
+        help="Number of runs to perform, each time using the next image in the dataset as a prior",
+    )
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=5,
+        help="The maximum batch size used during inference.",
+    )
+    parser.add_argument(
+        "--num_batches",
+        type=int,
+        help="The maximum number of batches per class to process. "
+             "This can be used to limit the amount images that are processed. "
+             "The number of processed images will not exceed num_classes * batch_size",
     )
 
     return parser.parse_args(arg_list)

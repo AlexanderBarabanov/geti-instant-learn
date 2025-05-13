@@ -3,6 +3,7 @@
 
 import argparse
 import logging
+import os
 import shutil
 import sys
 import time
@@ -67,10 +68,11 @@ def get_all_instances(images: list[np.ndarray], masks: list[np.ndarray], count: 
     prior_masks = []
     for i, (image, mask) in enumerate(zip(images, masks, strict=False)):
         prior_images.append(Image(image))
-        mask[mask > 1] = 1  # Keep all instances
-        mask = mask[:, :, None]
+        mask2 = mask
+        mask2[mask2 > 1] = 1  # Keep all instances
+        mask2 = mask2[:, :, None]
         masks = Masks()
-        masks.add(mask)
+        masks.add(mask2)
         prior_masks.append(masks)
         if i >= count - 1:
             break
@@ -97,6 +99,220 @@ def save_priors(prior_images: list[Image], prior_masks: list[Masks], output_path
         cv2.imwrite(str(output_path_obj / f"prior_{i}.png"), overlay)
 
 
+def infer_all_batches(
+    batches: BatchedSingleCategoryIter,
+    pipeline: Pipeline,
+    category_name: str,
+    priors_batch_index: int,
+    visualizer: ExportMaskVisualization,
+    metrics_calculators: dict[int, SegmentationMetrics],
+    number_of_batches: int,
+    progress: Progress,
+) -> tuple[int, int]:
+    """This performs an inference run on all batches.
+
+    Args:
+        batches: An iterable of batches that return numpy images and masks
+        pipeline: The pipeline to run
+        category_name: The current category
+        priors_batch_index: The current prior batch
+        visualizer: The visualizer for exporting
+        metrics_calculators: The calculator for the metrics
+        number_of_batches: The number of batches.
+        progress: The progress bar
+
+    Returns:
+        The number of samples that were processed and the total time it took.
+    """
+    # Task for batches for the current category and prior (transient)
+    batches.reset()  # reset batch iterator because it was consumed
+    num_batches_to_process = len(batches) if number_of_batches is None else min(len(batches), number_of_batches + 1)
+    batches_task = progress.add_task(
+        f"[magenta]Infer step: {category_name}", total=num_batches_to_process, transient=True
+    )
+    time_sum = 0
+    time_count = 0
+    for batch_index, (images, masks) in enumerate(batches):
+        target_images = [Image(image) for image in images]
+        pipeline.reset_state(reset_references=False)
+        start_time = time.time()
+        pipeline.infer(target_images=target_images)
+        time_sum += time.time() - start_time
+        time_count += len(images)
+
+        # Generate names for exported files and export them
+        export_paths = [
+            str(
+                Path("predictions")
+                / f"priors_batch_{priors_batch_index}"
+                / category_name
+                / Path(batches.get_image_filename(batch_index, image_index)).name
+            )
+            for image_index in range(len(images))
+        ]
+        export_paths_all_points = [
+            str(
+                Path("predictions_all_points")
+                / f"priors_batch_{priors_batch_index}"
+                / category_name
+                / Path(batches.get_image_filename(batch_index, image_index)).name
+            )
+            for image_index in range(len(images))
+        ]
+        export_paths_gt = [
+            str(
+                Path("ground_truth")
+                / f"priors_batch_{priors_batch_index}"
+                / category_name
+                / Path(batches.get_image_filename(batch_index, image_index)).name
+            )
+            for image_index in range(len(images))
+        ]
+        s = pipeline.get_state()
+        visualizer(
+            images=s.target_images,
+            masks=s.masks,
+            names=export_paths,
+            points=s.used_points,
+        )
+        visualizer(
+            images=s.target_images,
+            masks=s.masks,
+            names=export_paths_all_points,
+            points=visualizer.points_from_priors(s.priors),
+        )
+        gt_masks = visualizer.arrays_to_masks(masks)
+        visualizer(
+            images=s.target_images,
+            masks=gt_masks,
+            names=export_paths_gt,
+        )
+        metrics_calculators[priors_batch_index](
+            predictions=s.masks,
+            references=gt_masks,
+            mapping={0: category_name},
+        )
+        progress.update(batches_task, advance=1)
+        if number_of_batches is not None and batch_index >= number_of_batches:  # Adjusted condition
+            break
+    progress.remove_task(batches_task)
+    return time_sum, time_count
+
+
+def get_image_and_mask_from_filename(
+    filename: str, dataset: Dataset, category_name: str
+) -> tuple[np.ndarray, np.ndarray]:
+    """Get the image and mask from using a base filename and dataset.
+
+    Args:
+        filename: The base filename.
+        dataset: The dataset to search.
+        category_name: The category that the image belongs to.
+
+    Returns:
+        The image array and the mask
+    """
+    filenames = {os.path.basename(dataset.get_image_filename(i)): i for i in range(dataset.get_image_count())}
+    idx = filenames[filename]
+    cat_id = dataset.category_name_to_id(category_name)
+    image = dataset.get_image_by_index(idx)
+    masks = dataset.get_masks_by_index(idx)
+
+    mask = masks[cat_id] if cat_id in masks else np.zeros_like(image)[:, :, 0]
+    return image, mask
+
+
+def infer_all_images(
+    filenames: list[str],
+    dataset: Dataset,
+    pipeline: Pipeline,
+    category_name: str,
+    priors_batch_index: int,
+    visualizer: ExportMaskVisualization,
+    metrics_calculators: dict[int, SegmentationMetrics],
+    progress: Progress,
+) -> tuple[int, int]:
+    """This performs an inference run on all batches.
+
+    Args:
+        filenames: A list of filenames
+        dataset: The dataset containing the images
+        pipeline: The pipeline to run
+        category_name: The current category
+        priors_batch_index: The current prior batch
+        visualizer: The visualizer for exporting
+        metrics_calculators: The calculator for the metrics
+        progress: The progress bar
+
+    Returns:
+        The number of samples that were processed and the total time it took.
+    """
+    # Task for batches for the current category and prior (transient)
+    batches_task = progress.add_task(f"[magenta]Infer step: {category_name}", total=1, transient=True)
+    time_sum = 0
+    time_count = 0
+
+    images = []
+    masks = []
+    for filename in filenames:
+        image, mask = get_image_and_mask_from_filename(filename, dataset, category_name)
+        images.append(image)
+        masks.append(mask)
+
+    target_images = [Image(image) for image in images]
+    pipeline.reset_state(reset_references=False)
+    start_time = time.time()
+    pipeline.infer(target_images=target_images)
+    time_sum += time.time() - start_time
+    time_count += len(images)
+
+    # Generate names for exported files and export them
+    export_paths = [
+        str(Path("predictions") / f"priors_batch_{priors_batch_index}" / category_name / filenames[image_index])
+        for image_index in range(len(images))
+    ]
+    export_paths_all_points = [
+        str(
+            Path("predictions_all_points")
+            / f"priors_batch_{priors_batch_index}"
+            / category_name
+            / filenames[image_index]
+        )
+        for image_index in range(len(images))
+    ]
+    export_paths_gt = [
+        str(Path("ground_truth") / f"priors_batch_{priors_batch_index}" / category_name / filenames[image_index])
+        for image_index in range(len(images))
+    ]
+    s = pipeline.get_state()
+    visualizer(
+        images=s.target_images,
+        masks=s.masks,
+        names=export_paths,
+        points=s.used_points,
+    )
+    visualizer(
+        images=s.target_images,
+        masks=s.masks,
+        names=export_paths_all_points,
+        points=visualizer.points_from_priors(s.priors),
+    )
+    gt_masks = visualizer.arrays_to_masks(masks)
+    visualizer(
+        images=s.target_images,
+        masks=gt_masks,
+        names=export_paths_gt,
+    )
+    metrics_calculators[priors_batch_index](
+        predictions=s.masks,
+        references=gt_masks,
+        mapping={0: category_name},
+    )
+    progress.update(batches_task, advance=1)
+    progress.remove_task(batches_task)
+    return time_sum, time_count
+
+
 def predict_on_dataset(
     args: argparse.Namespace,
     pipeline: Pipeline,
@@ -108,6 +324,7 @@ def predict_on_dataset(
     backbone_name: str,
     number_of_priors_tests: int,
     number_of_batches: int | None,
+    dataset_filenames: list[str] | None,
 ) -> pd.DataFrame:
     """This runs predictions on the dataset and evaluates them.
 
@@ -123,7 +340,8 @@ def predict_on_dataset(
         number_of_priors_tests: The number of priors to try
         number_of_batches: The number of batches per class to process (limited testing)
             pass None to process all data
-    Returns:
+        dataset_filenames: Only do inference on these images
+    Returns: The timing
 
     """
     unique_output_str = handle_output_path(unique_output, args.overwrite)
@@ -131,7 +349,7 @@ def predict_on_dataset(
     print(f"Output path: {unique_output_path}")
 
     visualizer = ExportMaskVisualization(
-        state=pipeline._state,
+        state=pipeline.get_state(),
         output_folder=str(unique_output_path),
     )
     metrics_calculators: dict[int, SegmentationMetrics] = {}  # keep metrics per prior
@@ -168,20 +386,20 @@ def predict_on_dataset(
                 # Add a new metrics calculator if needed
                 if priors_batch_index not in metrics_calculators:
                     metrics_calculators[priors_batch_index] = SegmentationMetrics(
-                        state=pipeline._state,
+                        state=pipeline.get_state(),
                         categories=dataset.get_categories(),
                     )
 
                 # Select priors
-                priors_images, priors_masks = get_all_instances(
+                priors_images2, priors_masks2 = get_all_instances(
                     priors_images,
                     priors_masks,
                     args.n_shot,
                 )
 
                 # Learn using the priors (currently only use the first masks)
-                reference_priors = [Priors(masks=priors_masks[i]) for i in range(len(priors_masks))]
-                pipeline.learn(reference_images=priors_images, reference_priors=reference_priors)
+                reference_priors = [Priors(masks=priors_masks2[i]) for i in range(len(priors_masks2))]
+                pipeline.learn(reference_images=priors_images2, reference_priors=reference_priors)
                 progress.update(priors_task, advance=1)
 
                 # Save priors
@@ -192,90 +410,43 @@ def predict_on_dataset(
                         / category_name
                         / f"prior_{image_index}.png"
                     )
-                    for image_index in range(len(priors_images))
+                    for image_index in range(len(priors_images2))
                 ]
                 masks_priors = visualizer.masks_from_priors(
-                    pipeline._state.reference_priors,
+                    pipeline.get_state().reference_priors,
                 )
                 visualizer(
-                    images=pipeline._state.reference_images,
+                    images=pipeline.get_state().reference_images,
                     masks=masks_priors,
                     names=priors_export_paths,
                 )
+                if dataset_filenames is None:
+                    # Iterate over all batches
+                    ts, tc = infer_all_batches(
+                        batches=batches,
+                        pipeline=pipeline,
+                        category_name=category_name,
+                        priors_batch_index=priors_batch_index,
+                        visualizer=visualizer,
+                        metrics_calculators=metrics_calculators,
+                        number_of_batches=number_of_batches,
+                        progress=progress,
+                    )
+                else:
+                    # Infer on a single image
+                    ts, tc = infer_all_images(
+                        filenames=dataset_filenames,
+                        dataset=dataset,
+                        pipeline=pipeline,
+                        category_name=category_name,
+                        priors_batch_index=priors_batch_index,
+                        visualizer=visualizer,
+                        metrics_calculators=metrics_calculators,
+                        progress=progress,
+                    )
 
-                # Task for batches for the current category and prior (transient)
-                batches.reset()  # reset batch iterator because it was consumed
-                num_batches_to_process = (
-                    len(batches) if number_of_batches is None else min(len(batches), number_of_batches + 1)
-                )
-                batches_task = progress.add_task(
-                    f"[magenta]Infer step: {category_name}", total=num_batches_to_process, transient=True
-                )
-
-                # Iterate over all batches
-                for batch_index, (images, masks) in enumerate(batches):
-                    target_images = [Image(image) for image in images]
-                    pipeline.reset_state(reset_references=False)
-                    start_time = time.time()
-                    pipeline.infer(target_images=target_images)
-                    time_sum += time.time() - start_time
-                    time_count += len(images)
-
-                    # Generate names for exported files and export them
-                    export_paths = [
-                        str(
-                            Path("predictions")
-                            / f"priors_batch_{priors_batch_index}"
-                            / category_name
-                            / Path(batches.get_image_filename(batch_index, image_index)).name
-                        )
-                        for image_index in range(len(images))
-                    ]
-                    export_paths_all_points = [
-                        str(
-                            Path("predictions_all_points")
-                            / f"priors_batch_{priors_batch_index}"
-                            / category_name
-                            / Path(batches.get_image_filename(batch_index, image_index)).name
-                        )
-                        for image_index in range(len(images))
-                    ]
-                    export_paths_gt = [
-                        str(
-                            Path("ground_truth")
-                            / f"priors_batch_{priors_batch_index}"
-                            / category_name
-                            / Path(batches.get_image_filename(batch_index, image_index)).name
-                        )
-                        for image_index in range(len(images))
-                    ]
-                    visualizer(
-                        images=pipeline._state.target_images,
-                        masks=pipeline._state.masks,
-                        names=export_paths,
-                        points=pipeline._state.used_points,
-                    )
-                    visualizer(
-                        images=pipeline._state.target_images,
-                        masks=pipeline._state.masks,
-                        names=export_paths_all_points,
-                        points=visualizer.points_from_priors(visualizer._state.priors),
-                    )
-                    gt_masks = visualizer.arrays_to_masks(masks)
-                    visualizer(
-                        images=pipeline._state.target_images,
-                        masks=gt_masks,
-                        names=export_paths_gt,
-                    )
-                    metrics_calculators[priors_batch_index](
-                        predictions=pipeline._state.masks,
-                        references=gt_masks,
-                        mapping={0: category_name},
-                    )
-                    progress.update(batches_task, advance=1)
-                    if number_of_batches is not None and batch_index >= number_of_batches:  # Adjusted condition
-                        break
-                progress.remove_task(batches_task)
+                time_sum += ts
+                time_count += tc
 
                 if priors_batch_index >= number_of_priors_tests - 1:
                     break  # Do not proceed with the next batch of priors
@@ -301,7 +472,7 @@ def predict_on_dataset(
         if all_metrics is None:
             all_metrics = metrics
         else:
-            for key in all_metrics.keys():
+            for key in all_metrics:
                 all_metrics[key].extend(metrics[key])
 
     # Create DataFrame for output
@@ -342,7 +513,7 @@ def main() -> None:
 
     for backbone_name in backbones_to_run:
         for dataset_name in datasets_to_run:
-            dataset = load_dataset(dataset_name, whitelist=args.class_name)
+            dataset = load_dataset(dataset_name, whitelist=args.class_name, batch_size=args.batch_size)
             for pidx, pipeline_name in enumerate(pipelines_to_run):
                 if pipeline_name == "PerSAMModular" and backbone_name == "EfficientViT-SAM":
                     print(f"Skipping {backbone_name} {pipeline_name} because it is not supported")
@@ -357,6 +528,10 @@ def main() -> None:
                     unique_output_path = (
                         output_path / args.experiment_name / f"{dataset_name}_{backbone_name}_{pipeline_name}"
                     )
+                elif args.dataset_filenames is not None:
+                    unique_output_path = (
+                        output_path / f"{dataset_name}_{backbone_name}_{pipeline_name}_{args.dataset_filenames}"
+                    )
                 else:
                     unique_output_path = output_path / f"{dataset_name}_{backbone_name}_{pipeline_name}"
 
@@ -369,8 +544,9 @@ def main() -> None:
                     dataset_name=dataset_name,
                     pipeline_name=pipeline_name,
                     backbone_name=backbone_name,
-                    number_of_priors_tests=1,
-                    number_of_batches=None,
+                    number_of_priors_tests=args.num_priors,
+                    number_of_batches=args.num_batches,
+                    dataset_filenames=args.dataset_filenames.split(","),
                 )
                 all_results.append(all_metrics_df)
 

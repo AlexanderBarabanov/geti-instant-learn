@@ -126,7 +126,8 @@ class SegmentationMetrics(Calculator):
                     continue
                 if class_id - 1 in reference.class_ids():
                     ref = reference.to_numpy(class_id - 1)
-                    ref_mask[np.max(ref, axis=0) > 0] = class_id
+                    if len(ref) > 0:
+                        ref_mask[np.max(ref, axis=0) > 0] = class_id
 
                 if class_id - 1 in prediction.class_ids():
                     pred = prediction.to_numpy(class_id - 1)

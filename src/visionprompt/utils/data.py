@@ -9,10 +9,11 @@ from visionprompt.datasets.lvis.lvis_dataset import LVISDataset
 from visionprompt.datasets.perseg.perseg_dataset import PerSegDataset
 
 
-def load_dataset(dataset_name: str, whitelist: list[str] | None = None) -> Dataset:
+def load_dataset(dataset_name: str, whitelist: list[str] | None = None, batch_size: int = 5) -> Dataset:
     """Load a dataset.
 
     Args:
+        batch_size: The batch size used during inference
         dataset_name: Name of the dataset
         whitelist: Whitelist of categories
 
@@ -28,21 +29,21 @@ def load_dataset(dataset_name: str, whitelist: list[str] | None = None) -> Datas
         return PerSegDataset(
             whitelist=whitelist,
             iterator_type=BatchedCategoryIter,
-            iterator_kwargs={"batch_size": 5},
+            iterator_kwargs={"batch_size": batch_size},
         )
     if dataset_name == "lvis":
         whitelist = whitelist if whitelist is not None else ("cupcake", "sheep", "pastry", "doughnut")
         return LVISDataset(
             whitelist=whitelist,
             iterator_type=BatchedCategoryIter,
-            iterator_kwargs={"batch_size": 5},
+            iterator_kwargs={"batch_size": batch_size},
         )
     if dataset_name == "lvis_validation":
         whitelist = whitelist if whitelist is not None else ("cupcake", "sheep", "pastry", "doughnut")
         return LVISDataset(
             whitelist=whitelist,
             iterator_type=BatchedCategoryIter,
-            iterator_kwargs={"batch_size": 5},
+            iterator_kwargs={"batch_size": batch_size},
             name="validation",
         )
     msg = f"Unknown dataset name {dataset_name}"

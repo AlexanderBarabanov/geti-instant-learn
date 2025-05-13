@@ -62,23 +62,25 @@ class SamMAPIDecoder(Segmenter):
                 reference_features=reference,
                 apply_masks_refinement=False,
             )
-            mask = result.get_mask(0).mask
-            mask = np.stack(mask)
             masks = Masks()
-            for m in mask:
-                masks.add(m, class_id=0)
-
-            # Convert output into Points and Priors
             points = Points()
-            ps = np.stack(result.data[0].points)
-            scores = result.data[0].scores
-            # Generate x, y, score, label
-            # Note that Model API does not return the used background points
-            points_scores = np.ones([len(ps), 4])
-            points_scores[:, 0] = ps[:, 0]
-            points_scores[:, 1] = ps[:, 1]
-            points_scores[:, 2] = scores
-            points.add(points_scores, class_id=0)
+
+            if 0 in result.data:
+                mask = result.get_mask(0).mask
+                mask = np.stack(mask)
+                for m in mask:
+                    masks.add(m, class_id=0)
+
+                # Convert output into Points and Priors
+                ps = np.stack(result.data[0].points)
+                scores = result.data[0].scores
+                # Generate x, y, score, label
+                # Note that Model API does not return the used background points
+                points_scores = np.ones([len(ps), 4])
+                points_scores[:, 0] = ps[:, 0]
+                points_scores[:, 1] = ps[:, 1]
+                points_scores[:, 2] = scores
+                points.add(points_scores, class_id=0)
 
             # Add to return list
             points_per_image.append(points)
