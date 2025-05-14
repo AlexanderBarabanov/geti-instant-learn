@@ -40,6 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const referenceContainer = document.getElementById("reference-container");
 
   const skipPointsCheckbox = document.getElementById("skipPointsInExistingMasks");
+  const randomPriorCheckbox = document.getElementById("randomPriorCheckbox");
 
   async function fetchAndPopulateClasses (selectedDataset) {
     classNameSelect.innerHTML =
@@ -209,6 +210,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const similarityThreshold = parseFloat(similarityThresholdInput.value);
     const maskSimilarityThreshold = parseFloat(maskSimilarityThresholdInput.value);
     const skipPoints = skipPointsCheckbox?.checked ?? false;
+    const useRandomPrior = randomPriorCheckbox?.checked ?? false;
 
     if (!className || isNaN(nShot) || nShot < 1 || isNaN(similarityThreshold) || isNaN(maskSimilarityThreshold) || isNaN(numTargetImages) || numTargetImages < 1) {
       // Use progress text for errors before starting
@@ -235,7 +237,7 @@ document.addEventListener("DOMContentLoaded", () => {
     progressBarFill.style.width = "0%";
     progressBarFill.classList.remove("bg-red-600");
     progressBarFill.classList.add("bg-blue-600");
-    progressText.textContent = "Initializing...";
+    progressText.textContent = useRandomPrior ? "Initializing with Random Prior..." : "Initializing...";
     Object.keys(canvasDataStore).forEach((key) => delete canvasDataStore[key]);
     Object.keys(maskImageCache).forEach((key) => delete maskImageCache[key]);
     Object.keys(groundTruthMaskImageCache).forEach((key) => delete groundTruthMaskImageCache[key]);
@@ -263,6 +265,7 @@ document.addEventListener("DOMContentLoaded", () => {
           similarity_threshold: similarityThreshold,
           mask_similarity_threshold: maskSimilarityThreshold,
           skip_points_in_existing_masks: skipPoints,
+          random_prior: useRandomPrior
         }),
       });
 
@@ -689,9 +692,15 @@ document.addEventListener("DOMContentLoaded", () => {
       resultsContainer.appendChild(targetItemDiv);
 
       // Store data needed for redraws - use unique canvasId
+      const augmentedMasks = (result.masks || []).map(mask => ({
+        ...mask,
+        isCheckboxHovered: false,
+        isPointHovered: false,
+      }));
+
       canvasDataStore[canvasId] = {
         image: null,
-        masks: result.masks || [],
+        masks: augmentedMasks,
         points: {
           used: result.used_points || [],
           all: (result.prior_points || []).concat(result.used_points || [])
@@ -705,7 +714,8 @@ document.addEventListener("DOMContentLoaded", () => {
         originalHeight: 0,
         similarityMaps: result.similarity_maps || [],
         ground_truth_mask_uri: result.gt_mask_uri || null, // Store GT Mask URI
-        showGroundTruth: false // State for GT visibility
+        showGroundTruth: false, // State for GT visibility
+        currentlyPointHoveredMaskIndex: null, // For point hover tracking
       };
 
       // Similarity Map Display 
@@ -762,9 +772,59 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       canvas.addEventListener("click", handleCanvasClick);
 
+      // Add mousemove listener for point hovering
+      canvas.addEventListener("mousemove", (event) => {
+        const currentData = canvasDataStore[canvasId];
+        if (!currentData || !currentData.masks) return;
+
+        const rect = canvas.getBoundingClientRect();
+        // Calculate scaled mouse coordinates, similar to handleCanvasClick
+        const scaleMouseX = canvas.width / rect.width;
+        const scaleMouseY = canvas.height / rect.height;
+        const x = (event.clientX - rect.left) * scaleMouseX;
+        const y = (event.clientY - rect.top) * scaleMouseY;
+        let aPointWasHovered = false;
+        let newHoveredMaskIndex = null;
+
+        for (const pPoint of currentData.clickablePoints) {
+          const distance = Math.sqrt((x - pPoint.x) ** 2 + (y - pPoint.y) ** 2);
+          if (distance < pPoint.radius) {
+            newHoveredMaskIndex = pPoint.maskIndex;
+            aPointWasHovered = true;
+            break;
+          }
+        }
+
+        if (currentData.currentlyPointHoveredMaskIndex !== newHoveredMaskIndex) {
+          // Clear previous highlight if any
+          if (currentData.currentlyPointHoveredMaskIndex !== null && currentData.masks[currentData.currentlyPointHoveredMaskIndex]) {
+            currentData.masks[currentData.currentlyPointHoveredMaskIndex].isPointHovered = false;
+          }
+          // Set new highlight if any
+          if (newHoveredMaskIndex !== null && currentData.masks[newHoveredMaskIndex]) {
+            currentData.masks[newHoveredMaskIndex].isPointHovered = true;
+          }
+          currentData.currentlyPointHoveredMaskIndex = newHoveredMaskIndex;
+          redrawCanvas(canvasId);
+        }
+      });
+
+      // Add mouseout listener for canvas to clear point hover
+      canvas.addEventListener("mouseout", () => {
+        const currentData = canvasDataStore[canvasId];
+        if (!currentData || !currentData.masks) return;
+
+        if (currentData.currentlyPointHoveredMaskIndex !== null && currentData.masks[currentData.currentlyPointHoveredMaskIndex]) {
+          currentData.masks[currentData.currentlyPointHoveredMaskIndex].isPointHovered = false;
+          currentData.currentlyPointHoveredMaskIndex = null;
+          redrawCanvas(canvasId);
+        }
+      });
+
       // Create checkboxes and add listeners
       if (result.masks && result.masks.length > 0) {
-        result.masks.forEach((mask, maskIndex) => {
+        result.masks.forEach((_, maskIndex) => { // Iterate with original maskIndex
+          const mask = canvasDataStore[canvasId].masks[maskIndex]; // Get augmented mask
           const checkboxId = `${canvasId}-mask-${mask.instance_id}`;
 
           // Create container for checkbox + label for styling
@@ -778,6 +838,7 @@ document.addEventListener("DOMContentLoaded", () => {
           checkbox.value = mask.instance_id;
           checkbox.checked = true;
           checkbox.dataset.canvasId = canvasId;
+          checkbox.dataset.maskIndex = maskIndex; // Set maskIndex for the event listener
           checkbox.classList.add(
             "h-4",
             "w-4",
@@ -799,6 +860,23 @@ document.addEventListener("DOMContentLoaded", () => {
           checkbox.addEventListener("change", (event) => {
             const targetCanvasId = event.target.dataset.canvasId;
             redrawCanvas(targetCanvasId);
+          });
+
+          // Add hover listeners to the maskDiv for better UX
+          maskDiv.addEventListener("mouseenter", () => {
+            const currentMask = canvasDataStore[canvasId].masks[maskIndex];
+            if (currentMask) {
+              currentMask.isCheckboxHovered = true;
+              redrawCanvas(canvasId);
+            }
+          });
+
+          maskDiv.addEventListener("mouseleave", () => {
+            const currentMask = canvasDataStore[canvasId].masks[maskIndex];
+            if (currentMask) {
+              currentMask.isCheckboxHovered = false;
+              redrawCanvas(canvasId);
+            }
           });
         });
       } else {
@@ -923,9 +1001,20 @@ document.addEventListener("DOMContentLoaded", () => {
       if (visibleMaskIds.has(mask.instance_id)) {
         const maskImg = maskImageCache[mask.mask_data_uri];
         if (maskImg && maskImg !== 'loading' && maskImg.complete) {
-          ctx.globalAlpha = 0.5;
+          const shouldHighlight = mask.isCheckboxHovered || mask.isPointHovered;
+          if (shouldHighlight) {
+            ctx.save();
+            // Apply a distinct highlight, e.g., brightness, contrast, and a white drop shadow
+            ctx.filter = 'brightness(1.4) contrast(1.1) drop-shadow(0 0 4px #FFFFFF)';
+          }
+
+          ctx.globalAlpha = 0.5; // Original opacity for mask
           ctx.drawImage(maskImg, 0, 0, canvas.width, canvas.height);
           ctx.globalAlpha = 1.0;
+
+          if (shouldHighlight) {
+            ctx.restore(); // Restore context to remove filter for subsequent drawings
+          }
         } else if (!maskImg || maskImg === 'loading') {
         } else {
           console.error(`Failed mask image encountered: ${mask.instance_id}`);

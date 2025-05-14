@@ -11,7 +11,7 @@ authors = [
   { name="Daan Krol", email="daan.krol@intel.com" },
   { name="Klaas Dijkstra", email="klaas.dijkstra@intel.com" },
 ]
-description = "VisionPrompt - A modular framework for visual prompting"
+description = "Vision Prompt - A modular framework for visual prompting"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"

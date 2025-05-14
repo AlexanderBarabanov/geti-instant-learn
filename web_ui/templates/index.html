@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VisionPrompt UI</title>
+  <title>Vision Prompt UI</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -23,7 +23,7 @@
 <body class="bg-gray-100 text-gray-800 font-sans p-8">
   <div class="bg-white p-6 rounded-lg shadow-md">
     <h1 class="text-3xl font-bold mb-4 text-primary">
-      VisionPrompt UI
+      Vision Prompt UI
     </h1>
 
     <div class="flex justify-between items-start mb-6 gap-6">
@@ -145,14 +145,23 @@
           <div class="flex items-center space-x-2 pt-5">
             <input type="checkbox" id="skipPointsInExistingMasks" name="skipPointsInExistingMasks"
               class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded" checked>
-            <label for="skipPointsInExistingMasks" class="font-medium text-gray-700">Skip Covered Points</label>
+            <label for="skipPointsInExistingMasks" class="font-medium text-gray-700">Skip covered points</label>
+          </div>
+        </div>
+        <div class="control-item flex flex-col">
+          <div class="flex items-center space-x-2 pt-5">
+            <input id="randomPriorCheckbox" name="randomPriorCheckbox" type="checkbox"
+              class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded">
+            <label for="randomPriorCheckbox" class="font-medium text-gray-700">Use random references</label>
           </div>
         </div>
         <div class="control-item run-button-item flex flex-col justify-end">
-          <button id="runButton"
-            class="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
-            Run
-          </button>
+          <div class="flex gap-2 items-center">
+            <button id="runButton"
+              class="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+              Run
+            </button>
+          </div>
         </div>
       </div>
     </div>

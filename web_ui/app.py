@@ -11,6 +11,7 @@ python -m web_ui.app
 
 import base64
 import json
+import random
 
 import cv2
 import numpy as np
@@ -25,6 +26,7 @@ from flask import (
 )
 
 from visionprompt.context_learner.types import Image, Masks, Points, Priors, Similarities
+from visionprompt.datasets.dataset_base import Dataset
 from visionprompt.utils.args import get_arguments
 from visionprompt.utils.constants import DATASETS, MODEL_MAP, PIPELINES
 from visionprompt.utils.data import load_dataset
@@ -373,11 +375,12 @@ def _reload_pipeline_if_needed(reload_needed, requested_values):
 
 
 def _load_and_prepare_data(
-    dataset_name,
-    class_name_filter,
-    n_shot,
-    num_target_images=None,
-):
+    dataset_name: str,
+    class_name_filter: str,
+    n_shot: int,
+    num_target_images: int | None = None,
+    random_prior: bool = False,
+) -> tuple[list[Image], list[Priors], list[int], Dataset]:
     """Loads the specified dataset, validates parameters, and prepares reference data.
 
     Args:
@@ -385,6 +388,7 @@ def _load_and_prepare_data(
         class_name_filter (str): The class name to filter data by.
         n_shot (int): The number of reference shots.
         num_target_images (int, optional): The number of target images to limit.
+        random_prior (bool, optional): Whether to use random prior.
 
     Returns:
         tuple: A tuple containing:
@@ -399,83 +403,57 @@ def _load_and_prepare_data(
         ValueError: If inputs are invalid (e.g., empty class name, not enough samples).
         Exception: For other dataset loading or processing errors.
     """
-    if not class_name_filter:
-        raise ValueError("Class name filter cannot be empty")
+    full_dataset = load_dataset(dataset_name)
 
-    try:
-        full_dataset = load_dataset(dataset_name)
-    except FileNotFoundError:
-        app.logger.error(
-            f"Dataset '{dataset_name}' files not found during processing.",
-            exc_info=True,
-        )
-        raise  # Propagate the error
-    except Exception as e:
-        app.logger.error(f"Failed to load dataset '{dataset_name}': {e}", exc_info=True)
-        raise ValueError(f"Could not load dataset '{dataset_name}'.") from e
-
-    try:
-        image_count_for_category = full_dataset.get_image_count_per_category(
-            class_name_filter,
-        )
-    except KeyError:
-        raise KeyError(
-            f"Class name '{class_name_filter}' not found in dataset '{dataset_name}'",
-        )
-    except Exception as e:
-        app.logger.error(
-            f"Error accessing category data for '{class_name_filter}': {e}",
-            exc_info=True,
-        )
-        raise RuntimeError("Error retrieving category information.") from e
+    image_count_for_category = full_dataset.get_image_count_per_category(
+        class_name_filter,
+    )
 
     if image_count_for_category == 0:
-        raise ValueError(
-            f"No data found for class '{class_name_filter}' in dataset '{dataset_name}'",
-        )
+        msg = f"No data found for class '{class_name_filter}' in dataset '{dataset_name}'"
+        raise ValueError(msg)
 
+    # Ensure there are enough images for n_shot references and at least one target image.
     if image_count_for_category <= n_shot:
-        raise ValueError(
-            f"Not enough samples ({image_count_for_category}) for class '{class_name_filter}' to provide {n_shot} reference shots and at least one target.",
-        )
+        msg = f"Not enough samples ({image_count_for_category}) for class '{class_name_filter}' to provide {n_shot} reference shot(s) and at least one target image."
+        raise ValueError(msg)
 
-    reference_indices = range(n_shot)
-    target_indices = range(n_shot, image_count_for_category)
+    all_available_indices = list(range(image_count_for_category))
+
+    if random_prior:
+        reference_indices = sorted(random.sample(all_available_indices, n_shot))
+        # Target indices are those not chosen for reference
+        target_indices = [i for i in all_available_indices if i not in reference_indices]
+        if not target_indices:
+            msg = f"No target images remaining after selecting {n_shot} random prior(s) for class '{class_name_filter}'. Consider reducing N-shot or checking dataset size."
+            raise ValueError(msg)
+    else:
+        reference_indices = all_available_indices[:n_shot]
+        target_indices = all_available_indices[n_shot:]
 
     reference_images = []
     reference_priors = []
 
     for i in reference_indices:
-        try:
-            image_list = full_dataset.get_images_by_category(
-                class_name_filter,
-                start=i,
-                end=i + 1,
-            )
-            masks_list = full_dataset.get_masks_by_category(
-                class_name_filter,
-                start=i,
-                end=i + 1,
-            )
-            if not image_list or not masks_list:
-                raise ValueError(f"Missing image or mask for reference index {i}")
-            image_np = image_list[0]
-            mask_np = masks_list[0]
-            if mask_np.dtype != np.uint8:
-                mask_np = (mask_np > 0).astype(np.uint8)
-            ref_image_obj = Image(image_np)
-            reference_images.append(ref_image_obj)
-            masks = Masks()
-            masks.add(mask_np, class_id=0)
-            reference_priors.append(Priors(masks=masks))
-        except Exception as e:
-            app.logger.error(
-                f"Error processing reference {i} for class {class_name_filter}: {e}",
-                exc_info=True,
-            )
-            raise RuntimeError(
-                f"Error processing reference images for '{class_name_filter}'.",
-            ) from e
+        image_list = full_dataset.get_images_by_category(
+            class_name_filter,
+            start=i,
+            end=i + 1,
+        )
+        masks_list = full_dataset.get_masks_by_category(
+            class_name_filter,
+            start=i,
+            end=i + 1,
+        )
+        image_np = image_list[0]
+        mask_np = masks_list[0]
+        if mask_np.dtype != np.uint8:
+            mask_np = (mask_np > 0).astype(np.uint8)
+        ref_image_obj = Image(image_np)
+        reference_images.append(ref_image_obj)
+        masks = Masks()
+        masks.add(mask_np, class_id=0)
+        reference_priors.append(Priors(masks=masks))
 
     # Limit target images based on input
     if num_target_images is not None and num_target_images >= 1:
@@ -535,6 +513,7 @@ def run_processing():
         dataset_name = request_data.get("dataset", "PerSeg")
         class_name_filter = request_data.get("class_name", "can")
         n_shot = int(request_data.get("n_shot", 1))
+        random_prior = request_data.get("random_prior", False)
         try:
             (
                 reference_images,
@@ -546,6 +525,7 @@ def run_processing():
                 class_name_filter,
                 n_shot,
                 requested_values["num_target_images"],
+                random_prior=random_prior,
             )
         except (FileNotFoundError, KeyError, ValueError, RuntimeError) as e:
             app.logger.error(f"Data preparation error: {e}", exc_info=True)
@@ -564,7 +544,6 @@ def run_processing():
             app.logger.error(f"Error during pipeline learn step: {e}", exc_info=True)
             return jsonify({"error": "Pipeline learn step failed."}), 500
 
-        # --- Prepare Reference Data for Frontend ---
         prepared_reference_data = []
         try:
             for i, (ref_img, ref_prior) in enumerate(zip(reference_images, reference_priors, strict=False)):
@@ -585,7 +564,6 @@ def run_processing():
         except Exception as e:
             app.logger.error(f"Error preparing reference data for frontend: {e}", exc_info=True)
             prepared_reference_data = []
-        # --- End Prepare Reference Data ---
 
         def stream_inference_and_results(
             target_indices_stream,
