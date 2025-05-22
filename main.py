@@ -516,9 +516,9 @@ def main() -> None:
     pipelines_str = "-".join(pipelines_to_run)
     backbones_str = "-".join(backbones_to_run)
 
-    for pipeline_name in pipelines_to_run:
-        for dataset_name in datasets_to_run:
-            dataset = load_dataset(dataset_name, whitelist=args.class_name)
+    for dataset_name in datasets_to_run:
+        dataset = load_dataset(dataset_name, whitelist=args.class_name)
+        for pipeline_name in pipelines_to_run:
             for bidx, backbone_name in enumerate(backbones_to_run):
                 if pipeline_name == "PerSAMModular" and backbone_name == "EfficientViT-SAM":
                     print(f"Skipping {backbone_name} {pipeline_name} because it is not supported")
