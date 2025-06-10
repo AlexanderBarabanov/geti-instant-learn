@@ -1,34 +1,23 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
-
+from abc import abstractmethod
 
 import torch
+from src.visionprompt.context_learner.types.features import Features
 
 from visionprompt.context_learner.processes import Process
 from visionprompt.context_learner.types import Priors, Similarities
 
 
 class PromptGenerator(Process):
-    """This class generates priors from similarities."""
+    """This class generates priors."""
 
-    def __call__(self, similarities: list[Similarities]) -> list[Priors]:
-        """This method extracts priors from similarities.
+    @abstractmethod
+    def __call__(self) -> list[Priors]:
+        """This method extracts priors."""
 
-        Args:
-            similarities: The similarities between reference features and target features.
-
-        Returns:
-            A priors that have been created from the similarities.
-
-        Examples:
-            >>> from visionprompt.context_learner.types.state import State
-            >>> state = State()
-            >>> prompt_gen = PromptGenerator(state=state)
-            >>> r = prompt_gen([Similarities()])
-        """
-        return [Priors()]
-
-    def _filter_duplicate_points(self, priors: Priors) -> Priors:
+    @staticmethod
+    def _filter_duplicate_points(priors: Priors) -> Priors:
         """Filter out duplicate points, handling foreground and background points separately.
 
         This is applied for the points of each similarity map.
@@ -74,3 +63,38 @@ class PromptGenerator(Process):
                 )
 
         return priors
+
+
+class SimilarityPromptGenerator(PromptGenerator):
+    """This class generates priors from similarities."""
+
+    @abstractmethod
+    def __call__(self, target_similarities: list[Similarities] | None = None) -> tuple:
+        """This method extracts priors from similarities.
+
+        Args:
+            target_similarities: The similarities between reference features and target features.
+
+        Returns:
+            A priors that have been created from the similarities.
+
+        """
+
+
+class FeaturePromptGenerator(PromptGenerator):
+    """This class generates priors from feature maps."""
+
+    @abstractmethod
+    def __call__(
+        self, reference_features: list[Features] | None = None, target_features: list[Features] | None = None
+    ) -> tuple:
+        """This method extracts priors from similarities.
+
+        Args:
+            reference_features: List of reference features
+            target_features: List of target features
+
+        Returns:
+            A priors that have been created from the feature maps.
+
+        """

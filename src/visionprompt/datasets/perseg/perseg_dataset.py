@@ -1,7 +1,6 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-import os
 from pathlib import Path
 
 import cv2
@@ -224,7 +223,7 @@ class PerSegDataset(Dataset):
         """
         return self._category_index_to_name
 
-    def category_index_to_id(self, index: int) -> int:
+    def category_index_to_id(self, index: int) -> int:  # noqa: PLR6301
         """Get the category id.
 
         Args:
@@ -235,16 +234,16 @@ class PerSegDataset(Dataset):
         """
         return index
 
-    def category_id_to_name(self, id: int) -> str:
+    def category_id_to_name(self, cat_id: int) -> str:
         """Get the category name.
 
         Args:
-            id: The category id
+            cat_id: The category id
 
         Returns:
             The category name
         """
-        return self._category_index_to_name[id]
+        return self._category_index_to_name[cat_id]
 
     def category_name_to_id(self, name: str) -> int:
         """Get the category id.
@@ -319,6 +318,15 @@ class PerSegDataset(Dataset):
             The masks
         """
         return {self._annotations[index].category_id: self._annotations[index].get_mask()}
+
+    def get_categories_of_image(self, index: int) -> list[str]:
+        """This method gets all categories presents on an image.
+
+        Args:
+            index: The image index
+
+        """
+        return [self._category_index_to_name[self._annotations[index].category_id]]
 
     def get_images_by_category(
         self,
@@ -395,6 +403,9 @@ class PerSegDataset(Dataset):
             category_id = category_index_or_name
         elif isinstance(category_index_or_name, str):
             category_id = self._category_name_to_index[category_index_or_name]
+        else:
+            msg = f"Invalid category_index_or_name: {category_index_or_name}"
+            raise TypeError(msg)
 
         image_ids = self._category_to_annotations[category_id]
         return len(image_ids)
@@ -412,6 +423,9 @@ class PerSegDataset(Dataset):
             category_id = category_index_or_name
         elif isinstance(category_index_or_name, str):
             category_id = self._category_name_to_index[category_index_or_name]
+        else:
+            msg = f"Invalid category_index_or_name: {category_index_or_name}"
+            raise TypeError(msg)
 
         cat_name = self._category_index_to_name[category_id]
         return self.instance_count[cat_name]
@@ -422,8 +436,8 @@ class PerSegDataset(Dataset):
         download_src = self._files["downloads_source"]
         download_dest = self._files["downloads_destination"]
         unzip_dest = self._files["unzipped_destination"]
-        self._download(download_src, download_dest)
-        self._unzip(download_dest, unzip_dest)
+        self._download(download_src, str(download_dest))
+        self._unzip(str(download_dest), str(unzip_dest))
         if not unzip_dest.exists():
             msg = f"Failed to produce {unzip_dest}"
             raise RuntimeError(msg)
@@ -439,15 +453,10 @@ def test_index_iter() -> None:
         for category_id, mask in masks.items():
             overlay = color_overlay(image, mask)
             cat = dataset.get_categories()[category_id]
-            output_folder = os.path.join(dataset.get_root_path(), "overlays", cat)
-            orig_filename = os.path.splitext(
-                os.path.basename(dataset.get_image_filename(image_index)),
-            )[0]
-            os.makedirs(output_folder, exist_ok=True)
-            cv2.imwrite(
-                os.path.join(output_folder, f"{orig_filename}_{cat}.jpg"),
-                overlay,
-            )
+            output_folder = Path(dataset.get_root_path()) / "overlays" / cat
+            orig_filename = Path(Path(dataset.get_image_filename(image_index)).name).stem
+            Path.mkdir(output_folder, parents=True)
+            cv2.imwrite(str(Path(output_folder / f"{orig_filename}_{cat}.jpg")), overlay)
 
 
 def test_category_iter() -> None:
@@ -460,15 +469,15 @@ def test_category_iter() -> None:
             # Generate and save overlays
             overlay = color_overlay(image, mask)
             cat = dataset.get_categories()[category_index]
-            output_folder = os.path.join(dataset.get_root_path(), "overlays", cat)
-            orig_filename = os.path.splitext(
-                os.path.basename(
+            output_folder = Path(dataset.get_root_path()) / "overlays" / cat
+            orig_filename = Path(
+                Path(
                     dataset.get_image_filename_in_category(category_index, image_index),
-                ),
-            )[0]
-            os.makedirs(output_folder, exist_ok=True)
+                ).name
+            ).stem
+            Path.mkdir(output_folder, parents=True)
             cv2.imwrite(
-                os.path.join(output_folder, f"{orig_filename}_{cat}.jpg"),
+                str(Path(output_folder) / f"{orig_filename}_{cat}.jpg"),
                 overlay,
             )
 

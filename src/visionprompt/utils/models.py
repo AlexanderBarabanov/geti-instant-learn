@@ -78,11 +78,33 @@ def load_pipeline(backbone_name: str, pipeline_name: str, args: Namespace) -> Pi
     logging.info(f"Constructing pipeline: {pipeline_name}")
     # Construct pipeline
     if pipeline_name == "PerSAMModular":
-        return PerSam(sam_model, args)
+        return PerSam(
+            sam_model,
+            args.num_foreground_points,
+            args.num_background_points,
+            args.apply_mask_refinement,
+            args.skip_points_in_existing_masks,
+            args.similarity_threshold,
+        )
     if pipeline_name == "PerDinoModular":
-        return PerDino(sam_model, args)
+        return PerDino(
+            sam_model,
+            args.num_foreground_points,
+            args.num_background_points,
+            args.apply_mask_refinement,
+            args.skip_points_in_existing_masks,
+            args.similarity_threshold,
+            args.mask_similarity_threshold,
+        )
     if pipeline_name == "MatcherModular":
-        return Matcher(sam_model, args)
+        return Matcher(
+            sam_model,
+            args.num_foreground_points,
+            args.num_background_points,
+            args.apply_mask_refinement,
+            args.mask_similarity_threshold,
+            args.skip_points_in_existing_masks,
+        )
     if pipeline_name == "PerSAMMAPIModular":
         return PerSamMAPI()
     msg = f"Algorithm {pipeline_name} not implemented yet"

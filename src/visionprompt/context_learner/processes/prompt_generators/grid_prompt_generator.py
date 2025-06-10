@@ -4,18 +4,20 @@
 
 import torch
 
-from visionprompt.context_learner.processes.prompt_generators.prompt_generator_base import (
-    PromptGenerator,
-)
-from visionprompt.context_learner.types import Priors, Similarities, State
+from visionprompt.context_learner.processes.prompt_generators.prompt_generator_base import SimilarityPromptGenerator
+from visionprompt.context_learner.types import Priors, Similarities
+from visionprompt.context_learner.types.image import Image
 
 
-class GridPromptGenerator(PromptGenerator):
-    """This class generates prompts for the segmenter based on the similarities between the reference and target images."""
+class GridPromptGenerator(SimilarityPromptGenerator):
+    """This class generates prompts for the segmenter.
+
+    This is based on the similarities between the reference and target images.
+    """
 
     def __init__(
         self,
-        state: State,
+        encoder_input_size: int,
         downsizing: int = 64,
         similarity_threshold: float = 0.65,
         num_bg_points: int = 1,
@@ -23,36 +25,38 @@ class GridPromptGenerator(PromptGenerator):
         """Generate prompts for the segmenter based on the similarities between the reference and target images.
 
         Args:
-            state: State the pipeline state object
+            encoder_input_size: int the size of the encoder input image.
             downsizing: int the downsizing factor for the grid
             similarity_threshold: float the threshold for the similarity mask
             num_bg_points: int the number of background points to sample
         """
-        super().__init__(state)
+        super().__init__()
         self.downsizing = downsizing
         self.similarity_threshold = similarity_threshold
         self.num_bg_points = num_bg_points
+        self.encoder_input_size = encoder_input_size
 
     def __call__(
-        self,
-        image_similarities: list[Similarities],
+        self, target_similarities: list[Similarities] | None = None, target_images: list[Image] | None = None
     ) -> list[Priors]:
-        """This generates prompt candidates (or priors) based on the similarities between the reference and target images.
+        """This generates prompt candidates (or priors).
 
+        Ths is based on the similarities between the reference and target images.
         It uses a grid based approach to create multi object aware prompt for the segmenter.
 
         Args:
-            image_similarities: List[Similarities] List of similarities, one per target image instance
+            target_similarities: List[Similarities] List of similarities, one per target image instance
+            target_images: List[Image] List of target image instances
 
         Returns:
             List[Priors] List of priors, one per target image instance
         """
-        encoder_input_size = self._state.encoder_input_size
+        encoder_input_size = self.encoder_input_size
         priors_per_image: list[Priors] = []
 
-        for i, similarities_per_image in enumerate(image_similarities):
+        for i, similarities_per_image in enumerate(target_similarities):
             priors = Priors()
-            original_image_size = self._state.target_images[i].size
+            original_image_size = target_images[i].size
             for class_id, similarities in similarities_per_image.data.items():
                 background_points = self._get_background_points(similarities)
 

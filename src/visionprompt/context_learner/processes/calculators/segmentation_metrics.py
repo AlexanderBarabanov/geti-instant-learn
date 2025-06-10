@@ -7,21 +7,20 @@ import numpy as np
 from sklearn.metrics import confusion_matrix
 
 from visionprompt.context_learner.processes.calculators.calculator_base import Calculator
-from visionprompt.context_learner.types import Masks, State
+from visionprompt.context_learner.types import Masks
 
 
 class SegmentationMetrics(Calculator):
     """This class handles metrics calculations."""
 
-    def __init__(self, state: State, categories: list[str]) -> None:
+    def __init__(self, categories: list[str]) -> None:
         """Ths class handles metrics calculations.
 
         Args:
-            state: The state object of the pipeline
             categories: A list of category names that will be used.
                 Note: The background should not be present and is added automatically.
         """
-        super().__init__(state)
+        super().__init__()
         self.n_samples = 0
         self.tp_count = self.fp_count = self.fn_count = self.tn_count = 0
         self.confusion: dict[str : np.ndarray] = {}  # category: binary confusion summation
@@ -85,10 +84,10 @@ class SegmentationMetrics(Calculator):
             d["accuracy"].append(accuracy)
         return d
 
-    def __call__(
+    def __call__(  # noqa: C901
         self,
-        predictions: list[Masks],
-        references: list[Masks],
+        predictions: list[Masks] | None = None,
+        references: list[Masks] | None = None,
         mapping: dict[int, str] | None = None,
     ) -> None:
         """This class compares predicted and reference masks.
@@ -102,6 +101,12 @@ class SegmentationMetrics(Calculator):
             references: List of reference masks
             mapping: Dictionary mapping class ids to class names.
         """
+        if mapping is None:
+            mapping = {}
+        if references is None:
+            references = []
+        if predictions is None:
+            predictions = []
         if mapping is None:
             mapping = dict(enumerate(self.categories))
         else:

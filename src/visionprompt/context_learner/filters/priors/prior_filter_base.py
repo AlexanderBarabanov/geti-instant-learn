@@ -11,4 +11,3 @@ class PriorFilter(Filter):
 
     def __call__(self, priors: list[Priors]) -> list[Priors]:
         """Filter the priors."""
-        return priors

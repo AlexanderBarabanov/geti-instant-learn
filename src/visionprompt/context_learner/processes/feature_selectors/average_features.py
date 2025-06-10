@@ -13,6 +13,9 @@ from visionprompt.context_learner.types import Features
 class AverageFeatures(FeatureSelector):
     """This class averages features across all reference images and their masks for each class."""
 
+    def __init__(self) -> None:
+        super().__init__()
+
     def __call__(self, features_per_image: list[Features]) -> list[Features]:
         """This method averages all features across all reference images and their masks for each class.
 

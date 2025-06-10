@@ -19,7 +19,7 @@ from torchvision import transforms
 
 import visionprompt.third_party.dinov2.utils.utils as dinov2_utils
 from visionprompt.context_learner.processes.encoders.encoder_base import Encoder
-from visionprompt.context_learner.types import Features, Image, Masks, Priors, State
+from visionprompt.context_learner.types import Features, Image, Masks, Priors
 from visionprompt.third_party.dinov2.data.transforms import MaybeToTensor, make_normalize_transform
 from visionprompt.third_party.dinov2.models import vision_transformer
 from visionprompt.third_party.dinov2.models.vision_transformer import DinoVisionTransformer
@@ -29,28 +29,23 @@ from visionprompt.utils.constants import DINO_WEIGHTS
 class DinoEncoder(Encoder):
     """This encoder uses the DINOv2 model to encode the images."""
 
-    def __init__(self, state: State) -> None:
-        super().__init__(state)
-        self.input_image_size = 518
+    def __init__(self) -> None:
+        super().__init__()
+        self.encoder_input_size = 518
         self.patch_size = 14
-        self.feature_size = self.input_image_size // self.patch_size
-
-        # Store encoder configuration in the state
-        self._state.encoder_input_size = self.input_image_size
-        self._state.encoder_patch_size = self.patch_size
-        self._state.encoder_feature_size = self.feature_size
+        self.feature_size = self.encoder_input_size // self.patch_size
 
         self.model: DinoVisionTransformer = self._setup_model()
         self.encoder_transform = transforms.Compose([
             MaybeToTensor(),
-            transforms.Resize((self.input_image_size, self.input_image_size)),
+            transforms.Resize((self.encoder_input_size, self.encoder_input_size)),
             make_normalize_transform(),
         ])
         self.encoder_mask_transform = transforms.Compose([
             MaybeToTensor(),
             transforms.Lambda(lambda x: x.unsqueeze(0) if x.ndim == 2 else x),
             transforms.Lambda(lambda x: x.float()),
-            transforms.Resize([self.input_image_size, self.input_image_size]),
+            transforms.Resize([self.encoder_input_size, self.encoder_input_size]),
             # MinPool to make sure we do not use background features
             transforms.Lambda(lambda x: (x * -1) + 1),
             torch.nn.MaxPool2d(
@@ -61,7 +56,7 @@ class DinoEncoder(Encoder):
 
     def __call__(
         self,
-        images: list[Image],
+        images: list[Image] | None = None,
         priors_per_image: list[Priors] | None = None,
     ) -> tuple[list[Features], list[Masks]]:
         """This method creates an embedding from the images for locations inside the mask.
@@ -86,7 +81,9 @@ class DinoEncoder(Encoder):
         return image_features, resized_masks_per_image
 
     def _extract_local_features(self, features: Features, masks_per_class: Masks) -> tuple[Features, Masks]:
-        """This method extracts the local features from the image by only keeping the features that are inside the masks.
+        """This method extracts the local features from the image.
+
+         This only keeps the features that are inside the masks.
 
         Args:
             features: The features to extract the local features from.
@@ -125,7 +122,7 @@ class DinoEncoder(Encoder):
     def _setup_model(self) -> DinoVisionTransformer:
         """This method initializes the DINO model."""
         dinov2: DinoVisionTransformer = vision_transformer.__dict__["vit_large"](
-            img_size=self.input_image_size,
+            img_size=self.encoder_input_size,
             patch_size=self.patch_size,
             init_values=1e-5,
             ffn_layer="mlp",

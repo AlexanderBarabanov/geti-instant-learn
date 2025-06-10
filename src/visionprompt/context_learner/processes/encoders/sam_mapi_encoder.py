@@ -14,7 +14,6 @@ from visionprompt.context_learner.types.features import Features
 from visionprompt.context_learner.types.image import Image
 from visionprompt.context_learner.types.masks import Masks
 from visionprompt.context_learner.types.priors import Priors
-from visionprompt.context_learner.types.state import State
 
 
 class SamMAPIEncoder(Encoder):
@@ -23,8 +22,8 @@ class SamMAPIEncoder(Encoder):
     This encoder extracts features from images using a SAM model. It can be used to extract reference/local features.
     """
 
-    def __init__(self, state: State, model: SAMLearnableVisualPrompter) -> None:
-        super().__init__(state)
+    def __init__(self, model: SAMLearnableVisualPrompter) -> None:
+        super().__init__()
         self._model = model
 
     @staticmethod
@@ -41,8 +40,8 @@ class SamMAPIEncoder(Encoder):
         polygons = []
         for cnt in contours:
             # Approximate contour to polygon (optional, for simplification)
-            epsilon = 0.01 * cv2.arcLength(cnt, True)
-            approx = cv2.approxPolyDP(cnt, epsilon, True)
+            epsilon = 0.01 * cv2.arcLength(cnt, closed=True)
+            approx = cv2.approxPolyDP(cnt, epsilon, closed=True)
             polygon = approx.reshape(-1, 2)
             polygons.append(polygon)
         return polygons
@@ -109,7 +108,9 @@ class SamMAPIEncoder(Encoder):
         features: Features,
         masks_per_class: Masks,
     ) -> tuple[Features, Masks]:
-        """This method extracts the local features from the image by only keeping the features that are inside the masks.
+        """This method extracts the local features from the image.
+
+         This only keeping the features that are inside the masks.
 
         Args:
             features: The features to extract the local features from.

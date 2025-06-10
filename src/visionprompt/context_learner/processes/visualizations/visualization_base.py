@@ -6,7 +6,7 @@ import numpy as np
 import torch
 
 from visionprompt.context_learner.processes import Process
-from visionprompt.context_learner.types import Masks, Points, Priors, State
+from visionprompt.context_learner.types import Masks, Points, Priors
 
 
 class Visualization(Process):
@@ -14,14 +14,6 @@ class Visualization(Process):
 
     It provides a way to visualize the data.
     """
-
-    def __init__(self, state: State) -> None:
-        """Initialize the visualization process.
-
-        Args:
-            state: The state of the parent pipeline
-        """
-        super().__init__(state)
 
     @staticmethod
     def masks_from_priors(priors: list[Priors]) -> list[Masks]:
@@ -74,6 +66,5 @@ class Visualization(Process):
             masks.append(m)
         return masks
 
-    def __call__(self, *args, **kwargs) -> None:
+    def __call__(self) -> None:
         """Call visualization process."""
-        raise NotImplementedError

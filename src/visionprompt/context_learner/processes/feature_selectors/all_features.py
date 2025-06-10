@@ -13,6 +13,9 @@ from visionprompt.context_learner.types import Features
 class AllFeaturesSelector(FeatureSelector):
     """This class selects all features over all prior images without averaging."""
 
+    def __init__(self) -> None:
+        super().__init__()
+
     def __call__(self, features_per_image: list[Features]) -> list[Features]:
         """This method merges all features over all prior images without averaging.
 

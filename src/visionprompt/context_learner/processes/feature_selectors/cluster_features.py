@@ -9,26 +9,31 @@ from sklearn.cluster import KMeans
 from visionprompt.context_learner.processes.feature_selectors.feature_selector_base import (
     FeatureSelector,
 )
-from visionprompt.context_learner.types import Features, State
+from visionprompt.context_learner.types import Features
 
 
 class ClusterFeatures(FeatureSelector):
-    """This class clusters the features of the reference images and averages the features per cluster.
+    """This class clusters the features of the reference images.
 
-    This is loosly based on the paper "Part-aware Personalized Segment Anything Model for Patient-Specific Segmentation"
+     This also averages the features per cluster.
+
+    This is loosely based on the paper "Part-aware Personalized Segment Anything Model for
+    Patient-Specific Segmentation"
     https://arxiv.org/abs/2403.05433.
     """
 
-    def __init__(self, state: State, num_clusters: int = 3) -> None:
-        super().__init__(state)
+    def __init__(self, num_clusters: int = 3) -> None:
+        super().__init__()
         self.num_clusters = num_clusters
 
     def __call__(self, features_per_image: list[Features]) -> list[Features]:
-        """This method clusters all features (across all reference images and their masks) and averages the features per cluster.
+        """This method clusters all features.
+
+         This is done across all reference images and their masks. This also averages the
+         features per cluster.
 
         Args:
             features_per_image: A list of features for each reference image.
-            num_clusters: The number of clusters to use.
 
         Returns:
             A list of Features object with the averaged features per cluster.

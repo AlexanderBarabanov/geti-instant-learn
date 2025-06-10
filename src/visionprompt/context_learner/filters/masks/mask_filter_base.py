@@ -11,9 +11,8 @@ from visionprompt.context_learner.types import Masks
 class MaskFilter(Filter):
     """This is the base class for all mask filters."""
 
-    def __call__(self, masks: list[Masks]) -> list[Masks]:
+    def __call__(self, masks_per_image: list[Masks]) -> list[Masks]:
         """Filter the masks."""
-        return masks
 
     @staticmethod
     def _calculate_mask_iou(

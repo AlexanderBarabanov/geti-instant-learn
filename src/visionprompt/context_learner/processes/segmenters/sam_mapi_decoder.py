@@ -5,13 +5,12 @@
 import numpy as np
 from model_api.models import SAMLearnableVisualPrompter
 from model_api.models.visual_prompting import VisualPromptingFeatures
+from src.visionprompt.context_learner.types.features import Features
 
 from visionprompt.context_learner.processes.segmenters.segmenter_base import Segmenter
 from visionprompt.context_learner.types.image import Image
 from visionprompt.context_learner.types.masks import Masks
 from visionprompt.context_learner.types.points import Points
-from visionprompt.context_learner.types.priors import Priors
-from visionprompt.context_learner.types.state import State
 
 
 class SamMAPIDecoder(Segmenter):
@@ -19,36 +18,34 @@ class SamMAPIDecoder(Segmenter):
 
     def __init__(
         self,
-        state: State,
         model: SAMLearnableVisualPrompter,
     ) -> None:
-        super().__init__(state)
+        super().__init__()
         self.model = model
 
     def __call__(
         self,
         images: list[Image],
-        priors: list[Priors],
+        reference_features: list[Features] | None = None,
     ) -> tuple[list[Masks], list[Points]]:
         """Create masks from priors using SAM.
 
         Args:
             images: List of target images.
-            priors: Priors are ignored, instead the features are taken directly from
-                _state.reference_features.
+            reference_features: Features from the reference images.
 
         Returns:
             A tuple of a list of masks, one for each class in each target image,
             and a list of points, one for each class in each target image.
         """
         # Recreate feature object from the _state
-        if len(self._state.reference_features) != 1:
-            msg = "MAPISamDecoder only supports one set of global reference features"
+        if len(reference_features) != 1:
+            msg = "MAPISamDecoder only supports one set of reference features"
             raise ValueError(
                 msg,
             )
         reference = VisualPromptingFeatures(
-            self._state.reference_features[0].global_features.numpy(),
+            reference_features[0].global_features.numpy(),
             used_indices=np.array([0]),
         )
 

@@ -5,26 +5,27 @@
 import torch
 
 from visionprompt.context_learner.filters.priors.prior_filter_base import PriorFilter
-from visionprompt.context_learner.types import Priors, State
+from visionprompt.context_learner.types import Priors
 
 
 class MaxPointFilter(PriorFilter):
-    """Filter that reduces the number of points in priors to a maximum value,
-    selecting the points with the highest scores.
+    """Filter that reduces the number of points in priors to a maximum value.
+
+    This selects the points with the highest scores.
     """
 
-    def __init__(self, state: State, max_num_points: int = 40) -> None:
+    def __init__(self, max_num_points: int = 40) -> None:
         """Initialize the max point filter.
 
         Args:
             state: The state object
             max_num_points: Maximum number of points to keep per class
         """
-        super().__init__(state)
+        super().__init__()
         self.max_num_points = max_num_points
 
     def __call__(self, priors: list[Priors]) -> list[Priors]:
-        """Filter points in the priors, keeping the ones with highest scores.
+        """Filter points in the priors, keeping the ones with the highest scores.
 
         Modifies the priors in-place to preserve all other information.
 

@@ -11,8 +11,7 @@ from visionprompt.context_learner.pipelines.pipeline_base import Pipeline
 from visionprompt.context_learner.processes.encoders.sam_mapi_encoder import SamMAPIEncoder
 from visionprompt.context_learner.processes.mask_processors.mask_to_polygon import MasksToPolygons
 from visionprompt.context_learner.processes.segmenters.sam_mapi_decoder import SamMAPIDecoder
-from visionprompt.context_learner.types import Image, Priors, State
-from visionprompt.context_learner.types.annotations import Annotations
+from visionprompt.context_learner.types import Image, Priors, Results
 from visionprompt.utils.constants import MAPI_DECODER_PATH, MAPI_ENCODER_PATH
 
 if TYPE_CHECKING:
@@ -21,14 +20,7 @@ if TYPE_CHECKING:
 
 
 class PerSamMAPI(Pipeline):
-    """This is the PerSam algorithm pipeline using the ModelAPI implementation.
-
-    >>> p = PerSamMAPI()
-    >>> p.learn([Image()] * 3, [Priors()] * 3)
-    >>> a = p.infer([Image()])
-    >>> isinstance(a[0], Annotations)
-    True
-    """
+    """This is the PerSam algorithm pipeline using the ModelAPI implementation."""
 
     def __init__(self) -> None:
         super().__init__()
@@ -38,41 +30,32 @@ class PerSamMAPI(Pipeline):
         model = SAMLearnableVisualPrompter(encoder, decoder)
 
         # Create pipeline processes
-        self.encoder: SamMAPIEncoder = SamMAPIEncoder(self._state, model)
-        self.mask_processor: MaskProcessor = MasksToPolygons(self._state)
-        self.segmenter: Segmenter = SamMAPIDecoder(self._state, model)
-        self.mask_processor: MaskProcessor = MasksToPolygons(self._state)
+        self.encoder: SamMAPIEncoder = SamMAPIEncoder(model)
+        self.mask_processor: MaskProcessor = MasksToPolygons()
+        self.segmenter: Segmenter = SamMAPIDecoder(model)
+        self.mask_processor: MaskProcessor = MasksToPolygons()
+        self.reference_features = None
 
-    def learn(self, reference_images: list[Image], reference_priors: list[Priors]) -> None:
+    def learn(self, reference_images: list[Image], reference_priors: list[Priors]) -> Results:
         """Perform learning step on the reference images and priors."""
         if len(reference_images) > 1 or len(reference_priors) > 1:
             msg = "PerSamMAPI does not support multiple references"
             raise RuntimeError(msg)
-        s: State = self._state
-
-        # Set input in state for convenience
-        s.reference_images = reference_images
-        s.reference_priors = reference_priors
 
         # Extract features
-        s.reference_features, s.processed_reference_masks = self.encoder(
-            s.reference_images,
-            s.reference_priors,
+        self.reference_features, _ = self.encoder(
+            reference_images,
+            reference_priors,
         )
+        return Results()
 
-    def infer(self, target_images: list[Image]) -> list[Annotations]:
+    def infer(self, target_images: list[Image]) -> Results:
         """Perform inference step on the target images."""
-        s: State = self._state
+        masks, _ = self.segmenter(target_images, self.reference_features)
+        annotations = self.mask_processor(masks)
 
-        # Set input in state for convenience
-        s.target_images = target_images
-        self._state.masks.clear()
-        self._state.annotations.clear()
-        self._state.used_points.clear()
-        self._state.priors.clear()
-
-        s.masks, s.used_points = self.segmenter(target_images, priors=[])
-        s.priors = [Priors(points=p) for p in s.used_points]  # Generate a dummy Priors list
-        s.annotations = self.mask_processor(s.masks)
-
-        return s.annotations
+        # write output
+        results = Results()
+        results.masks = masks
+        results.annotations = annotations
+        return results

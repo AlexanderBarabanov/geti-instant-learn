@@ -3,7 +3,6 @@
 
 import argparse
 import logging
-import os
 import shutil
 import sys
 import time
@@ -20,7 +19,7 @@ from visionprompt.context_learner.processes.visualizations import ExportMaskVisu
 from visionprompt.context_learner.types import Image, Masks, Priors
 from visionprompt.datasets import BatchedSingleCategoryIter, Dataset
 from visionprompt.utils.args import get_arguments
-from visionprompt.utils.data import load_dataset
+from visionprompt.utils.data import get_filename_categories, get_image_and_mask_from_filename, load_dataset
 from visionprompt.utils.models import load_pipeline
 from visionprompt.utils.utils import parse_experiment_args
 
@@ -134,9 +133,8 @@ def infer_all_batches(
     time_count = 0
     for batch_index, (images, masks) in enumerate(batches):
         target_images = [Image(image) for image in images]
-        pipeline.reset_state(reset_references=False)
         start_time = time.time()
-        pipeline.infer(target_images=target_images)
+        results = pipeline.infer(target_images=target_images)
         time_sum += time.time() - start_time
         time_count += len(images)
 
@@ -168,27 +166,26 @@ def infer_all_batches(
             )
             for image_index in range(len(images))
         ]
-        s = pipeline.get_state()
         visualizer(
-            images=s.target_images,
-            masks=s.masks,
+            images=target_images,
+            masks=results.masks,
             names=export_paths,
-            points=s.used_points,
+            points=results.used_points,
         )
         visualizer(
-            images=s.target_images,
-            masks=s.masks,
+            images=target_images,
+            masks=results.masks,
             names=export_paths_all_points,
-            points=visualizer.points_from_priors(s.priors),
+            points=visualizer.points_from_priors(results.priors),
         )
         gt_masks = visualizer.arrays_to_masks(masks)
         visualizer(
-            images=s.target_images,
+            images=target_images,
             masks=gt_masks,
             names=export_paths_gt,
         )
         metrics_calculators[priors_batch_index](
-            predictions=s.masks,
+            predictions=results.masks,
             references=gt_masks,
             mapping={0: category_name},
         )
@@ -197,29 +194,6 @@ def infer_all_batches(
             break
     progress.remove_task(batches_task)
     return time_sum, time_count
-
-
-def get_image_and_mask_from_filename(
-    filename: str, dataset: Dataset, category_name: str
-) -> tuple[np.ndarray, np.ndarray]:
-    """Get the image and mask from using a base filename and dataset.
-
-    Args:
-        filename: The base filename.
-        dataset: The dataset to search.
-        category_name: The category that the image belongs to.
-
-    Returns:
-        The image array and the mask
-    """
-    filenames = {os.path.basename(dataset.get_image_filename(i)): i for i in range(dataset.get_image_count())}
-    idx = filenames[filename]
-    cat_id = dataset.category_name_to_id(category_name)
-    image = dataset.get_image_by_index(idx)
-    masks = dataset.get_masks_by_index(idx)
-
-    mask = masks[cat_id] if cat_id in masks else np.zeros_like(image)[:, :, 0]
-    return image, mask
 
 
 def infer_all_images(
@@ -260,15 +234,19 @@ def infer_all_images(
         masks.append(mask)
 
     target_images = [Image(image) for image in images]
-    pipeline.reset_state(reset_references=False)
     start_time = time.time()
-    pipeline.infer(target_images=target_images)
+    results = pipeline.infer(target_images=target_images)
     time_sum += time.time() - start_time
     time_count += len(images)
 
     # Generate names for exported files and export them
     export_paths = [
-        str(Path("predictions") / f"priors_batch_{priors_batch_index}" / category_name / filenames[image_index])
+        str(
+            Path("predictions")
+            / f"priors_batch_{priors_batch_index}"
+            / category_name
+            / Path(filenames[image_index]).name
+        )
         for image_index in range(len(images))
     ]
     export_paths_all_points = [
@@ -276,35 +254,39 @@ def infer_all_images(
             Path("predictions_all_points")
             / f"priors_batch_{priors_batch_index}"
             / category_name
-            / filenames[image_index]
+            / Path(filenames[image_index]).name
         )
         for image_index in range(len(images))
     ]
     export_paths_gt = [
-        str(Path("ground_truth") / f"priors_batch_{priors_batch_index}" / category_name / filenames[image_index])
+        str(
+            Path("ground_truth")
+            / f"priors_batch_{priors_batch_index}"
+            / category_name
+            / Path(filenames[image_index]).name
+        )
         for image_index in range(len(images))
     ]
-    s = pipeline.get_state()
     visualizer(
-        images=s.target_images,
-        masks=s.masks,
+        images=target_images,
+        masks=results.masks,
         names=export_paths,
-        points=s.used_points,
+        points=results.used_points,
     )
     visualizer(
-        images=s.target_images,
-        masks=s.masks,
+        images=target_images,
+        masks=results.masks,
         names=export_paths_all_points,
-        points=visualizer.points_from_priors(s.priors),
+        points=visualizer.points_from_priors(results.priors),
     )
     gt_masks = visualizer.arrays_to_masks(masks)
     visualizer(
-        images=s.target_images,
+        images=target_images,
         masks=gt_masks,
         names=export_paths_gt,
     )
     metrics_calculators[priors_batch_index](
-        predictions=s.masks,
+        predictions=results.masks,
         references=gt_masks,
         mapping={0: category_name},
     )
@@ -313,7 +295,7 @@ def infer_all_images(
     return time_sum, time_count
 
 
-def predict_on_dataset(
+def predict_on_dataset(  # noqa: C901
     args: argparse.Namespace,
     pipeline: Pipeline,
     priors_dataset: Dataset,
@@ -349,7 +331,6 @@ def predict_on_dataset(
     print(f"Output path: {unique_output_path}")
 
     visualizer = ExportMaskVisualization(
-        state=pipeline.get_state(),
         output_folder=str(unique_output_path),
     )
     metrics_calculators: dict[int, SegmentationMetrics] = {}  # keep metrics per prior
@@ -366,6 +347,7 @@ def predict_on_dataset(
         TimeRemainingColumn(),
         TimeElapsedColumn(),
     )
+    cat_filter = get_filename_categories(dataset_filenames, dataset)
 
     with progress:
         # Main task for categories (persistent)
@@ -374,6 +356,8 @@ def predict_on_dataset(
         # Iterate over all categories in the dataset
         for category_index, batches in enumerate(dataset):
             category_name = dataset.category_index_to_name(category_index)
+            if cat_filter is not None and category_name not in cat_filter:
+                continue  # skip this category because it is filtered
 
             priors_cat_index = priors_dataset.category_name_to_index(category_name)
 
@@ -385,10 +369,7 @@ def predict_on_dataset(
             for priors_batch_index, (priors_images, priors_masks) in enumerate(priors_iter):
                 # Add a new metrics calculator if needed
                 if priors_batch_index not in metrics_calculators:
-                    metrics_calculators[priors_batch_index] = SegmentationMetrics(
-                        state=pipeline.get_state(),
-                        categories=dataset.get_categories(),
-                    )
+                    metrics_calculators[priors_batch_index] = SegmentationMetrics(categories=dataset.get_categories())
 
                 # Select priors
                 priors_images2, priors_masks2 = get_all_instances(
@@ -418,10 +399,10 @@ def predict_on_dataset(
                     for image_index in range(len(priors_images2))
                 ]
                 masks_priors = visualizer.masks_from_priors(
-                    pipeline.get_state().reference_priors,
+                    reference_priors,
                 )
                 visualizer(
-                    images=pipeline.get_state().reference_images,
+                    images=priors_images2,
                     masks=masks_priors,
                     names=priors_export_paths,
                 )
@@ -534,9 +515,8 @@ def main() -> None:
                         output_path / args.experiment_name / f"{dataset_name}_{backbone_name}_{pipeline_name}"
                     )
                 elif args.dataset_filenames is not None:
-                    unique_output_path = (
-                        output_path / f"{dataset_name}_{backbone_name}_{pipeline_name}_{args.dataset_filenames}"
-                    )
+                    fn_str = f"{args.dataset_filenames}".replace("/", "_")
+                    unique_output_path = output_path / f"{dataset_name}_{backbone_name}_{pipeline_name}_{fn_str}"
                 else:
                     unique_output_path = output_path / f"{dataset_name}_{backbone_name}_{pipeline_name}"
 

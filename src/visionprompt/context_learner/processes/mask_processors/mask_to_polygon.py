@@ -14,14 +14,17 @@ from visionprompt.context_learner.types import Annotations, Masks
 class MasksToPolygons(MaskProcessor):
     """This class converts a list of masks to a list of annotations (polygons)."""
 
-    def __call__(self, masks: list[Masks]) -> list[Annotations]:
+    def __init__(self) -> None:
+        super().__init__()
+
+    def __call__(self, masks: list[Masks] | None = None) -> list[Annotations]:
         """Convert a list of masks to a list of annotations (polygons)."""
         annotations_list = []
 
         for mask_obj in masks:
             annotation = Annotations()
 
-            for class_id in mask_obj._data:
+            for class_id in mask_obj.data:
                 instance_masks = mask_obj.data[class_id].cpu().numpy()
 
                 for instance_idx in range(len(instance_masks)):

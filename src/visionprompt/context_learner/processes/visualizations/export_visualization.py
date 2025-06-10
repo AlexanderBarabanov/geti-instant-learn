@@ -1,7 +1,7 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-import os
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -9,22 +9,24 @@ import numpy as np
 from visionprompt.context_learner.processes.visualizations.visualization_base import (
     Visualization,
 )
-from visionprompt.context_learner.types import Image, Masks, Points, State
+from visionprompt.context_learner.types import Image, Masks, Points
 from visionprompt.utils.utils import get_colors
 
 
 class ExportMaskVisualization(Visualization):
-    def __init__(self, state: State, output_folder: str) -> None:
-        super().__init__(state)
+    """The class exports the images for visualization."""
+
+    def __init__(self, output_folder: str) -> None:
+        super().__init__()
         self.output_folder = output_folder
 
     @staticmethod
     def create_overlay(
         image: np.ndarray,
         masks: np.ndarray,
-        points=None,
-        scores=None,
-        types=None,
+        points: list[Points] | None = None,
+        scores: list[float] | None = None,
+        types: list[int] | None = None,
     ) -> np.ndarray:
         """Save a visualization of the segmentation mask overlaid on the image.
 
@@ -32,7 +34,7 @@ class ExportMaskVisualization(Visualization):
             image: RGB image as numpy array
             masks: Segmentation mask object with containing instance masks
             points: Optional points to visualize
-            scores: Optional confidence scores for the points\
+            scores: Optional confidence scores for the points
             types: The type of point (usually, 0 for background, 1 for foreground)
         """
         image_vis = image.copy()
@@ -75,12 +77,26 @@ class ExportMaskVisualization(Visualization):
 
     def __call__(
         self,
-        images: list[Image],
-        masks: list[Masks],
-        names: list[str],
+        images: list[Image] | None = None,
+        masks: list[Masks] | None = None,
+        names: list[str] | None = None,
         points: list[Points] | None = None,
-    ):
+    ) -> None:
+        """This method exports the visualization images.
+
+        Args:
+            images: List of input images
+            masks: List of input masks
+            names: List of filenames
+            points: List of points to visualize
+        """
         # Generate overlay
+        if names is None:
+            names = []
+        if masks is None:
+            masks = []
+        if images is None:
+            images = []
         for i in range(len(images)):
             # Get correct datas
             masks_per_class = masks[i]
@@ -88,8 +104,8 @@ class ExportMaskVisualization(Visualization):
             image_np = images[i].to_numpy()
             name = names[i]
 
-            output_filename = os.path.join(self.output_folder, name)
-            os.makedirs(os.path.dirname(output_filename), exist_ok=True)
+            output_filename = Path(self.output_folder) / name
+            Path.mkdir(Path(output_filename, parents=True).parent, exist_ok=True, parents=True)
 
             if len(masks_per_class.class_ids()) > 1:
                 msg = "Multiple class masks not supported yet."

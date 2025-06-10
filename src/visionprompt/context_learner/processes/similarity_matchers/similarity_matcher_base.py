@@ -1,6 +1,6 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
-
+from abc import abstractmethod
 
 import torch
 import torch.nn.functional as F
@@ -13,11 +13,8 @@ from visionprompt.context_learner.types.similarities import Similarities
 class SimilarityMatcher(Process):
     """This class calculates the (cosine) similarities between reference features and target features."""
 
-    def __call__(
-        self,
-        reference_features: list[Features],
-        target_features: list[Features],
-    ) -> list[Similarities]:
+    @abstractmethod
+    def __call__(self, reference_features: list[Features], target_features: list[Features]) -> list[Similarities]:
         """This method calculates the similarities between reference features and target features.
 
         Args:
@@ -28,20 +25,15 @@ class SimilarityMatcher(Process):
             A list of similarities per target_features.
             Note: the number of elements in output list is usually the same as
                 the number of items in the target_features list.
-
-        Examples:
-            >>> from visionprompt.context_learner.types.state import State
-            >>> state = State()
-            >>> sim = SimilarityMatcher(state=state)
-            >>> r = sim([Features()], [Features()])
         """
-        return [Similarities()]
 
+    @staticmethod
     def _resize_similarities(
-        self,
         similarities: torch.Tensor,
         original_image_size: tuple[int, int],
         embedding_shape: tuple[int, int],
+        encoder_input_size: int,
+        encoder_patch_size: int,
         transformed_image_size: tuple[int, int] | None = None,
     ) -> torch.Tensor:
         """This function resizes the similarities to the target image size while removing padding.
@@ -50,6 +42,8 @@ class SimilarityMatcher(Process):
             similarities: torch.Tensor The similarities to resize
             transformed_image_size: tuple[int, int] The size of the transformed image
             original_image_size: tuple[int, int] The size of the original image
+            encoder_input_size: int The size of the encoder input
+            encoder_patch_size: int The size of the encoder patches
             embedding_shape: tuple[int, int] The shape of the embedding
 
         Returns:
@@ -65,7 +59,7 @@ class SimilarityMatcher(Process):
             # resize the similarities to the target image size
             similarities = F.interpolate(
                 similarities,
-                size=self._state.encoder_input_size,
+                size=encoder_input_size,
                 mode="bilinear",
                 align_corners=False,
             )
@@ -85,8 +79,8 @@ class SimilarityMatcher(Process):
         else:
             similarities = similarities.reshape(
                 similarities.shape[0],
-                self._state.encoder_input_size // self._state.encoder_patch_size,
-                self._state.encoder_input_size // self._state.encoder_patch_size,
+                encoder_input_size // encoder_patch_size,
+                encoder_input_size // encoder_patch_size,
             ).unsqueeze(0)
             similarities = F.interpolate(
                 similarities,

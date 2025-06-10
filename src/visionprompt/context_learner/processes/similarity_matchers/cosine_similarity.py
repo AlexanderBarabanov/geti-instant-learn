@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
+from src.visionprompt.context_learner.types.image import Image
+
 from visionprompt.context_learner.processes.similarity_matchers.similarity_matcher_base import (
     SimilarityMatcher,
 )
@@ -9,12 +11,18 @@ from visionprompt.context_learner.types import Features, Similarities
 
 
 class CosineSimilarity(SimilarityMatcher):
-    """This class computes the cosine similarity between the reference features and the target features."""
+    """This class computes the cosine similarity."""
+
+    def __init__(self, encoder_input_size: int, encoder_patch_size: int) -> None:
+        super().__init__()
+        self.encoder_input_size = encoder_input_size
+        self.encoder_patch_size = encoder_patch_size
 
     def __call__(
         self,
         reference_features: list[Features],
         target_features: list[Features],
+        target_images: list[Image] | None = None,
     ) -> list[Similarities]:
         """This function computes the cosine similarity between the reference features and the target features.
 
@@ -24,6 +32,7 @@ class CosineSimilarity(SimilarityMatcher):
         Args:
             reference_features: List[Features] List of reference features, one per prior image instance
             target_features: List[Features] List of target features, one per target image instance
+            target_images: List[Image] List of target images
 
         Returns:
             List[Similarities] List of similarities, one per target image instance which are resized to
@@ -37,8 +46,8 @@ class CosineSimilarity(SimilarityMatcher):
                 keepdim=True,
             )
             embedding_shape = target.global_features_shape
-            original_image_size = self._state.target_images[i].size
-            transformed_image_size = self._state.target_images[i].transformed_size
+            original_image_size = target_images[i].size
+            transformed_image_size = target_images[i].transformed_size
 
             # reshape from (encoder_shape, encoder_shape, embed_dim)
             # to (encoder_shape*encoder_shape, embed_dim) if necessary
@@ -61,6 +70,8 @@ class CosineSimilarity(SimilarityMatcher):
                         transformed_image_size=transformed_image_size,
                         original_image_size=original_image_size,
                         embedding_shape=embedding_shape,
+                        encoder_input_size=self.encoder_input_size,
+                        encoder_patch_size=self.encoder_patch_size,
                     )
 
                     all_similarities.add(

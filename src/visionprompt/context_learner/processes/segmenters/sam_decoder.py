@@ -11,7 +11,7 @@ import torch
 import torch.nn.functional as F
 
 from visionprompt.context_learner.processes.segmenters.segmenter_base import Segmenter
-from visionprompt.context_learner.types import Image, Masks, Points, Priors, State
+from visionprompt.context_learner.types import Image, Masks, Points, Priors
 from visionprompt.context_learner.types.similarities import Similarities
 from visionprompt.third_party.PersonalizeSAM.per_segment_anything.predictor import SamPredictor
 
@@ -21,7 +21,6 @@ class SamDecoder(Segmenter):
 
     def __init__(
         self,
-        state: State,
         sam_predictor: SamPredictor,
         apply_mask_refinement: bool = False,
         target_guided_attention: bool = False,
@@ -33,7 +32,6 @@ class SamDecoder(Segmenter):
         The resulting masks are then filtered based on the average similarity of that mask.
 
         Args:
-            state: State the pipeline state object
             sam_predictor: SamPredictor the SAM predictor
             apply_mask_refinement: bool whether to apply mask refinement
             target_guided_attention: bool whether to use target guided attention, TODO: not implemented yet
@@ -41,7 +39,7 @@ class SamDecoder(Segmenter):
             skip_points_in_existing_masks: bool whether to skip points that fall within already generated masks
               for the same class
         """
-        super().__init__(state)
+        super().__init__()
         self.predictor = sam_predictor
         self.apply_mask_refinement = apply_mask_refinement
         self.target_guided_attention = target_guided_attention
@@ -54,7 +52,7 @@ class SamDecoder(Segmenter):
     def __call__(
         self,
         images: list[Image],
-        priors: list[Priors],
+        priors: list[Priors] | None = None,
         similarities: list[Similarities] | None = None,
     ) -> tuple[list[Masks], list[Points]]:
         """Create masks from priors using SAM.
@@ -91,10 +89,10 @@ class SamDecoder(Segmenter):
 
         return masks_per_image, points_per_image
 
-    def _predict_by_individual_point(
+    def _predict_by_individual_point(  # noqa: C901
         self,
         image: Image,
-        points: Points,
+        all_image_points: Points,
         similarities: Similarities | None = None,
         image_id: int = 0,
     ) -> tuple[Masks, Points]:
@@ -102,7 +100,7 @@ class SamDecoder(Segmenter):
 
         Args:
             image: The image to predict masks from.
-            points: The points to predict masks from.
+            all_image_points: The points to predict masks from.
             similarities: Optional similarities.
             image_id: ID to identify which image is being processed.
 
@@ -113,7 +111,7 @@ class SamDecoder(Segmenter):
         all_used_points = Points()
 
         self.predictor.set_image(image.data)
-        for class_id, points_per_map in points.data.items():  # noqa: PLR1702
+        for class_id, points_per_map in all_image_points.data.items():  # noqa: PLR1702
             # iterate over each point list of each similarity map
             for points in points_per_map:
                 if len(points) == 0:
@@ -122,7 +120,8 @@ class SamDecoder(Segmenter):
                     continue
 
                 points_used = []
-                # point list is of shape (n, 4), each item is (x, y, score, label), label is 1 for foreground and 0 for background
+                # point list is of shape (n, 4), each item is (x, y, score, label), label is 1
+                # for foreground and 0 for background
                 background_points = points[points[:, 3] == 0].cpu().numpy()
                 foreground_points = points[points[:, 3] == 1].cpu().numpy()
 
@@ -159,7 +158,6 @@ class SamDecoder(Segmenter):
                         point_coords=point_coords,
                         point_labels=point_labels,
                         multimask_output=False,
-                        # TODO target guided attention and target-semantic prompting
                     )
 
                     if not self.apply_mask_refinement:

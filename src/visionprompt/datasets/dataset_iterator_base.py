@@ -14,7 +14,8 @@ class DatasetIter(Sized, Iterable):
         parent: Parent dataset
     """
 
-    def __init__(self, parent: "Dataset") -> None:  # noqa: F821
+    def __init__(self, parent: "Dataset", *args, **kwargs) -> None:  # noqa: F821
+        super().__init__(*args, **kwargs)
         self._parent = parent
 
     def __len__(self) -> int:

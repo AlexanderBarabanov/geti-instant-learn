@@ -6,34 +6,49 @@ import torch
 from scipy.optimize import linear_sum_assignment
 from torch.nn import functional as F
 
-from visionprompt.context_learner.processes.prompt_generators.prompt_generator_base import (
-    PromptGenerator,
-)
-from visionprompt.context_learner.types import Features, Masks, Priors, Similarities, State
+from visionprompt.context_learner.processes.prompt_generators.prompt_generator_base import FeaturePromptGenerator
+from visionprompt.context_learner.types import Features, Masks, Priors, Similarities
+from visionprompt.context_learner.types.image import Image
 
 
-class BidirectionalPromptGenerator(PromptGenerator):
-    """This class generates prompts for the segmenter based on the similarities between the reference and target images."""
+class BidirectionalPromptGenerator(FeaturePromptGenerator):
+    """This class generates prompts for the segmenter.
 
-    def __init__(self, state: State, num_background_points: int = 2) -> None:
-        super().__init__(state)
+    This is based on the similarities between the reference and target images.
+    """
+
+    def __init__(
+        self,
+        encoder_input_size: int,
+        encoder_patch_size: int,
+        encoder_feature_size: int,
+        num_background_points: int = 2,
+    ) -> None:
+        super().__init__()
+        self.encoder_input_size = encoder_input_size
         self.num_background_points = num_background_points
+        self.encoder_patch_size = encoder_patch_size
+        self.encoder_feature_size = encoder_feature_size
 
     def __call__(
         self,
-        reference_features: list[Features],
-        reference_masks: list[Masks],
-        target_features_list: list[Features],
-    ) -> list[Priors]:
-        """This generates prompt candidates (or priors) based on the similarities between the reference and target images.
+        reference_features: list[Features] | None = None,
+        target_features: list[Features] | None = None,
+        reference_masks: list[Masks] | None = None,
+        target_images: list[Image] | None = None,
+    ) -> tuple[list[Priors], list[Similarities]]:
+        """This generates prompt candidates (or priors) based on the similarities.
+
+        This is done between the reference and target images.
 
         It uses bidirectional matching to create prompts for the segmenter.
         This Prompt Generator computes the similarity map internally.
 
         Args:
             reference_features: List[Features] List of reference features, one per reference image instance
+            target_features: List[Features] List of target features, one per target image instance
             reference_masks: List[Masks] List of reference masks, one per reference image instance
-            target_features_list: List[Features] List of target features, one per target image instance
+            target_images: ListImage] The target images
 
         Returns:
             List[Priors] List of priors, one per target image instance
@@ -46,11 +61,12 @@ class BidirectionalPromptGenerator(PromptGenerator):
             reference_features.global_features.shape[-1],
         )
         reference_masks = self._merge_masks(reference_masks)
+        similarities_per_images = []
 
-        for i, target_features in enumerate(target_features_list):
+        for target_image_features, target_image in zip(target_features, target_images, strict=False):
             priors = Priors()
             similarities = Similarities()
-            similarity_map = flattened_global_features @ target_features.global_features.T
+            similarity_map = flattened_global_features @ target_image_features.global_features.T
 
             for class_id, mask in reference_masks.data.items():
                 # Construct local similarity map. This can later be used to filter out masks.
@@ -60,10 +76,10 @@ class BidirectionalPromptGenerator(PromptGenerator):
                 local_mean_reference_feature = local_mean_reference_feature / local_mean_reference_feature.norm(
                     dim=-1, keepdim=True
                 )
-                local_similarity_map = local_mean_reference_feature @ target_features.global_features.T
+                local_similarity_map = local_mean_reference_feature @ target_image_features.global_features.T
                 local_similarity_map = self._resize_similarity_map(
                     local_similarity_map,
-                    self._state.target_images[i].size,
+                    target_image.size,
                 )
                 similarities.add(local_similarity_map, class_id)
 
@@ -86,7 +102,7 @@ class BidirectionalPromptGenerator(PromptGenerator):
                     )
                     image_level_fg_points = self._transform_to_image_coordinates(
                         fg_points,
-                        original_image_size=self._state.target_images[i].size,
+                        original_image_size=target_image.size,
                     )
                     fg_point_labels = torch.ones(
                         (len(image_level_fg_points), 1),
@@ -108,7 +124,7 @@ class BidirectionalPromptGenerator(PromptGenerator):
                     )
                     image_level_bg_points = self._transform_to_image_coordinates(
                         bg_points,
-                        original_image_size=self._state.target_images[i].size,
+                        original_image_size=target_image.size,
                     )
                     bg_point_labels = torch.zeros(
                         (len(image_level_bg_points), 1),
@@ -124,11 +140,11 @@ class BidirectionalPromptGenerator(PromptGenerator):
 
                 priors.points.add(fg_bg_points, class_id)
             priors_per_image.append(priors)
-            self._state.similarities.append(similarities)
-        return priors_per_image
+            similarities_per_images.append(similarities)
+        return priors_per_image, similarities_per_images
 
+    @staticmethod
     def _perform_matching(
-        self,
         similarity_map: torch.Tensor,
         mask: torch.Tensor,
     ) -> tuple[list, torch.Tensor, list]:
@@ -253,32 +269,33 @@ class BidirectionalPromptGenerator(PromptGenerator):
         self,
         similarity_map: torch.Tensor,
         mask: torch.Tensor,
-    ) -> tuple[torch.Tensor | None, torch.Tensor | None]:
+    ) -> tuple[torch.Tensor | None, torch.Tensor | None, torch.Tensor | None]:
         """Select the N background points based on lowest average similarity to masked reference features.
 
         Args:
             similarity_map: torch.Tensor - Similarity matrix [num_ref_features, num_target_features]
             mask: torch.Tensor - Mask indicating relevant reference features [num_ref_features]
 
-        Returns:
-            tuple containing:
-                avg_sim_to_masked_ref: torch.Tensor[num_target_features] - Average similarity of each target feature
-                  to the masked reference features
-                bg_point_indices: torch.Tensor[N, 2] | None - Indices [ref_indices, target_indices] (relative to original map)
-                                                           or None if no points found.
-                bg_similarity_scores: torch.Tensor[N] | None - Similarity scores of background points or None.
+        Returns: tuple containing:
+
+        avg_sim_to_masked_ref: torch.Tensor[num_target_features] -
+        Average similarity of each target feature to the masked reference features.
+        bg_point_indices: torch.Tensor[N, 2] | None - Indices [ref_indices, target_indices] (
+        relative to original map) or None if no points found.
+        bg_similarity_scores: torch.Tensor[
+        N] | None - Similarity scores of background points or None.
         """
         masked_ref_indices = mask.flatten().nonzero(as_tuple=True)[0]
         if masked_ref_indices.numel() == 0:
-            return None, None
+            return None, None, None
 
         avg_sim_to_masked_ref = similarity_map[masked_ref_indices].mean(dim=0)
         if avg_sim_to_masked_ref.numel() == 0:
-            return None, None
+            return None, None, None
 
         k = min(self.num_background_points, avg_sim_to_masked_ref.numel())
         if k <= 0:
-            return None, None
+            return None, None, None
 
         bg_similarity_scores, bg_target_indices = torch.topk(
             avg_sim_to_masked_ref,
@@ -314,7 +331,7 @@ class BidirectionalPromptGenerator(PromptGenerator):
         target_indices = matched_indices[1]
 
         # Extract y and x coordinates from the target indices
-        feature_size = self._state.encoder_feature_size
+        feature_size = self.encoder_feature_size
         y_coords = target_indices // feature_size
         x_coords = target_indices % feature_size
 
@@ -350,8 +367,8 @@ class BidirectionalPromptGenerator(PromptGenerator):
             return torch.empty(0, 3, dtype=points.dtype, device=points.device)
 
         # Get encoder configuration from state
-        patch_size = self._state.encoder_patch_size
-        encoder_input_size = self._state.encoder_input_size
+        patch_size = self.encoder_patch_size
+        encoder_input_size = self.encoder_input_size
 
         # Convert feature grid coordinates to patch coordinates
         x_image = points[:, 0] * patch_size + patch_size // 2
@@ -374,7 +391,8 @@ class BidirectionalPromptGenerator(PromptGenerator):
             dim=1,
         )
 
-    def _merge_masks(self, reference_masks: list[Masks]) -> Masks:
+    @staticmethod
+    def _merge_masks(reference_masks: list[Masks]) -> Masks:
         """Merge the reference masks from multiple instances into a single Masks object.
 
         This is done by concatenating masks for the same class ID.
@@ -408,8 +426,8 @@ class BidirectionalPromptGenerator(PromptGenerator):
         """
         similarity_map = (
             similarity_map.reshape(
-                self._state.encoder_input_size // self._state.encoder_patch_size,
-                self._state.encoder_input_size // self._state.encoder_patch_size,
+                self.encoder_input_size // self.encoder_patch_size,
+                self.encoder_input_size // self.encoder_patch_size,
             )
             .unsqueeze(0)
             .unsqueeze(0)

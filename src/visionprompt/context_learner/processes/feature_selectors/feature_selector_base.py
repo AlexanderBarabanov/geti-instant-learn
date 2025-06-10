@@ -1,6 +1,6 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
-
+from abc import abstractmethod
 
 import torch
 
@@ -11,25 +11,19 @@ from visionprompt.context_learner.types import Features
 class FeatureSelector(Process):
     """This is the base class for feature selectors."""
 
-    def __call__(self, features: list[Features]) -> list[Features]:
+    @abstractmethod
+    def __call__(self, features_per_image: list[Features]) -> list[Features]:
         """This method merges features.
 
         This class has the same interface as the FeatureFilter() but,
-        is defined a process because it it an integral part of a pipeline flow.
+        is defined a process because it is an integral part of a pipeline flow.
 
         Args:
-            features: A list of features.
+            features_per_image: A list of features.
 
         Returns:
             A list of new features.
-
-        Examples:
-            >>> from visionprompt.context_learner.types.state import State
-            >>> state = State()
-            >>> select = FeatureSelector(state=state)
-            >>> r = select([Features()])
         """
-        return features
 
     @staticmethod
     def get_all_local_class_features(

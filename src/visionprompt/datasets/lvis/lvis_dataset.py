@@ -3,7 +3,7 @@
 
 import json
 import logging
-import pickle
+import pickle  # noqa: S403
 import shutil
 from collections import OrderedDict
 from pathlib import Path
@@ -131,7 +131,7 @@ class LVISImage(Image):
 
         if not Path(image_filename).exists():
             logging.info(f"Downloading {self.source_url}")
-            img_data = requests.get(self.source_url).content
+            img_data = requests.get(self.source_url, timeout=60).content
             Path(image_filename).parent.mkdir(parents=True, exist_ok=True)
             with Path(image_filename).open("wb") as handler:
                 handler.write(img_data)
@@ -273,16 +273,16 @@ class LVISDataset(Dataset):
         """
         return self._category_index_to_id[index]
 
-    def category_id_to_name(self, id: int) -> str:
+    def category_id_to_name(self, cat_id: int) -> str:
         """Get the category name.
 
         Args:
-            id: The category id
+            cat_id: The category id
 
         Returns:
             The category name
         """
-        return self._category_id_to_name[id]
+        return self._category_id_to_name[cat_id]
 
     def category_name_to_id(self, name: str) -> int:
         """Get the category id.
@@ -392,6 +392,22 @@ class LVISDataset(Dataset):
             masks[category_id] = np.max(masks[category_id], axis=0)
 
         return masks
+
+    def get_categories_of_image(self, index: int) -> list[str]:
+        """This method gets all categories presents on an image.
+
+        Args:
+            index: The image index
+
+        """
+        cats = []
+        image_id = self._image_index_to_id[self._name][index]
+        annotation_ids = self._image_to_annotations[self._name][image_id]
+        for annotation_id in annotation_ids:
+            annot = self._annotations[self._name][annotation_id]
+            name = self._category_id_to_name[annot.category_id]
+            cats.append(name)
+        return cats
 
     def get_images_by_category(
         self,
@@ -674,7 +690,7 @@ class LVISDataset(Dataset):
             filename: The filename of the metadata
         """
         with Path(filename).open("rb") as f:
-            data = pickle.load(f)
+            data = pickle.load(f)  # noqa: S301
             self._category_id_to_name = data["category_id_to_name"]
             self._category_name_to_id = data["category_name_to_id"]
             self.instance_count = data["instance_count"]
@@ -708,7 +724,7 @@ class LVISDataset(Dataset):
             filename: The filename of the data
         """
         with Path(filename).open("rb") as f:
-            data = pickle.load(f)
+            data = pickle.load(f)  # noqa: S301
             self._image_index_to_id = data["image_index_to_id"]
             self._images = data["images"]
             self._annotations = data["annotations"]
@@ -731,7 +747,7 @@ class LVISDataset(Dataset):
         if Path(self._cache_check_file).exists():
             identical = True
             with Path(self._cache_check_file).open("rb") as f:
-                data = pickle.load(f)
+                data = pickle.load(f)  # noqa: S301
                 identical = identical and data["whitelist"] == self._whitelist
         else:
             identical = False
@@ -767,12 +783,12 @@ def test_index_iter() -> None:
         # Generate and save overlays
         for category_id, mask in masks.items():
             overlay = color_overlay(image, mask)
-            cat = dataset._category_id_to_name[category_id]
+            cat = dataset.category_id_to_name(category_id)
             output_folder = Path(dataset.get_root_path(), "overlays", cat)
             orig_filename = Path(dataset.get_image_filename(image_index)).stem
             output_folder.mkdir(parents=True, exist_ok=True)
             cv2.imwrite(
-                output_folder / f"{orig_filename}_{cat}.jpg",
+                str(Path(output_folder) / f"{orig_filename}_{cat}.jpg"),
                 overlay,
             )
 
@@ -791,12 +807,12 @@ def test_category_iter() -> None:
         for image_index, (image, mask) in enumerate(zip(images, masks, strict=False)):
             # Generate and save overlays
             overlay = color_overlay(image, mask)
-            cat = dataset._category_id_to_name[dataset._category_index_to_id[category_index]]
+            cat = dataset.category_id_to_name(dataset.category_index_to_id(category_index))
             output_folder = Path(dataset.get_root_path(), "overlays", cat)
             orig_filename = Path(dataset.get_image_filename_in_category(category_index, image_index)).stem
             output_folder.mkdir(parents=True, exist_ok=True)
             cv2.imwrite(
-                output_folder / f"{orig_filename}_{cat}.jpg",
+                str(Path(output_folder) / f"{orig_filename}_{cat}.jpg"),
                 overlay,
             )
 

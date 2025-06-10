@@ -11,4 +11,3 @@ class FeatureFilterBase(Filter):
 
     def __call__(self, features: list[Features]) -> list[Features]:
         """Filter the features."""
-        return features

@@ -7,24 +7,27 @@ import torch
 from torch.nn import functional as F
 
 from visionprompt.context_learner.processes.encoders.encoder_base import Encoder
-from visionprompt.context_learner.types import Features, Image, Masks, Priors, State
+from visionprompt.context_learner.types import Features, Image, Masks, Priors
 from visionprompt.third_party.Matcher.segment_anything.predictor import SamPredictor
 
 
 class SamEncoder(Encoder):
-    """This encoder extracts features from images using a SAM model. It can be used to extract reference/local features."""
+    """This encoder extracts features from images using a SAM model.
 
-    def __init__(self, state: State, sam_predictor: SamPredictor) -> None:
-        super().__init__(state)
+    It can be used to extract reference/local features.
+    """
+
+    def __init__(self, sam_predictor: SamPredictor) -> None:
+        super().__init__()
         self.predictor: SamPredictor = sam_predictor
         if hasattr(self.predictor.model.image_encoder, "img_size"):
-            self._state.encoder_input_size = self.predictor.model.image_encoder.img_size
+            self.encoder_input_size = self.predictor.model.image_encoder.img_size
         else:
-            self._state.encoder_input_size = self.predictor.model.image_size
+            self.encoder_input_size = self.predictor.model.image_size
 
     def __call__(
         self,
-        images: list[Image],
+        images: list[Image] | None = None,
         priors_per_image: list[Priors] | None = None,
     ) -> tuple[list[Features], list[Masks]]:
         """This method creates an embedding from the images.
@@ -80,7 +83,9 @@ class SamEncoder(Encoder):
         features: Features,
         masks_per_class: Masks,
     ) -> tuple[Features, Masks]:
-        """This method extracts the local features from the image by only keeping the features that are inside the masks.
+        """This method extracts the local features from the image.
+
+        This only keeping the features that are inside the masks.
 
         Args:
             features: The features to extract the local features from.
@@ -95,8 +100,6 @@ class SamEncoder(Encoder):
             # perform per mask as the current predictor does not support batches
             masks: torch.Tensor  # 3D tensor with n_masks x H x W
             for mask in masks:
-                #  TODO(Daankrol): EfficientViT-SAM does not support apply_image.
-                #      We need to apply the transform manually.
                 input_mask = self.predictor.transform.apply_image(
                     mask.numpy().astype(np.uint8) * 255,
                 )

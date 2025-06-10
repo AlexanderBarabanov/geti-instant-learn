@@ -1,29 +1,22 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
-
+from abc import abstractmethod
 
 from visionprompt.context_learner.processes import Process
-from visionprompt.context_learner.types import Image, Masks, Priors
+from visionprompt.context_learner.types import Image, Masks
 
 
 class Segmenter(Process):
-    """This class extracts segmentation masks from priors."""
+    """This class extracts segmentation masks."""
 
-    def __call__(self, images: list[Image], priors: list[Priors]) -> list[Masks]:
-        """This method extracts priors from similarities.
+    @abstractmethod
+    def __call__(self, images: list[Image]) -> list[Masks]:
+        """This method extracts segmentation masks.
 
         Args:
             images: The images to segment.
-            priors: The priors that are used for segmenting.
 
         Returns:
             Segmentation masks.
 
-        Examples:
-            >>> from visionprompt.context_learner.types.state import State
-            >>> from visionprompt.context_learner.types.image import Image
-            >>> state = State()
-            >>> segment = Segmenter(state=state)
-            >>> r = segment([Image()], [Priors()])
         """
-        return [Masks()]

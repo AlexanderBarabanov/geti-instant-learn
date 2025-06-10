@@ -11,4 +11,3 @@ class AnnotationFilter(Filter):
 
     def __call__(self, annotations: list[Annotations]) -> list[Annotations]:
         """Filter the annotations."""
-        return annotations

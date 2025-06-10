@@ -1,7 +1,7 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-from typing import Any, BinaryIO
+from typing import BinaryIO
 
 
 class Data:
@@ -10,13 +10,9 @@ class Data:
     It provides a way to save and load the data to and from a file.
     """
 
-    def __init__(self, data: Any) -> None:
-        """Initialize the data.
-
-        Args:
-            data: The data to initialize the object with.
-        """
-        self._data = data
+    def __init__(self) -> None:
+        """Initialize the data."""
+        self._data = None
 
     @property
     def shape(self) -> tuple[int, ...]:
@@ -24,7 +20,7 @@ class Data:
         return self._data.shape
 
     @property
-    def data(self) -> Any:
+    def data(self) -> None:
         """Get the data."""
         return self._data
 

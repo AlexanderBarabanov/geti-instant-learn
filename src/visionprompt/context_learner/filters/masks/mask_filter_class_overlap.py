@@ -12,10 +12,10 @@ from visionprompt.context_learner.types import Masks, Points
 class ClassOverlapMaskFilter(MaskFilter):
     """This filter inspects overlapping areas between different label masks."""
 
-    def __call__(
+    def __call__(  # noqa: C901
         self,
-        masks_per_image: list[Masks],
-        used_points_per_image: list[Points],
+        masks_per_image: list[Masks] | None = None,
+        used_points_per_image: list[Points] | None = None,
         threshold_iou: float = 0.8,
     ) -> list[Masks]:
         """Inspect overlapping areas between different label masks.
@@ -28,6 +28,10 @@ class ClassOverlapMaskFilter(MaskFilter):
         Returns:
             List of masks per image
         """
+        if used_points_per_image is None:
+            used_points_per_image = []
+        if masks_per_image is None:
+            masks_per_image = []
         for image_masks, image_used_points in zip(masks_per_image, used_points_per_image, strict=False):
             for (label, masks), (other_label, other_masks) in product(
                 image_masks.data.items(), image_masks.data.items()

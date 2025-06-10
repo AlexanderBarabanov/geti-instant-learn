@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-import os
 import zipfile
 from abc import ABC
 from collections.abc import Iterable, Iterator
+from pathlib import Path
 from typing import NoReturn
 
 import numpy as np
@@ -57,7 +57,7 @@ class Image:
         raise NotImplementedError
 
 
-class Dataset(torch.utils.data.Dataset, Iterable, ABC):
+class Dataset(torch.utils.data.Dataset, Iterable, ABC):  # noqa: PLR0904
     """Dataset class.
 
     Args:
@@ -103,6 +103,15 @@ class Dataset(torch.utils.data.Dataset, Iterable, ABC):
 
         Returns:
             A dict of masks per category.
+        """
+        raise NotImplementedError
+
+    def get_categories_of_image(self, index: int) -> list[str]:
+        """This method gets all categories presents on an image.
+
+        Args:
+            index: The image index
+
         """
         raise NotImplementedError
 
@@ -211,7 +220,7 @@ class Dataset(torch.utils.data.Dataset, Iterable, ABC):
         """Return the category id given the category index."""
         raise NotImplementedError
 
-    def category_id_to_name(self, id: int) -> str:
+    def category_id_to_name(self, cat_id: int) -> str:
         """Return the category name given a category id."""
         raise NotImplementedError
 
@@ -230,14 +239,14 @@ class Dataset(torch.utils.data.Dataset, Iterable, ABC):
     @staticmethod
     def _download(source: str, destination: str) -> None:
         """Helper function to download data with caching."""
-        if os.path.isfile(destination):
+        if Path(destination).is_file():
             logging.info(f"Using cached downloaded file {destination}")
             return
         logging.info(f"Downloading data from {source} to {destination}...")
 
-        response = requests.get(source)
+        response = requests.get(source, timeout=60)
         if response.status_code == 200:
-            with open(destination, "wb") as file:
+            with Path(destination).open("wb") as file:
                 file.write(response.content)
             logging.info(f"Downloaded {source} to {destination}")
         else:
@@ -246,12 +255,12 @@ class Dataset(torch.utils.data.Dataset, Iterable, ABC):
     @staticmethod
     def _unzip(source: str, destination: str) -> None:
         """Helper function to unzip data with caching."""
-        if os.path.isfile(destination) or os.path.isdir(destination):
+        if Path(destination).exists():
             logging.info(f"Using cached unzipped file or folder {destination}")
             return
 
         with zipfile.ZipFile(source, "r") as zf:
-            zf.extractall(os.path.dirname(source))
+            zf.extractall(Path(source).parent)
 
         logging.info(f"Unzipped {source} to {destination}")
 
@@ -273,9 +282,10 @@ class Dataset(torch.utils.data.Dataset, Iterable, ABC):
         """
         return self._iterator_type(parent=self, **self._iterator_kwargs)
 
-    def __get_item__(self, index: int):
-        """get_item is implemented for compatibility with torch's Dataset. What an item exactly
-            entails is determined by the iterator.
+    def __getitem__(self, index: int) -> tuple:
+        """get_item is implemented for compatibility with torch's Dataset.
+
+        What an item exactly entails is determined by the iterator.
 
         Args:
             index: The index to retrieve.
