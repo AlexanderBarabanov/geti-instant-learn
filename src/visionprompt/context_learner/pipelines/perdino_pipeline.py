@@ -3,6 +3,8 @@
 
 from typing import TYPE_CHECKING
 
+import torch
+
 from visionprompt.context_learner.filters.masks import ClassOverlapMaskFilter, MaskFilter
 from visionprompt.context_learner.filters.priors.max_point_filter import MaxPointFilter
 from visionprompt.context_learner.pipelines.pipeline_base import Pipeline
@@ -23,9 +25,11 @@ from visionprompt.context_learner.processes.similarity_matchers import (
 from visionprompt.context_learner.types import Image, Priors
 from visionprompt.context_learner.types.results import Results
 from visionprompt.third_party.Matcher.segment_anything import SamPredictor
+from visionprompt.utils.decorators import track_duration
 
 if TYPE_CHECKING:
     from visionprompt.context_learner.filters.priors.prior_filter_base import PriorFilter
+    from visionprompt.context_learner.processes.prompt_generators.prompt_generator_base import PromptGenerator
 
 
 class PerDino(Pipeline):
@@ -41,19 +45,41 @@ class PerDino(Pipeline):
         num_background_points: int,
         apply_mask_refinement: bool,
         skip_points_in_existing_masks: bool,
+        num_grid_cells: int,
         similarity_threshold: float,
-        mask_similarity_threshold: float,
+        mask_similarity_threshold: float | None,
+        precision: torch.dtype,
+        compile_models: bool,
+        verbose: bool,
+        image_size: int | tuple[int, int] | None = None,
     ) -> None:
-        super().__init__()
+        """Initialize the PerDino pipeline.
 
-        self.encoder: Encoder = DinoEncoder()
-        self.feature_selector: FeatureSelector = AverageFeatures()
-        self.similarity_matcher: SimilarityMatcher = CosineSimilarity(
-            encoder_input_size=self.encoder.encoder_input_size, encoder_patch_size=self.encoder.patch_size
+        Args:
+            sam_predictor: The SAM predictor to use.
+            num_foreground_points: The number of foreground points to use.
+            num_background_points: The number of background points to use.
+            apply_mask_refinement: Whether to apply mask refinement.
+            skip_points_in_existing_masks: Whether to skip points in existing masks.
+            num_grid_cells: The number of grid cells to use.
+            similarity_threshold: The similarity threshold for the similarity matcher.
+            mask_similarity_threshold: The similarity threshold for the mask.
+            precision: The precision to use for the model.
+            compile_models: Whether to compile the models.
+            verbose: Whether to print verbose output of the model optimization process.
+            image_size: The size of the image to use, if None, the image will not be resized.
+        """
+        super().__init__(image_size=image_size)
+
+        self.encoder: Encoder = DinoEncoder(
+            precision=precision,
+            compile_models=compile_models,
+            verbose=verbose,
         )
-        self.prompt_generator: GridPromptGenerator = GridPromptGenerator(
-            encoder_input_size=self.encoder.encoder_input_size,
-            downsizing=32,
+        self.feature_selector: FeatureSelector = AverageFeatures()
+        self.similarity_matcher: SimilarityMatcher = CosineSimilarity()
+        self.prompt_generator: PromptGenerator = GridPromptGenerator(
+            num_grid_cells=num_grid_cells,
             similarity_threshold=similarity_threshold,
             num_bg_points=num_background_points,
         )
@@ -70,8 +96,12 @@ class PerDino(Pipeline):
         self.class_overlap_mask_filter: MaskFilter = ClassOverlapMaskFilter()
         self.reference_features = None
 
+    @track_duration
     def learn(self, reference_images: list[Image], reference_priors: list[Priors]) -> Results:
         """Perform learning step on the reference images and priors."""
+        reference_images = self.resize_images(reference_images)
+        reference_priors = self.resize_masks(reference_priors)
+
         # Start running the pipeline
         reference_features, _ = self.encoder(
             reference_images,
@@ -80,8 +110,11 @@ class PerDino(Pipeline):
         self.reference_features = self.feature_selector(reference_features)
         return Results()
 
+    @track_duration
     def infer(self, target_images: list[Image]) -> Results:
         """Perform inference step on the target images."""
+        target_images = self.resize_images(target_images)
+
         # Start running the pipeline
         target_features, _ = self.encoder(target_images)
         similarities = self.similarity_matcher(self.reference_features, target_features, target_images)
@@ -97,4 +130,5 @@ class PerDino(Pipeline):
         results.used_points = used_points
         results.masks = masks
         results.annotations = annotations
+        results.similarities = similarities
         return results

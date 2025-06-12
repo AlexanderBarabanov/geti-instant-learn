@@ -99,7 +99,7 @@ class SamMAPIEncoder(Encoder):
         """
         self.predictor.set_image(image.data)
         # save the size after preprocessing for later use
-        image.transformed_size = self.predictor.input_size
+        image.sam_preprocessed_size = self.predictor.input_size
         embedding = self.predictor.get_image_embedding().squeeze().permute(1, 2, 0)
         return F.normalize(embedding, p=2, dim=-1)
 

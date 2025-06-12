@@ -16,7 +16,7 @@ from PIL import Image as PILImage
 
 from visionprompt.datasets.dataset_base import Annotation, Dataset, DatasetIter, Image
 from visionprompt.datasets.dataset_iterators import CategoryIter, IndexIter
-from visionprompt.utils.utils import color_overlay
+from visionprompt.utils import color_overlay
 
 
 def segment_to_mask(segment: list[float], height: int, width: int) -> np.ndarray:

@@ -2,26 +2,37 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import argparse
-import logging
 import shutil
-import sys
-import time
+import warnings
 from pathlib import Path
+
+warnings.filterwarnings("ignore", category=UserWarning)
+
+from logging import getLogger
 
 import cv2
 import numpy as np
 import pandas as pd
-from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn, TimeRemainingColumn
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
 
 from visionprompt.context_learner.pipelines import Pipeline
 from visionprompt.context_learner.processes.calculators import SegmentationMetrics
 from visionprompt.context_learner.processes.visualizations import ExportMaskVisualization
 from visionprompt.context_learner.types import Image, Masks, Priors
 from visionprompt.datasets import BatchedSingleCategoryIter, Dataset
-from visionprompt.utils.args import get_arguments
+from visionprompt.utils import setup_logger
+from visionprompt.utils.args import get_arguments, parse_experiment_args
 from visionprompt.utils.data import get_filename_categories, get_image_and_mask_from_filename, load_dataset
 from visionprompt.utils.models import load_pipeline
-from visionprompt.utils.utils import parse_experiment_args
+
+logger = getLogger("Vision Prompt")
 
 
 def handle_output_path(output_path: str, overwrite: bool) -> str:
@@ -107,6 +118,7 @@ def infer_all_batches(
     metrics_calculators: dict[int, SegmentationMetrics],
     number_of_batches: int,
     progress: Progress,
+    image_size: tuple[int, int] | None = None,
 ) -> tuple[int, int]:
     """This performs an inference run on all batches.
 
@@ -119,6 +131,7 @@ def infer_all_batches(
         metrics_calculators: The calculator for the metrics
         number_of_batches: The number of batches.
         progress: The progress bar
+        image_size: The size of the images to resize to
 
     Returns:
         The number of samples that were processed and the total time it took.
@@ -133,9 +146,8 @@ def infer_all_batches(
     time_count = 0
     for batch_index, (images, masks) in enumerate(batches):
         target_images = [Image(image) for image in images]
-        start_time = time.time()
         results = pipeline.infer(target_images=target_images)
-        time_sum += time.time() - start_time
+        time_sum += results.duration
         time_count += len(images)
 
         # Generate names for exported files and export them
@@ -179,6 +191,8 @@ def infer_all_batches(
             points=visualizer.points_from_priors(results.priors),
         )
         gt_masks = visualizer.arrays_to_masks(masks)
+        # resize masks to target image size
+        gt_masks = [mask.resize(image_size) for mask in gt_masks]
         visualizer(
             images=target_images,
             masks=gt_masks,
@@ -234,9 +248,8 @@ def infer_all_images(
         masks.append(mask)
 
     target_images = [Image(image) for image in images]
-    start_time = time.time()
     results = pipeline.infer(target_images=target_images)
-    time_sum += time.time() - start_time
+    time_sum += results.duration
     time_count += len(images)
 
     # Generate names for exported files and export them
@@ -307,6 +320,7 @@ def predict_on_dataset(  # noqa: C901
     number_of_priors_tests: int,
     number_of_batches: int | None,
     dataset_filenames: list[str] | None,
+    image_size: tuple[int, int] | None = None,
 ) -> pd.DataFrame:
     """This runs predictions on the dataset and evaluates them.
 
@@ -323,12 +337,13 @@ def predict_on_dataset(  # noqa: C901
         number_of_batches: The number of batches per class to process (limited testing)
             pass None to process all data
         dataset_filenames: Only do inference on these images
+        image_size: The size of the images to resize to
     Returns: The timing
 
     """
     unique_output_str = handle_output_path(unique_output, args.overwrite)
     unique_output_path = Path(unique_output_str)
-    print(f"Output path: {unique_output_path}")
+    logger.info(f"Output path: {unique_output_path}")
 
     visualizer = ExportMaskVisualization(
         output_folder=str(unique_output_path),
@@ -384,7 +399,7 @@ def predict_on_dataset(  # noqa: C901
                     pipeline.learn(reference_images=priors_images2, reference_priors=reference_priors)
                     progress.update(priors_task, advance=1)
                 except ValueError as e:
-                    print(e)
+                    logger.exception(e)
                     progress.update(priors_task, advance=1)
                     continue
 
@@ -417,6 +432,7 @@ def predict_on_dataset(  # noqa: C901
                         metrics_calculators=metrics_calculators,
                         number_of_batches=number_of_batches,
                         progress=progress,
+                        image_size=image_size,
                     )
                 else:
                     # Infer on a single image
@@ -445,7 +461,7 @@ def predict_on_dataset(  # noqa: C901
         metrics = calculator.get_metrics()
         ln = len(metrics["category"])
         metrics["prior_index"] = [prior_index] * ln
-        metrics["inference_time"] = [time_count / time_sum] * ln
+        metrics["inference_time"] = [time_sum / time_count] * ln
         metrics["images_per_category"] = [
             dataset.get_image_count_per_category(cat_name) for cat_name in metrics["category"]
         ]
@@ -461,20 +477,7 @@ def predict_on_dataset(  # noqa: C901
             for key in all_metrics:
                 all_metrics[key].extend(metrics[key])
 
-    # Create DataFrame for output
-    all_metrics_df = pd.DataFrame.from_dict(all_metrics)
-
-    # Print stats
-    print(
-        f"\nDataset: {dataset_name}, Backbone: {backbone_name}, Pipeline: {pipeline_name}",
-    )
-    print("nmIoU:      %.2f" % (100 * all_metrics_df.iou.mean()))
-    print("mPrecision: %.2f" % (100 * all_metrics_df.recall.mean()))
-    print("mRecall:    %.2f" % (100 * all_metrics_df.precision.mean()))
-    print(
-        f"Inference time: {all_metrics_df.inference_time.mean():.2f} seconds/target image",
-    )
-    return all_metrics_df
+    return pd.DataFrame.from_dict(all_metrics)
 
 
 def main() -> None:
@@ -485,8 +488,11 @@ def main() -> None:
     """
     # Initialize
     args = get_arguments()
-    logging.info(f"Using arguments: {args}\n")
     output_path = Path("~").expanduser() / "outputs"
+    if args.experiment_name:
+        output_path = output_path / args.experiment_name
+    setup_logger(output_path, args.log_level)
+
     output_path.mkdir(parents=True, exist_ok=True)
 
     # Create data frame with results
@@ -502,13 +508,17 @@ def main() -> None:
         for pipeline_name in pipelines_to_run:
             for bidx, backbone_name in enumerate(backbones_to_run):
                 if pipeline_name == "PerSAMModular" and backbone_name == "EfficientViT-SAM":
-                    print(f"Skipping {backbone_name} {pipeline_name} because it is not supported")
+                    logger.info(f"Skipping {backbone_name} {pipeline_name} because it is not supported")
                     continue
                 if pipeline_name == "PerSAMMAPIModular" and bidx > 0:
-                    print("Skipping because PerSAMMAPIModular is independent of the backbone")
+                    logger.info("Skipping because PerSAMMAPIModular is independent of the backbone")
                     continue
 
-                pipeline = load_pipeline(backbone_name, pipeline_name, args)
+                pipeline = load_pipeline(
+                    backbone_name=backbone_name,
+                    pipeline_name=pipeline_name,
+                    args=args,
+                )
 
                 if args.experiment_name:
                     unique_output_path = (
@@ -532,6 +542,7 @@ def main() -> None:
                     number_of_priors_tests=args.num_priors,
                     number_of_batches=args.num_batches,
                     dataset_filenames=args.dataset_filenames.split(",") if args.dataset_filenames else None,
+                    image_size=args.image_size,
                 )
                 all_results.append(all_metrics_df)
 
@@ -543,7 +554,7 @@ def main() -> None:
     )
     all_results_dataframe_filename.parent.mkdir(parents=True, exist_ok=True)
     all_result_dataframe.to_csv(str(all_results_dataframe_filename))
-    print(f"Saved all results to: {all_results_dataframe_filename}")
+    logger.info(f"Saved all results to: {all_results_dataframe_filename}")
 
     avg_results_dataframe_filename = (
         output_path / f"models-{backbones_str}_datasets-{datasets_str}_algorithms-{pipelines_str}_avg_results.csv"
@@ -553,11 +564,9 @@ def main() -> None:
         ["dataset_name", "pipeline_name", "backbone_name"],
     ).mean(numeric_only=True)
     avg_result_dataframe.to_csv(str(avg_results_dataframe_filename))
-    print(f"Saved average results to: {avg_results_dataframe_filename}")
-    print(f"\n\n Final Average Results:\n {avg_result_dataframe}")
+    logger.info(f"Saved average results to: {avg_results_dataframe_filename}")
+    logger.info(f"\n\n Final Average Results:\n {avg_result_dataframe}")
 
 
 if __name__ == "__main__":
-    logging.basicConfig(stream=sys.stdout, level=logging.INFO)
-    logging.getLogger("dinov2").setLevel(logging.WARNING)
     main()

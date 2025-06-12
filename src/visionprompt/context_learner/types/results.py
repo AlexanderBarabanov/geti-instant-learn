@@ -1,7 +1,11 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-from visionprompt.context_learner.types import Annotations, Masks, Points, Priors
+from visionprompt.context_learner.types.annotations import Annotations
+from visionprompt.context_learner.types.masks import Masks
+from visionprompt.context_learner.types.points import Points
+from visionprompt.context_learner.types.priors import Priors
+from visionprompt.context_learner.types.similarities import Similarities
 
 
 class Results:
@@ -12,6 +16,8 @@ class Results:
         self._priors: list[Priors] | None = None
         self._annotations: list[Annotations] | None = None
         self._used_points: list[Points] | None = None
+        self._similarities: list[Similarities] | None = None
+        self._duration: float | None = None
 
     @property
     def masks(self) -> list[Masks]:
@@ -52,3 +58,23 @@ class Results:
     def annotations(self, annotations: list[Annotations]) -> None:
         """Sets the annotations."""
         self._annotations = annotations
+
+    @property
+    def similarities(self) -> list[Similarities]:
+        """Returns similarities produced by the latest run of pipeline."""
+        return self._similarities if self._similarities is not None else []
+
+    @similarities.setter
+    def similarities(self, similarities: list[Similarities]) -> None:
+        """Sets the similarities."""
+        self._similarities = similarities
+
+    @property
+    def duration(self) -> float:
+        """Returns the duration of the latest run of pipeline."""
+        return self._duration if self._duration is not None else 0.0
+
+    @duration.setter
+    def duration(self, duration: float) -> None:
+        """Sets the duration."""
+        self._duration = duration

@@ -3,10 +3,9 @@
 from abc import abstractmethod
 
 import torch
-from src.visionprompt.context_learner.types.features import Features
 
 from visionprompt.context_learner.processes import Process
-from visionprompt.context_learner.types import Priors, Similarities
+from visionprompt.context_learner.types import Features, Priors, Similarities
 
 
 class PromptGenerator(Process):
@@ -63,6 +62,35 @@ class PromptGenerator(Process):
                 )
 
         return priors
+
+    @staticmethod
+    def _convert_points_to_original_size(
+        input_coords: torch.Tensor,
+        input_map_shape: tuple[int, int],
+        original_image_size: tuple[int, int],
+    ) -> torch.Tensor:
+        """Converts point coordinates from an input map's space to original image space.
+
+        Args:
+            input_coords: Tensor of shape (N, k) with [x, y, ...] coordinates.
+                                   Assumes input_coords[:, 0] is x and input_coords[:, 1] is y.
+            original_image_size: Tuple (width, height) of the original image.
+            input_map_shape: Tuple (height, width) of the input similarity map from which points were derived.
+
+        Returns:
+            Tensor of shape (N, k) with [x, y, ...] coordinates scaled to original_image_size.
+        """
+        points_original_coords = input_coords.clone()
+        original_width, original_height = original_image_size
+        map_w, map_h = input_map_shape
+        if map_w == 0 or map_h == 0:
+            return points_original_coords
+
+        scale_x = original_width / map_w
+        points_original_coords[:, 0] = points_original_coords[:, 0] * scale_x
+        scale_y = original_height / map_h
+        points_original_coords[:, 1] = points_original_coords[:, 1] * scale_y
+        return points_original_coords
 
 
 class SimilarityPromptGenerator(PromptGenerator):

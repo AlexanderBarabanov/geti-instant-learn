@@ -10,7 +10,7 @@ from visionprompt.context_learner.processes.visualizations.visualization_base im
     Visualization,
 )
 from visionprompt.context_learner.types import Image, Masks, Points
-from visionprompt.utils.utils import get_colors
+from visionprompt.utils import get_colors
 
 
 class ExportMaskVisualization(Visualization):

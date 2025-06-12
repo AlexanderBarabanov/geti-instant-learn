@@ -1,6 +1,7 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+from logging import getLogger
 from pathlib import Path
 
 import cv2
@@ -9,7 +10,9 @@ from PIL import Image as PILImage
 
 from visionprompt.datasets.dataset_base import Annotation, Dataset, DatasetIter, Image
 from visionprompt.datasets.dataset_iterators import CategoryIter, IndexIter
-from visionprompt.utils.utils import color_overlay
+from visionprompt.utils import color_overlay
+
+logger = getLogger("Vision Prompt")
 
 
 class PerSegAnnotation(Annotation):
@@ -139,16 +142,16 @@ class PerSegDataset(Dataset):
             path for path in images_folder.iterdir() if path.is_dir() and not path.name.startswith(".")
         ]
         if self._whitelist:
-            print(f"Applying whitelist: {self._whitelist}")  # Optional: for debugging
+            logger.info(f"Applying whitelist: {self._whitelist}")
             allowed_category_paths = [path for path in all_category_paths if path.name in self._whitelist]
             if not allowed_category_paths:
-                print(f"Warning: Whitelist {self._whitelist} resulted in zero categories being loaded.")
+                logger.warning(f"Warning: Whitelist {self._whitelist} resulted in zero categories being loaded.")
         else:
             allowed_category_paths = all_category_paths
 
         self._category_index_to_name = [path.name for path in allowed_category_paths]
         if not self._category_index_to_name:
-            print("Warning: No categories found or remaining after whitelist filtering.")
+            logger.warning("Warning: No categories found or remaining after whitelist filtering.")
             return  # Stop loading if no categories are left
 
         self._category_name_to_index = {name: index for index, name in enumerate(self._category_index_to_name)}
@@ -158,12 +161,12 @@ class PerSegDataset(Dataset):
         for cat_index, category in enumerate(self._category_index_to_name):
             images_sub_folder = images_folder / category
             if not images_sub_folder.is_dir():
-                print(f"Warning: Category folder not found: {images_sub_folder}, skipping.")
+                logger.warning(f"Warning: Category folder not found: {images_sub_folder}, skipping.")
                 continue
 
             images_filenames = [name for name in images_sub_folder.iterdir() if not name.name.startswith(".")]
             if not images_filenames:
-                print(f"Warning: No images found in category folder: {images_sub_folder}")
+                logger.warning(f"Warning: No images found in category folder: {images_sub_folder}")
                 # Initialize counts to 0 if no images are found for this whitelisted category
                 self.image_count[category] = 0
                 self.instance_count[category] = 0
@@ -183,7 +186,7 @@ class PerSegDataset(Dataset):
 
                 # Check if annotation file exists before adding
                 if not annotation_full_path.exists():
-                    print(f"Warning: Annotation file not found, skipping image: {annotation_full_path}")
+                    logger.warning(f"Warning: Annotation file not found, skipping image: {annotation_full_path}")
                     # Decrement counts if skipping due to missing annotation
                     self.image_count[category] -= 1
                     self.instance_count[category] -= 1

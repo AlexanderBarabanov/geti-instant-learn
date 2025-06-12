@@ -13,6 +13,7 @@ from visionprompt.context_learner.processes.mask_processors.mask_to_polygon impo
 from visionprompt.context_learner.processes.segmenters.sam_mapi_decoder import SamMAPIDecoder
 from visionprompt.context_learner.types import Image, Priors, Results
 from visionprompt.utils.constants import MAPI_DECODER_PATH, MAPI_ENCODER_PATH
+from visionprompt.utils.decorators import track_duration
 
 if TYPE_CHECKING:
     from visionprompt.context_learner.processes.mask_processors.mask_processor_base import MaskProcessor
@@ -36,6 +37,7 @@ class PerSamMAPI(Pipeline):
         self.mask_processor: MaskProcessor = MasksToPolygons()
         self.reference_features = None
 
+    @track_duration
     def learn(self, reference_images: list[Image], reference_priors: list[Priors]) -> Results:
         """Perform learning step on the reference images and priors."""
         if len(reference_images) > 1 or len(reference_priors) > 1:
@@ -49,6 +51,7 @@ class PerSamMAPI(Pipeline):
         )
         return Results()
 
+    @track_duration
     def infer(self, target_images: list[Image]) -> Results:
         """Perform inference step on the target images."""
         masks, _ = self.segmenter(target_images, self.reference_features)

@@ -1,13 +1,13 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
+import math
 from abc import abstractmethod
 
 import torch
 import torch.nn.functional as F
 
 from visionprompt.context_learner.processes.process_base import Process
-from visionprompt.context_learner.types.features import Features
-from visionprompt.context_learner.types.similarities import Similarities
+from visionprompt.context_learner.types import Features, Similarities
 
 
 class SimilarityMatcher(Process):
@@ -28,67 +28,51 @@ class SimilarityMatcher(Process):
         """
 
     @staticmethod
-    def _resize_similarities(
+    def _resize_similarities_to_target_size(
         similarities: torch.Tensor,
-        original_image_size: tuple[int, int],
-        embedding_shape: tuple[int, int],
-        encoder_input_size: int,
-        encoder_patch_size: int,
-        transformed_image_size: tuple[int, int] | None = None,
+        target_size: tuple[int, int] | int,
+        unpadded_image_size: tuple[int, int] | None = None,
     ) -> torch.Tensor:
         """This function resizes the similarities to the target image size while removing padding.
 
         Args:
             similarities: torch.Tensor The similarities to resize
-            transformed_image_size: tuple[int, int] The size of the transformed image
-            original_image_size: tuple[int, int] The size of the original image
-            encoder_input_size: int The size of the encoder input
-            encoder_patch_size: int The size of the encoder patches
-            embedding_shape: tuple[int, int] The shape of the embedding
+            target_size: tuple[int, int] | int | None The size of the target image,
+            unpadded_image_size: tuple[int, int] | None The size of the unpadded image
 
         Returns:
             torch.Tensor The resized similarities
         """
-        if transformed_image_size is not None:
-            similarities = similarities.reshape(
-                similarities.shape[0],
-                1,  # needed for bilinear interpolation
-                embedding_shape[0],
-                embedding_shape[1],
-            )
-            # resize the similarities to the target image size
+        square_size = int(math.sqrt(similarities.shape[-1]))
+        # put in batched square shape
+        similarities = similarities.reshape(
+            similarities.shape[0],
+            1,
+            square_size,
+            square_size,
+        )
+        # SAM models can in some cases add padding to the image, we need to remove it
+        if unpadded_image_size is not None:
             similarities = F.interpolate(
                 similarities,
-                size=encoder_input_size,
+                size=max(unpadded_image_size),
                 mode="bilinear",
                 align_corners=False,
             )
-            # remove padding
             similarities = similarities[
                 ...,
-                : transformed_image_size[0],
-                : transformed_image_size[1],
+                : unpadded_image_size[0],
+                : unpadded_image_size[1],
             ]
-            # resize back to original size
-            similarities = F.interpolate(
-                similarities,
-                size=original_image_size,
-                mode="bilinear",
-                align_corners=False,
-            ).squeeze(1)
-        else:
-            similarities = similarities.reshape(
-                similarities.shape[0],
-                encoder_input_size // encoder_patch_size,
-                encoder_input_size // encoder_patch_size,
-            ).unsqueeze(0)
-            similarities = F.interpolate(
-                similarities,
-                size=original_image_size,
-                mode="bilinear",
-                align_corners=False,
-            ).squeeze(0)
-            if similarities.ndim == 4:
-                similarities = similarities.squeeze(0)
+
+        # resize to (original) target size
+        similarities = F.interpolate(
+            similarities,
+            size=target_size,
+            mode="bilinear",
+            align_corners=False,
+        ).squeeze(1)
+        if similarities.ndim == 4:
+            similarities = similarities.squeeze(0)
 
         return similarities

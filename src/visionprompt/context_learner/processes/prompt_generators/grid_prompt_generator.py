@@ -17,24 +17,25 @@ class GridPromptGenerator(SimilarityPromptGenerator):
 
     def __init__(
         self,
-        encoder_input_size: int,
-        downsizing: int = 64,
+        num_grid_cells: int = 16,
         similarity_threshold: float = 0.65,
         num_bg_points: int = 1,
     ) -> None:
         """Generate prompts for the segmenter based on the similarities between the reference and target images.
 
         Args:
-            encoder_input_size: int the size of the encoder input image.
-            downsizing: int the downsizing factor for the grid
+            num_grid_cells: int The number of grid cells to divide the similarity map into, along each dimension.
+                                For example, 16 means a 16x16 grid.
             similarity_threshold: float the threshold for the similarity mask
             num_bg_points: int the number of background points to sample
         """
         super().__init__()
-        self.downsizing = downsizing
+        if num_grid_cells <= 0:
+            msg = "num_grid_cells must be positive."
+            raise ValueError(msg)
+        self.num_grid_cells = num_grid_cells
         self.similarity_threshold = similarity_threshold
         self.num_bg_points = num_bg_points
-        self.encoder_input_size = encoder_input_size
 
     def __call__(
         self, target_similarities: list[Similarities] | None = None, target_images: list[Image] | None = None
@@ -43,108 +44,133 @@ class GridPromptGenerator(SimilarityPromptGenerator):
 
         Ths is based on the similarities between the reference and target images.
         It uses a grid based approach to create multi object aware prompt for the segmenter.
+        The grid is defined by self.num_grid_cells and applied to the input similarity map's dimensions.
 
         Args:
-            target_similarities: List[Similarities] List of similarities, one per target image instance
+            target_similarities: List[Similarities] List of similarities, one per target image instance.
+                                Each similarity map within is expected to be 2D (H_map, W_map)
+                                or a stack of 2D maps 3D (num_maps, H_map, W_map).
             target_images: List[Image] List of target image instances
 
         Returns:
             List[Priors] List of priors, one per target image instance
         """
-        encoder_input_size = self.encoder_input_size
         priors_per_image: list[Priors] = []
 
         for i, similarities_per_image in enumerate(target_similarities):
             priors = Priors()
-            original_image_size = target_images[i].size
-            for class_id, similarities in similarities_per_image.data.items():
-                background_points = self._get_background_points(similarities)
+            original_image_shape = target_images[i].size  # (width, height)
 
-                for similarity_map in similarities:
-                    foreground_points = self._get_foreground_points(
-                        similarity_map,
-                        original_image_size,
-                        encoder_input_size,
-                    )
+            for class_id, class_similarity_maps in similarities_per_image.data.items():
+                background_points_enc = self._get_background_points(class_similarity_maps)  # Operates on (H_enc, W_enc)
+
+                # Convert background points to original image coordinates
+                background_points_orig = self._convert_points_to_original_size(
+                    background_points_enc,
+                    class_similarity_maps.shape[-2:],  # input_map_shape (H_map, W_map)
+                    original_image_shape,  # original_image_size (W_orig, H_orig)
+                )
+
+                for similarity_map_enc in class_similarity_maps:  # Each map is (H_map, W_map)
+                    foreground_points_enc = self._get_foreground_points(similarity_map_enc)
 
                     # Skip if no foreground points found
-                    if len(foreground_points) == 0:
-                        # add empty points for this similarity map
+                    if len(foreground_points_enc) == 0:
                         priors.points.add(
-                            torch.empty((0, 4), device=foreground_points.device),
+                            torch.empty((0, 4), device=similarity_map_enc.device),
                             class_id,
                         )
                         continue
 
+                    foreground_points_orig = self._convert_points_to_original_size(
+                        foreground_points_enc,
+                        similarity_map_enc.shape,  # input_map_shape (H_map, W_map)
+                        original_image_shape,  # original_image_size (W_orig, H_orig)
+                    )
+
                     fg_point_labels = torch.ones(
-                        (len(foreground_points), 1),
-                        device=foreground_points.device,
+                        (len(foreground_points_orig), 1),
+                        device=foreground_points_orig.device,
                     )
                     bg_point_labels = torch.zeros(
-                        (len(background_points), 1),
-                        device=background_points.device,
+                        (len(background_points_orig), 1),
+                        device=background_points_orig.device,
                     )
 
                     all_points = torch.cat(
                         [
-                            torch.cat([foreground_points, fg_point_labels], dim=1),
-                            torch.cat([background_points, bg_point_labels], dim=1),
+                            torch.cat([foreground_points_orig, fg_point_labels], dim=1),
+                            torch.cat([background_points_orig, bg_point_labels], dim=1),
                         ],
                         dim=0,
                     )
-                    # Add the all_points as a list item. Cannot be stacked since they have different shapes per mask
                     priors.points.add(all_points, class_id)
 
             priors = self._filter_duplicate_points(priors)
             priors_per_image.append(priors)
-
         return priors_per_image
 
     def _get_foreground_points(
         self,
         similarity: torch.Tensor,
-        original_image_size: torch.Tensor,
-        encoder_input_size: int,
     ) -> torch.Tensor:
         """Select foreground points based on the similarity mask and grid-based filtering.
 
+        Operates on the provided similarity map, using self.num_grid_cells to define the grid.
+
         Args:
-            similarity: Similarity mask tensor
-            original_image_size: Original image size
-            encoder_input_size: Size of the encoder input
+            similarity: 2D Similarity mask tensor (map_height, map_width)
+
         Returns:
-            Foreground points coordinates and scores with shape (N, 3) where each row is [x, y, score]
+            Foreground points coordinates and scores with shape (N, 3) where each row is [x, y, score],
+            in the input similarity map's coordinate space.
         """
-        point_coords = torch.where(similarity > self.similarity_threshold)
+        map_w, map_h = similarity.shape
+
+        if map_h == 0 or map_w == 0:
+            return torch.empty((0, 3), device=similarity.device)
+
+        point_coords = torch.where(similarity > self.similarity_threshold)  # (x_indices, y_indices)
         foreground_coords = torch.stack(
-            (*point_coords[::-1], similarity[point_coords]),
+            (point_coords[1], point_coords[0], similarity[point_coords]),
             axis=0,
         ).T
 
-        # skip if there are no foreground coords
         if len(foreground_coords) == 0:
             return torch.empty((0, 3), device=similarity.device)
 
-        # create grid of the original image size
-        ratio = encoder_input_size / max(original_image_size)
-        width = int(original_image_size[1] * ratio)
-        number_of_grid_cells = width // self.downsizing
+        cell_width = map_w / self.num_grid_cells
+        cell_height = map_h / self.num_grid_cells
 
-        # create grid numbers
+        if cell_height == 0 or cell_width == 0:
+            return foreground_coords[torch.topk(foreground_coords[:, 2], k=1, dim=0, largest=True)[1]]
+
+        # Assign each point to a grid cell ID (row-major order)
+        x_coord_on_map = foreground_coords[:, 0]
+        y_coord_on_map = foreground_coords[:, 1]
+        x_cell_index = (x_coord_on_map / cell_width).floor().long()
+        y_cell_index = (y_coord_on_map / cell_height).floor().long()
+        x_cell_index = torch.clamp(x_cell_index, 0, self.num_grid_cells - 1)
+        y_cell_index = torch.clamp(y_cell_index, 0, self.num_grid_cells - 1)
+
         idx_grid = (
-            foreground_coords[:, 1] * ratio // self.downsizing * number_of_grid_cells
-            + foreground_coords[:, 0] * ratio // self.downsizing
+            y_cell_index * self.num_grid_cells  # Row index * number of columns (which is self.num_grid_cells)
+            + x_cell_index  # Column index
         )
+        idx_unique_cells = torch.unique(idx_grid)
 
-        # filter out points that are in the same location
-        idx_unique = torch.unique(idx_grid.int())
-        matched_matrix = idx_grid.unsqueeze(-1) == idx_unique
-        # sample foreground coords matched by matched matrix
-        matched_grid = foreground_coords.unsqueeze(1) * matched_matrix.unsqueeze(-1)
+        selected_points_list = []
+        for cell_id in idx_unique_cells:
+            points_in_cell_mask = idx_grid == cell_id
+            points_in_cell = foreground_coords[points_in_cell_mask]
+            if len(points_in_cell) > 0:
+                best_point_in_cell = points_in_cell[torch.topk(points_in_cell[:, 2], k=1, dim=0, largest=True)[1]]
+                selected_points_list.append(best_point_in_cell)
 
-        # get highest score points for each grid cell
-        matched_indices = torch.topk(matched_grid[..., -1], k=1, dim=0, largest=True)[1][0]
-        points_scores = matched_grid[matched_indices].diagonal().T
+        if not selected_points_list:
+            return torch.empty((0, 3), device=similarity.device)
+
+        points_scores = torch.cat(selected_points_list, dim=0)
 
         # sort by highest score
         sorted_indices = torch.argsort(points_scores[:, -1], descending=True)
@@ -153,27 +179,43 @@ class GridPromptGenerator(SimilarityPromptGenerator):
     def _get_background_points(self, similarity: torch.Tensor) -> torch.Tensor:
         """Select background points based on the similarity mask.
 
+        Operates on the input similarity map (can be 2D or 3D).
+        If 3D, sums over the first dimension. Coordinates are relative to the map's H, W.
+
         Args:
-            similarity: Similarity mask tensor
+            similarity: Similarity mask tensor (H, W) or (num_maps, H, W)
+
         Returns:
             Background points coordinates with shape (num_bg_points, 3) where each row is [x, y, score]
+            in the input similarity map's H, W coordinate space.
         """
         if self.num_bg_points == 0:
             return torch.empty((0, 3), device=similarity.device)
 
-        # Stack all similarity maps
-        if similarity.ndim == 3:
-            similarity = similarity.sum(dim=0)
-        _, w_sim = similarity.shape
-        bg_values, bg_indices = torch.topk(
-            similarity.flatten(),
-            self.num_bg_points,
+        current_similarity_map = similarity
+        if current_similarity_map.ndim == 3:
+            if current_similarity_map.shape[0] == 0:  # Empty stack
+                return torch.empty((0, 3), device=similarity.device)
+            current_similarity_map = current_similarity_map.sum(dim=0)  # Sum over maps
+
+        map_h, map_w = current_similarity_map.shape
+        if map_h == 0 or map_w == 0:
+            return torch.empty((0, 3), device=similarity.device)
+
+        num_elements = current_similarity_map.numel()
+        k = min(self.num_bg_points, num_elements)
+        if k == 0:
+            return torch.empty((0, 3), device=similarity.device)
+
+        bg_values, bg_indices_flat = torch.topk(
+            current_similarity_map.flatten(),
+            k,
             largest=False,
         )
-        bg_x = (bg_indices // w_sim).unsqueeze(0)
-        bg_y = bg_indices - bg_x * w_sim
 
-        # Stack coordinates and similarity scores
-        bg_coords = torch.cat((bg_y, bg_x, bg_values.unsqueeze(0)), dim=0).T
+        # Convert flat indices to 2D coordinates (y for rows, x for columns)
+        bg_y_coords = (bg_indices_flat // map_w).long()
+        bg_x_coords = (bg_indices_flat % map_w).long()
 
+        bg_coords = torch.stack((bg_x_coords, bg_y_coords, bg_values), dim=0).T  # (N, 3)
         return bg_coords.float()

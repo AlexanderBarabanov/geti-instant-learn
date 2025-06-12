@@ -13,10 +13,8 @@ from visionprompt.context_learner.types import Features, Similarities
 class CosineSimilarity(SimilarityMatcher):
     """This class computes the cosine similarity."""
 
-    def __init__(self, encoder_input_size: int, encoder_patch_size: int) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.encoder_input_size = encoder_input_size
-        self.encoder_patch_size = encoder_patch_size
 
     def __call__(
         self,
@@ -45,9 +43,6 @@ class CosineSimilarity(SimilarityMatcher):
                 dim=-1,
                 keepdim=True,
             )
-            embedding_shape = target.global_features_shape
-            original_image_size = target_images[i].size
-            transformed_image_size = target_images[i].transformed_size
 
             # reshape from (encoder_shape, encoder_shape, embed_dim)
             # to (encoder_shape*encoder_shape, embed_dim) if necessary
@@ -65,13 +60,12 @@ class CosineSimilarity(SimilarityMatcher):
                 # Need to loop since number of reference features can differ per input mask.
                 for local_reference_features in local_reference_features_per_mask:
                     similarities = local_reference_features @ normalized_target.T
-                    similarities = self._resize_similarities(
+                    similarities = self._resize_similarities_to_target_size(
                         similarities=similarities,
-                        transformed_image_size=transformed_image_size,
-                        original_image_size=original_image_size,
-                        embedding_shape=embedding_shape,
-                        encoder_input_size=self.encoder_input_size,
-                        encoder_patch_size=self.encoder_patch_size,
+                        # scaling to 1024 can speed up prompt generation, however we can also resize the images at
+                        #   the start of the pipeline
+                        target_size=target_images[i].size,
+                        unpadded_image_size=target_images[i].sam_preprocessed_size,
                     )
 
                     all_similarities.add(

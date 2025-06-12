@@ -40,15 +40,16 @@ This repository explores algorithms that make visual prompting more effective, e
 Create a new environment and install dependencies. We recommend using `uv` for faster environment creation.
 
 ```bash
-# Create environment
-uv venv --python 3.11
-source .venv/bin/activate
+uv sync
 
-# Install visionprompt
-uv pip install -e .
+# Install extras (xFormers)
+uv sync --extra extras
 
-# Optional: Install xFormers for faster inference
-uv pip install -e ".[extras]"
+# Install dev dependencies (ruff, pre-commit)
+uv sync --extra dev
+
+# Install all dependencies
+uv sync --extra full
 ```
 
 ## Modular Pipeline Example

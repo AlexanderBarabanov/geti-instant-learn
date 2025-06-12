@@ -3,6 +3,8 @@
 
 import argparse
 
+import torch
+
 from visionprompt.utils.constants import DATASETS, MODEL_MAP, PIPELINES
 
 # Generate help strings with choices
@@ -27,7 +29,8 @@ def get_arguments(arg_list: list[str] | None = None) -> argparse.Namespace:
         Arguments
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sam_name", type=str, default="SAM", help=HELP_SAM_NAME)
+    parser.add_argument("--log_level", type=str, default="INFO", help="Log level")
+    parser.add_argument("--sam_name", type=str, default="MobileSAM", help=HELP_SAM_NAME)
     parser.add_argument("--pipeline", type=str, default="MatcherModular", help=HELP_PIPELINE)
     parser.add_argument(
         "--n_shot",
@@ -57,6 +60,21 @@ def get_arguments(arg_list: list[str] | None = None) -> argparse.Namespace:
         help="Filter on class name",
     )
     parser.add_argument(
+        "--num_grid_cells",
+        type=int,
+        default=16,
+        help="Number of grid cells to use for the grid prompt generator",
+    )
+    parser.add_argument(
+        "--image_size",
+        type=int,
+        default=None,
+        help="Size of the image to use for inference. If not provided, the original size will be used. "
+        "If provided, the image will be resized to the given size, maintaining aspect ratio. "
+        "Note: images are always resized to 1024x1024 for SAM and to 518x518 for DINO. "
+        "This will mainly influence the UI rendering.",
+    )
+    parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Overwrite existing output data",
@@ -82,7 +100,7 @@ def get_arguments(arg_list: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--mask_similarity_threshold",
         type=float,
-        default=0.45,
+        default=0.42,
         help="Threshold for filtering masks based on average similarity",
     )
     parser.add_argument(
@@ -122,5 +140,61 @@ def get_arguments(arg_list: list[str] | None = None) -> argparse.Namespace:
         "This can be used to limit the amount images that are processed. "
         "The number of processed images will not exceed num_classes * num_batches * batch_size",
     )
+    parser.add_argument(
+        "--precision",
+        type=str,
+        default="bfloat16",
+        choices=["float", "float16", "bfloat16"],
+        help="The precision to use for the models. Maps to torch.float32, torch.float16, or torch.bfloat16",
+    )
+    parser.add_argument(
+        "--compile_models",
+        type=bool,
+        default=False,
+        help="Whether to compile the models",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Whether to show the inference time of the optimized models",
+    )
 
-    return parser.parse_args(arg_list)
+    args = parser.parse_args(arg_list)
+
+    precision_map = {"float": torch.float32, "float16": torch.float16, "bfloat16": torch.bfloat16}
+    args.precision = precision_map[args.precision]
+
+    return args
+
+
+def parse_experiment_args(args: argparse.Namespace) -> tuple[list[str], list[str], list[str]]:
+    """Parse experiment arguments.
+
+    Args:
+        args: Arguments
+
+    Returns:
+        tuple containing:
+            - datasets_to_run: List of datasets to run
+            - pipelines_to_run: List of pipelines to run
+            - backbones_to_run: List of backbones to run
+    """
+    if args.dataset_name == "all":
+        valid_datasets = [d for d in DATASETS if d != "all"]
+    else:
+        datasets_to_run = [d.strip() for d in args.dataset_name.split(",")]
+        valid_datasets = [d for d in datasets_to_run if d in DATASETS]
+
+    if args.pipeline == "all":
+        valid_pipelines = [p for p in PIPELINES if p != "all"]
+    else:
+        pipelines_to_run = [p.strip() for p in args.pipeline.split(",")]
+        valid_pipelines = [p for p in pipelines_to_run if p in PIPELINES]
+
+    if args.sam_name == "all":
+        valid_backbones = [b for b in list(MODEL_MAP.keys()) if b != "all"]
+    else:
+        backbones_to_run = [b.strip() for b in args.sam_name.split(",")]
+        valid_backbones = [b for b in backbones_to_run if b in MODEL_MAP]
+
+    return valid_datasets, valid_pipelines, valid_backbones

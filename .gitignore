@@ -20,3 +20,4 @@ node_modules/
 .mypy_cache/
 .venv/
 *.egg-info/
+flash_4_configs.p

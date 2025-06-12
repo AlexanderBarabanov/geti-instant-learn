@@ -1,6 +1,7 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+from logging import getLogger
 from typing import Any
 
 import numpy as np
@@ -8,6 +9,8 @@ from sklearn.metrics import confusion_matrix
 
 from visionprompt.context_learner.processes.calculators.calculator_base import Calculator
 from visionprompt.context_learner.types import Masks
+
+logger = getLogger("Vision Prompt")
 
 
 class SegmentationMetrics(Calculator):
@@ -31,21 +34,23 @@ class SegmentationMetrics(Calculator):
         """This method calculates the metrics."""
         d = {
             "category": [],
+            "iou": [],
+            "f1score": [],
+            "precision": [],
+            "recall": [],
+            "accuracy": [],
             "true_positives": [],
             "true_negatives": [],
             "false_positives": [],
             "false_negatives": [],
-            "precision": [],
-            "recall": [],
-            "f1score": [],
             "jaccard": [],
-            "iou": [],
             "dice": [],
-            "accuracy": [],
         }
         for cat_name, confusion in self.confusion.items():
             if confusion.shape != (2, 2):
-                print(f"Warning: Confusion matrix for {cat_name} is not 2x2 ({confusion.shape}). Skipping metrics.")
+                logger.warning(
+                    f"Warning: Confusion matrix for {cat_name} is not 2x2 ({confusion.shape}). Skipping metrics."
+                )
                 continue
 
             tn = confusion[0, 0]  # True Negative (BG correctly predicted)

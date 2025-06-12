@@ -1,7 +1,7 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-import logging
+from logging import getLogger
 from pathlib import Path
 
 import numpy as np
@@ -10,6 +10,8 @@ from visionprompt.datasets.dataset_base import Dataset
 from visionprompt.datasets.dataset_iterators import BatchedCategoryIter
 from visionprompt.datasets.lvis.lvis_dataset import LVISDataset
 from visionprompt.datasets.perseg.perseg_dataset import PerSegDataset
+
+logger = getLogger("Vision Prompt")
 
 
 def load_dataset(dataset_name: str, whitelist: list[str] | None = None, batch_size: int = 5) -> Dataset:
@@ -27,7 +29,7 @@ def load_dataset(dataset_name: str, whitelist: list[str] | None = None, batch_si
         ValueError: If the dataset name is not recognized
     """
     # add logging that we are loading the dataset
-    logging.info(f"Loading dataset: {dataset_name}")
+    logger.info(f"Loading dataset: {dataset_name}")
     if dataset_name == "PerSeg":
         return PerSegDataset(
             whitelist=whitelist,

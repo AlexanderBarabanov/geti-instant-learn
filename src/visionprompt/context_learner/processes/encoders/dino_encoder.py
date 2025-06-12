@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import sys
+from logging import getLogger
 from pathlib import Path
 
 import requests
@@ -24,18 +25,37 @@ from visionprompt.third_party.dinov2.data.transforms import MaybeToTensor, make_
 from visionprompt.third_party.dinov2.models import vision_transformer
 from visionprompt.third_party.dinov2.models.vision_transformer import DinoVisionTransformer
 from visionprompt.utils.constants import DINO_WEIGHTS
+from visionprompt.utils.model_optimizer import optimize_dino_model
+
+logger = getLogger("Vision Prompt")
 
 
 class DinoEncoder(Encoder):
-    """This encoder uses the DINOv2 model to encode the images."""
+    """This encoder uses the DINOv2 model to encode the images.
 
-    def __init__(self) -> None:
+    Args:
+        state: The state of the pipeline.
+        precision: The precision to use for the model.
+        compile_models: Whether to compile the model.
+        verbose: Whether to show the inference time of the optimized model.
+    """
+
+    def __init__(
+        self,
+        precision: torch.dtype,
+        compile_models: bool,
+        verbose: bool,
+    ) -> None:
         super().__init__()
         self.encoder_input_size = 518
         self.patch_size = 14
         self.feature_size = self.encoder_input_size // self.patch_size
 
-        self.model: DinoVisionTransformer = self._setup_model()
+        self.model: DinoVisionTransformer = self._setup_model(
+            precision=precision,
+            compile_models=compile_models,
+            verbose=verbose,
+        )
         self.encoder_transform = transforms.Compose([
             MaybeToTensor(),
             transforms.Resize((self.encoder_input_size, self.encoder_input_size)),
@@ -110,8 +130,11 @@ class DinoEncoder(Encoder):
     @torch.no_grad()
     def _extract_global_features_batch(self, images: list[Image]) -> list[Features]:
         """Extract all global features from the images."""
-        image_batch = torch.stack([self.encoder_transform(image.data) for image in images]).cuda()
-        features = self.model.forward_features(image_batch)["x_prenorm"][:, 1:]
+        encoder_dtype = self.model.cls_token.dtype
+        image_batch = (
+            torch.stack([self.encoder_transform(image.data) for image in images]).cuda().to(dtype=encoder_dtype)
+        )
+        features = self.model.forward_features(image_batch)["x_prenorm"][:, 1:].float()
         features = features.reshape(len(images), -1, self.model.embed_dim)
         features = F.normalize(features, p=2, dim=-1)
         image_features: list[Features] = []
@@ -119,8 +142,17 @@ class DinoEncoder(Encoder):
             image_features.append(Features(global_features=features[idx]))
         return image_features
 
-    def _setup_model(self) -> DinoVisionTransformer:
-        """This method initializes the DINO model."""
+    def _setup_model(self, precision: torch.dtype, compile_models: bool, verbose: bool) -> DinoVisionTransformer:
+        """This method initializes the DINO model.
+
+        Args:
+            precision: The precision to use for the model.
+            compile_models: Whether to compile the model.
+            verbose: Whether to show the inference time of the optimized model.
+
+        Returns:
+            The initialized DINO model.
+        """
         dinov2: DinoVisionTransformer = vision_transformer.__dict__["vit_large"](
             img_size=self.encoder_input_size,
             patch_size=self.patch_size,
@@ -135,9 +167,14 @@ class DinoEncoder(Encoder):
         url = DINO_WEIGHTS["download_url"]
         _download_weights(path, url)
         dinov2_utils.load_pretrained_weights(dinov2, str(path), "teacher")
-        dinov2.eval()
-        dinov2.to(device="cuda")
-        return dinov2
+        dinov2.eval().cuda()
+        return optimize_dino_model(
+            model=dinov2,
+            input_image_size=self.encoder_input_size,
+            precision=precision,
+            verbose=verbose,
+            compile_models=compile_models,
+        )
 
 
 def _download_weights(path: Path, url: str) -> None:
@@ -161,7 +198,7 @@ def _download_weights(path: Path, url: str) -> None:
             with requests.get(url, stream=True, timeout=10) as r:
                 r.raise_for_status()
                 total_size = int(r.headers.get("content-length", 0))
-                print(f"Downloading {path.name} ({total_size / (1024 * 1024):.2f} MB) from {url}...")
+                logger.info(f"Downloading {path.name} ({total_size / (1024 * 1024):.2f} MiB) from {url}...")
                 with progress:
                     task_id = progress.add_task("download", total=total_size, filename=path.name)
                     with path.open("wb") as f:
@@ -172,11 +209,11 @@ def _download_weights(path: Path, url: str) -> None:
 
                 if not disable_progress and total_size > 0:
                     progress.update(task_id, completed=total_size)
-        except Exception as e:
-            print(f"\nAn unexpected error occurred during download: {e}")
+        except Exception:
+            logger.exception("An unexpected error occurred during download")
             if path.exists():
                 try:
                     path.unlink()
                 except OSError as unlink_e:
-                    print(f"Error removing file {path} after error: {unlink_e}")
+                    logger.exception(f"Error removing file {path} after error: {unlink_e}")  # noqa: TRY401
             raise

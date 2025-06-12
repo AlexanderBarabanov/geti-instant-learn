@@ -24,31 +24,39 @@ classifiers = [
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # REQUIREMENTS                                                                #
 dependencies = [
-    "matplotlib",
-    "numpy",
-    "opencv-python",
-    "flask",
-    "rich",
-    "requests",
-    "pycocotools",
-    "scipy",
-    "pot",
-    "umap",
-    "pandas",
-    "scikit-learn",
-    "openvino-model-api",
-    "torch",
-    "torchvision",
+    "matplotlib==3.10.3",
+    "numpy==1.26.4",
+    "opencv-python==4.11.0.86",
+    "flask==3.1.1",
+    "rich==14.0.0",
+    "requests==2.32.3",
+    "pycocotools==2.0.9",
+    "scipy==1.15.3",
+    "pot==0.9.5",
+    "umap==0.1.1",
+    "pandas==2.2.3",
+    "scikit-learn==1.6.1",
+    "openvino-model-api==0.3.0.2",
+    "torch==2.7.0+cu126",
+    "torchvision==0.22.0+cu126",
     "efficientvit",
-    "segment-anything-hq",
+    "segment-anything-hq==0.3",
+    "pytorch-labs-segment-anything-fast",
+    "markupsafe==3.0.2",
 ]
 
 [tool.uv.sources]
+markupsafe = { index = "pypi" }
 torch = { index = "pytorch" }
 xformers = { index = "pytorch" }
 torchvision = { index = "pytorch" }
 torchmetrics = { index = "pytorch" }
 efficientvit = { git = "https://github.com/mit-han-lab/efficientvit.git", rev = "71b35be" }
+pytorch-labs-segment-anything-fast = { git = "https://github.com/pytorch-labs/segment-anything-fast.git", rev = "e6aadeb"}
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
 
 [[tool.uv.index]]
 name = "pytorch"
@@ -59,11 +67,11 @@ packages = ["src/visionprompt"]
 
 [project.optional-dependencies]
 extras = [
-    "xformers",
+    "xformers==0.0.30",
 ]
 dev = [
-    "ruff",
-    "pre-commit",
+    "ruff==0.11.12",
+    "pre-commit==4.2.0",
 ]
 
 full = [

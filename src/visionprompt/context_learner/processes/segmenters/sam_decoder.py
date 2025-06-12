@@ -92,7 +92,7 @@ class SamDecoder(Segmenter):
     def _predict_by_individual_point(  # noqa: C901
         self,
         image: Image,
-        all_image_points: Points,
+        map_points: Points,
         similarities: Similarities | None = None,
         image_id: int = 0,
     ) -> tuple[Masks, Points]:
@@ -100,7 +100,7 @@ class SamDecoder(Segmenter):
 
         Args:
             image: The image to predict masks from.
-            all_image_points: The points to predict masks from.
+            map_points: The points to predict masks from.
             similarities: Optional similarities.
             image_id: ID to identify which image is being processed.
 
@@ -111,26 +111,22 @@ class SamDecoder(Segmenter):
         all_used_points = Points()
 
         self.predictor.set_image(image.data)
-        for class_id, points_per_map in all_image_points.data.items():  # noqa: PLR1702
+        for class_id, points_per_map in map_points.data.items():  # noqa: PLR1702
             # iterate over each point list of each similarity map
-            for points in points_per_map:
-                if len(points) == 0:
+            for points_in_current_map in points_per_map:
+                if len(points_in_current_map) == 0:
                     # no points for this class, add empty "used_points" for this class
                     all_used_points.add(torch.tensor(np.array([])), class_id)
                     continue
 
                 points_used = []
-                # point list is of shape (n, 4), each item is (x, y, score, label), label is 1
-                # for foreground and 0 for background
-                background_points = points[points[:, 3] == 0].cpu().numpy()
-                foreground_points = points[points[:, 3] == 1].cpu().numpy()
+                # point list is of shape (n, 4), each item is (x, y, score, label),
+                # label is 1 for foreground and 0 for background
+                background_points = points_in_current_map[points_in_current_map[:, 3] == 0].cpu().numpy()
+                foreground_points = points_in_current_map[points_in_current_map[:, 3] == 1].cpu().numpy()
 
                 # predict masks
                 for _i, (x, y, score, label) in enumerate(foreground_points):
-                    # remove points with very low confidence
-                    if score in {-1.0, 0.0}:
-                        continue
-
                     # filter out points that lie inside a previously found mask
                     if self.skip_points_in_existing_masks:
                         is_covered = False
@@ -158,6 +154,7 @@ class SamDecoder(Segmenter):
                         point_coords=point_coords,
                         point_labels=point_labels,
                         multimask_output=False,
+                        # TODO(Daankrol): target guided attention and target-semantic prompting
                     )
 
                     if not self.apply_mask_refinement:

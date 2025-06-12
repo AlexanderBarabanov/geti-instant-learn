@@ -1,43 +1,54 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-import logging
-import sys
+import warnings
 from argparse import Namespace
-from pathlib import Path
+from logging import getLogger
 
-import requests
+warnings.filterwarnings("ignore", category=UserWarning)
+
 from efficientvit.models.efficientvit import EfficientViTSamPredictor
 from efficientvit.sam_model_zoo import create_efficientvit_sam_model
-from rich.progress import (
-    BarColumn,
-    DownloadColumn,
-    Progress,
-    TextColumn,
-    TimeRemainingColumn,
-    TransferSpeedColumn,
-)
+from segment_anything_fast import sam_model_fast_registry
+from segment_anything_fast.predictor import SamPredictor as SamFastPredictor
 from segment_anything_hq import sam_model_registry as sam_hq_model_registry
+from segment_anything_hq.modeling.sam import Sam as SamHQ
 from segment_anything_hq.predictor import SamPredictor as SamHQPredictor
 
-from visionprompt.context_learner.pipelines.matcher_pipeline import Matcher
-from visionprompt.context_learner.pipelines.perdino_pipeline import PerDino
-from visionprompt.context_learner.pipelines.persam_mapi_pipeline import PerSamMAPI
-from visionprompt.context_learner.pipelines.persam_pipeline import PerSam
-from visionprompt.context_learner.pipelines.pipeline_base import Pipeline
+from visionprompt.context_learner.pipelines import (
+    Matcher,
+    PerDino,
+    PerSam,
+    PerSamMAPI,
+    Pipeline,
+    SoftMatcher,
+    SoftMatcherBiDirectional,
+    SoftMatcherRFF,
+    SoftMatcherRFFBiDirectional,
+    SoftMatcherRFFSampling,
+    SoftMatcherSampling,
+    SoftMatcherBiDirectionalSampling,
+    SoftMatcherRFFBiDirectionalSampling,
+)
 from visionprompt.third_party.PersonalizeSAM.per_segment_anything import (
     SamPredictor,
     sam_model_registry,
 )
+from visionprompt.third_party.PersonalizeSAM.per_segment_anything.modeling.sam import Sam
+from visionprompt.utils import download_file
 from visionprompt.utils.constants import DATA_PATH, MODEL_MAP
+from visionprompt.utils.model_optimizer import optimize_sam_model
+
+logger = getLogger("Vision Prompt")
 
 
-def load_pipeline(backbone_name: str, pipeline_name: str, args: Namespace) -> Pipeline:
-    """Load a pipeline based on the given arguments.
+def _load_sam_model(
+    backbone_name: str, args: Namespace
+) -> SamPredictor | SamHQPredictor | SamFastPredictor | EfficientViTSamPredictor:
+    """Load and optimize a SAM model.
 
     Args:
         backbone_name: The name of the backbone model.
-        pipeline_name: The name of the pipeline.
         args: The arguments to load the model.
 
     Returns:
@@ -54,59 +65,204 @@ def load_pipeline(backbone_name: str, pipeline_name: str, args: Namespace) -> Pi
     local_filename = model_info["local_filename"]
     checkpoint_path = DATA_PATH.joinpath(local_filename)
 
-    logging.info(f"Loading segmentation model: {backbone_name} from {checkpoint_path}")
+    logger.info(f"Loading segmentation model: {backbone_name} from {checkpoint_path}")
 
     if backbone_name in {"SAM", "MobileSAM"}:
-        sam_model = sam_model_registry[registry_name](checkpoint=str(checkpoint_path)).cuda()
-        sam_model.eval()
-        sam_model = SamPredictor(sam_model)
+        model: Sam = sam_model_registry[registry_name](checkpoint=str(checkpoint_path)).cuda().eval()
+        predictor = SamPredictor(model)
     elif backbone_name in {"SAM-HQ", "SAM-HQ-tiny"}:
-        sam_model = sam_hq_model_registry[registry_name](checkpoint=str(checkpoint_path)).cuda()
-        sam_model.eval()
-        sam_model = SamHQPredictor(sam_model)
+        model: SamHQ = sam_hq_model_registry[registry_name](checkpoint=str(checkpoint_path)).cuda().eval()
+        predictor = SamHQPredictor(model)
+    elif backbone_name == "SAM-Fast":
+        model = sam_model_fast_registry[registry_name](checkpoint=str(checkpoint_path)).cuda().eval()
+        predictor = SamFastPredictor(model)
     elif backbone_name == "EfficientViT-SAM":
-        sam_model = create_efficientvit_sam_model(
-            name=registry_name,
-            weight_url=str(checkpoint_path),
-        ).cuda()
-        sam_model.eval()
-        sam_model = EfficientViTSamPredictor(sam_model)
+        model = (
+            create_efficientvit_sam_model(
+                name=registry_name,
+                weight_url=str(checkpoint_path),
+            )
+            .cuda()
+            .eval()
+        )
+        predictor = EfficientViTSamPredictor(model)
     else:
         msg = f"Model {backbone_name} not implemented yet"
         raise NotImplementedError(msg)
 
-    logging.info(f"Constructing pipeline: {pipeline_name}")
-    # Construct pipeline
-    if pipeline_name == "PerSAMModular":
-        return PerSam(
-            sam_model,
-            args.num_foreground_points,
-            args.num_background_points,
-            args.apply_mask_refinement,
-            args.skip_points_in_existing_masks,
-            args.similarity_threshold,
-        )
-    if pipeline_name == "PerDinoModular":
-        return PerDino(
-            sam_model,
-            args.num_foreground_points,
-            args.num_background_points,
-            args.apply_mask_refinement,
-            args.skip_points_in_existing_masks,
-            args.similarity_threshold,
-            args.mask_similarity_threshold,
-        )
-    if pipeline_name == "MatcherModular":
-        return Matcher(
-            sam_model,
-            args.num_foreground_points,
-            args.num_background_points,
-            args.apply_mask_refinement,
-            args.mask_similarity_threshold,
-            args.skip_points_in_existing_masks,
-        )
-    if pipeline_name == "PerSAMMAPIModular":
-        return PerSamMAPI()
+    return optimize_sam_model(
+        sam_predictor=predictor,
+        precision=args.precision,
+        compile_models=args.compile_models,
+        verbose=args.verbose,
+    )
+
+
+def load_pipeline(
+    backbone_name: str,
+    pipeline_name: str,
+    args: Namespace,
+) -> Pipeline:
+    """Load a pipeline based on the given arguments.
+
+    Args:
+        backbone_name: The name of the backbone model.
+        pipeline_name: The name of the pipeline.
+        args: The arguments to load the model.
+
+    Returns:
+        The pipeline.
+    """
+    sam_model = _load_sam_model(backbone_name, args)
+
+    logger.info(f"Constructing pipeline: {pipeline_name}")
+    match pipeline_name:
+        case "PerSAMModular":
+            return PerSam(
+                sam_model,
+                num_foreground_points=args.num_foreground_points,
+                num_background_points=args.num_background_points,
+                apply_mask_refinement=args.apply_mask_refinement,
+                skip_points_in_existing_masks=args.skip_points_in_existing_masks,
+                num_grid_cells=args.num_grid_cells,
+                similarity_threshold=args.similarity_threshold,
+                mask_similarity_threshold=args.mask_similarity_threshold,
+                image_size=args.image_size,
+            )
+        case "PerDinoModular":
+            return PerDino(
+                sam_model,
+                num_foreground_points=args.num_foreground_points,
+                num_background_points=args.num_background_points,
+                apply_mask_refinement=args.apply_mask_refinement,
+                skip_points_in_existing_masks=args.skip_points_in_existing_masks,
+                num_grid_cells=args.num_grid_cells,
+                similarity_threshold=args.similarity_threshold,
+                mask_similarity_threshold=args.mask_similarity_threshold,
+                precision=args.precision,
+                compile_models=args.compile_models,
+                verbose=args.verbose,
+                image_size=args.image_size,
+            )
+        case "MatcherModular":
+            return Matcher(
+                sam_model,
+                num_foreground_points=args.num_foreground_points,
+                num_background_points=args.num_background_points,
+                apply_mask_refinement=args.apply_mask_refinement,
+                skip_points_in_existing_masks=args.skip_points_in_existing_masks,
+                mask_similarity_threshold=args.mask_similarity_threshold,
+                precision=args.precision,
+                compile_models=args.compile_models,
+                verbose=args.verbose,
+                image_size=args.image_size,
+            )
+        case "PerSAMMAPIModular":
+            return PerSamMAPI()
+        case "SoftMatcherModular":
+            return SoftMatcher(
+                sam_model,
+                num_foreground_points=args.num_foreground_points,
+                num_background_points=args.num_background_points,
+                apply_mask_refinement=args.apply_mask_refinement,
+                skip_points_in_existing_masks=args.skip_points_in_existing_masks,
+                mask_similarity_threshold=args.mask_similarity_threshold,
+                precision=args.precision,
+                compile_models=args.compile_models,
+                verbose=args.verbose,
+                image_size=args.image_size,
+            )
+        case "SoftMatcherRFFModular":
+            return SoftMatcherRFF(
+                sam_model,
+                num_foreground_points=args.num_foreground_points,
+                num_background_points=args.num_background_points,
+                apply_mask_refinement=args.apply_mask_refinement,
+                skip_points_in_existing_masks=args.skip_points_in_existing_masks,
+                mask_similarity_threshold=args.mask_similarity_threshold,
+                precision=args.precision,
+                compile_models=args.compile_models,
+                verbose=args.verbose,
+                image_size=args.image_size,
+            )
+        case "SoftMatcherBiDirectionalModular":
+            return SoftMatcherBiDirectional(
+                sam_model,
+                num_foreground_points=args.num_foreground_points,
+                num_background_points=args.num_background_points,
+                apply_mask_refinement=args.apply_mask_refinement,
+                skip_points_in_existing_masks=args.skip_points_in_existing_masks,
+                mask_similarity_threshold=args.mask_similarity_threshold,
+                precision=args.precision,
+                compile_models=args.compile_models,
+                verbose=args.verbose,
+                image_size=args.image_size,
+            )
+        case "SoftMatcherRFFBiDirectionalModular":
+            return SoftMatcherRFFBiDirectional(
+                sam_model,
+                num_foreground_points=args.num_foreground_points,
+                num_background_points=args.num_background_points,
+                apply_mask_refinement=args.apply_mask_refinement,
+                skip_points_in_existing_masks=args.skip_points_in_existing_masks,
+                mask_similarity_threshold=args.mask_similarity_threshold,
+                precision=args.precision,
+                compile_models=args.compile_models,
+                verbose=args.verbose,
+                image_size=args.image_size,
+            )
+        case "SoftMatcherSamplingModular":
+            return SoftMatcherSampling(
+                sam_model,
+                num_foreground_points=args.num_foreground_points,
+                num_background_points=args.num_background_points,
+                apply_mask_refinement=args.apply_mask_refinement,
+                skip_points_in_existing_masks=args.skip_points_in_existing_masks,
+                mask_similarity_threshold=args.mask_similarity_threshold,
+                precision=args.precision,
+                compile_models=args.compile_models,
+                verbose=args.verbose,
+                image_size=args.image_size,
+            )
+        case "SoftMatcherRFFSamplingModular":
+            return SoftMatcherRFFSampling(
+                sam_model,
+                num_foreground_points=args.num_foreground_points,
+                num_background_points=args.num_background_points,
+                apply_mask_refinement=args.apply_mask_refinement,
+                skip_points_in_existing_masks=args.skip_points_in_existing_masks,
+                mask_similarity_threshold=args.mask_similarity_threshold,
+                precision=args.precision,
+                compile_models=args.compile_models,
+                verbose=args.verbose,
+                image_size=args.image_size,
+            )
+        case "SoftMatcherBiDirectionalSamplingModular":
+            return SoftMatcherBiDirectionalSampling(
+                sam_model,
+                num_foreground_points=args.num_foreground_points,
+                num_background_points=args.num_background_points,
+                apply_mask_refinement=args.apply_mask_refinement,
+                skip_points_in_existing_masks=args.skip_points_in_existing_masks,
+                mask_similarity_threshold=args.mask_similarity_threshold,
+                precision=args.precision,
+                compile_models=args.compile_models,
+                verbose=args.verbose,
+                image_size=args.image_size,
+            )
+        case "SoftMatcherRFFBiDirectionalSamplingModular":
+            return SoftMatcherRFFBiDirectionalSampling(
+                sam_model,
+                num_foreground_points=args.num_foreground_points,
+                num_background_points=args.num_background_points,
+                apply_mask_refinement=args.apply_mask_refinement,
+                skip_points_in_existing_masks=args.skip_points_in_existing_masks,
+                mask_similarity_threshold=args.mask_similarity_threshold,
+                precision=args.precision,
+                compile_models=args.compile_models,
+                verbose=args.verbose,
+                image_size=args.image_size,
+            )
     msg = f"Algorithm {pipeline_name} not implemented yet"
     raise NotImplementedError(msg)
 
@@ -129,53 +285,4 @@ def check_model_weights(model_name: str) -> None:
 
     if not target_path.exists():
         print(f"Model weights for {model_name} not found at {target_path}, downloading...")
-        _download_file(download_url, target_path)
-
-
-def _download_file(url: str, target_path: Path) -> None:
-    """Download a file from a URL to a target path."""
-    target_dir = target_path.parent
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    disable_progress = not sys.stderr.isatty()
-    progress = Progress(
-        TextColumn("[bold blue]{task.fields[filename]}", justify="right"),
-        BarColumn(bar_width=None),
-        "[progress.percentage]{task.percentage:>3.1f}%",
-        " • ",
-        DownloadColumn(),
-        " • ",
-        TransferSpeedColumn(),
-        " • ",
-        TimeRemainingColumn(),
-        transient=True,
-        disable=disable_progress,
-    )
-
-    try:  # noqa: PLR1702
-        with requests.get(url, stream=True, timeout=10) as r:
-            r.raise_for_status()
-            total_size = int(r.headers.get("content-length", 0))
-            print(f"Downloading {target_path.name} ({total_size / (1024 * 1024):.2f} MB) from {url}...")
-
-            with progress:
-                task_id = progress.add_task("download", total=total_size, filename=target_path.name)
-                with target_path.open("wb") as f:
-                    for chunk in r.iter_content(chunk_size=8192):
-                        if chunk:
-                            f.write(chunk)
-                            progress.update(task_id, advance=len(chunk))
-
-            if not disable_progress and total_size > 0:
-                progress.update(task_id, completed=total_size)
-
-        print(f"Downloaded model weights successfully to {target_path}")
-    except Exception as e:
-        # Catch other potential errors (e.g., file writing issues)
-        print(f"\nAn unexpected error occurred during download: {e}")
-        if target_path.exists():
-            try:
-                target_path.unlink()
-            except OSError as unlink_e:
-                print(f"Error removing file {target_path} after error: {unlink_e}")
-        raise  # Re-raise
+        download_file(download_url, target_path)

@@ -30,6 +30,11 @@ MODEL_MAP = {
         "local_filename": "sam_hq_vit_tiny.pth",
         "download_url": "https://huggingface.co/lkeab/hq-sam/resolve/main/sam_hq_vit_tiny.pth",
     },
+    "SAM-Fast": {  # 1024x1024 input resolution
+        "registry_name": "vit_h",
+        "local_filename": "sam_vit_h_4b8939.pth",
+        "download_url": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth",
+    },
 }
 DINO_WEIGHTS = {
     "registry_name": "dinov2_vitl14",
@@ -45,6 +50,14 @@ PIPELINES = [
     "PerSAMModular",
     "PerDinoModular",
     "PerSAMMAPIModular",
+    "SoftMatcherModular",
+    "SoftMatcherRFFModular",
+    "SoftMatcherBiDirectionalModular",
+    "SoftMatcherRFFBiDirectionalModular",
+    "SoftMatcherSamplingModular",
+    "SoftMatcherRFFSamplingModular",
+    "SoftMatcherBiDirectionalSamplingModular",
+    "SoftMatcherRFFBiDirectionalSamplingModular",
 ]
 MAPI_ENCODER_PATH = DATA_PATH.joinpath("otx_models", "sam_vit_b_zsl_encoder.xml")
 MAPI_DECODER_PATH = DATA_PATH.joinpath("otx_models", "sam_vit_b_zsl_decoder.xml")

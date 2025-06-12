@@ -41,6 +41,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const skipPointsCheckbox = document.getElementById("skipPointsInExistingMasks");
   const randomPriorCheckbox = document.getElementById("randomPriorCheckbox");
+  const compileModelsCheckbox = document.getElementById("compileModelsCheckbox");
+  const precisionSelect = document.getElementById("precisionSelect");
 
   async function fetchAndPopulateClasses (selectedDataset) {
     classNameSelect.innerHTML =
@@ -211,6 +213,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const maskSimilarityThreshold = parseFloat(maskSimilarityThresholdInput.value);
     const skipPoints = skipPointsCheckbox?.checked ?? false;
     const useRandomPrior = randomPriorCheckbox?.checked ?? false;
+    const compileModels = compileModelsCheckbox?.checked ?? true;
+    const precision = precisionSelect.value;
 
     if (!className || isNaN(nShot) || nShot < 1 || isNaN(similarityThreshold) || isNaN(maskSimilarityThreshold) || isNaN(numTargetImages) || numTargetImages < 1) {
       // Use progress text for errors before starting
@@ -237,7 +241,7 @@ document.addEventListener("DOMContentLoaded", () => {
     progressBarFill.style.width = "0%";
     progressBarFill.classList.remove("bg-red-600");
     progressBarFill.classList.add("bg-blue-600");
-    progressText.textContent = useRandomPrior ? "Initializing with Random Prior..." : "Initializing...";
+    progressText.textContent = useRandomPrior ? "Loading pipeline with Random Prior..." : "Loading pipeline...";
     Object.keys(canvasDataStore).forEach((key) => delete canvasDataStore[key]);
     Object.keys(maskImageCache).forEach((key) => delete maskImageCache[key]);
     Object.keys(groundTruthMaskImageCache).forEach((key) => delete groundTruthMaskImageCache[key]);
@@ -265,7 +269,9 @@ document.addEventListener("DOMContentLoaded", () => {
           similarity_threshold: similarityThreshold,
           mask_similarity_threshold: maskSimilarityThreshold,
           skip_points_in_existing_masks: skipPoints,
-          random_prior: useRandomPrior
+          random_prior: useRandomPrior,
+          compile_models: compileModels,
+          precision: precision,
         }),
       });
 

@@ -1,163 +1,104 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-import argparse
 import colorsys
+import logging
 import random
+import sys
+from logging import getLogger
+from pathlib import Path
 
 import cv2
 import numpy as np
-import ot
+import requests
 import torch
 import umap
 from matplotlib import pyplot as plt
-from model_api.models import Prompt
-from model_api.models.visual_prompting import VisualPromptingFeatures
+from rich.progress import (
+    BarColumn,
+    DownloadColumn,
+    Progress,
+    TextColumn,
+    TimeRemainingColumn,
+    TransferSpeedColumn,
+)
 from sklearn.cluster import KMeans
 from sklearn.manifold import TSNE
 from torch.nn import functional as F
 
-from visionprompt.context_learner.types import Image, Masks, Points
-from visionprompt.utils.constants import DATASETS, MODEL_MAP, PIPELINES
-
-# Define some colors for visualization
-COLORS = [
-    (255, 0, 0),
-    (0, 255, 0),
-    (0, 0, 255),
-    (255, 255, 0),
-    (0, 255, 255),
-    (255, 0, 255),
-    (128, 0, 0),
-    (0, 128, 0),
-    (0, 0, 128),
-    (128, 128, 0),
-    (0, 128, 128),
-    (128, 0, 128),
-]
+logger = getLogger("Vision Prompt")
 
 
-def _draw_points(
-    img: np.ndarray,
-    x: np.ndarray,
-    y: np.ndarray,
-    size: int = 1,
-    color: tuple[int, int, int] = (255, 255, 255),
-) -> np.ndarray:
-    """Draw points on an image.
+def setup_logger(dir_path: Path, log_level: str) -> None:
+    """Save logs to a directory and setup console logging."""
+    root_logger = logging.getLogger()
+    root_logger.setLevel(log_level.upper())
 
-    Args:
-        img: Image to draw points on
-        x: x coordinates of points
-        y: y coordinates of points
-        size: Size of the points
-        color: Color of the points
+    # Clear existing handlers to prevent duplicate logs
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
 
-    Returns:
-        Image with points drawn on it
-    """
-    if size == 1:  # faster
-        img[y.astype(int), x.astype(int)] = color
-    else:  # slower
-        for xx, yy in zip(x, y, strict=False):
-            cv2.drawMarker(img, (int(xx), int(yy)), color, cv2.MARKER_STAR, size)
-    return img
+    if not dir_path.exists():
+        dir_path.mkdir(parents=True, exist_ok=True)
+    file_handler = logging.FileHandler(dir_path / "logs.log")
+    file_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+    root_logger.addHandler(file_handler)
+
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(logging.Formatter("%(levelname)s - %(name)s: \t%(message)s"))
+    root_logger.addHandler(console_handler)
+
+    # Set PIL logger to a higher level to avoid verbose debug logs
+    logging.getLogger("PIL").setLevel(logging.INFO)
 
 
-def overlay_masks_and_points(
-    image: Image,
-    masks: Masks,
-    points: Points,
-) -> np.ndarray:
-    """Overlays masks onto an image using fixed blending weights (0.7 image, 0.3 mask).
+def download_file(url: str, target_path: Path) -> None:
+    """Download a file from a URL to a target path."""
+    target_dir = target_path.parent
+    target_dir.mkdir(parents=True, exist_ok=True)
 
-      Creates a combined mask first. Draws points on top with distinct colors per class.
+    disable_progress = not sys.stderr.isatty()
+    progress = Progress(
+        TextColumn("[bold blue]{task.fields[filename]}", justify="right"),
+        BarColumn(bar_width=None),
+        "[progress.percentage]{task.percentage:>3.1f}%",
+        " • ",
+        DownloadColumn(),
+        " • ",
+        TransferSpeedColumn(),
+        " • ",
+        TimeRemainingColumn(),
+        transient=True,
+        disable=disable_progress,
+    )
 
-    Args:
-        image: The input Image object.
-        masks: A Masks object containing masks per class.
-        points: A Points object containing points per class.
-        alpha: Transparency level (currently ignored for mask blending, uses 0.3).
+    try:  # noqa: PLR1702
+        with requests.get(url, stream=True, timeout=10) as r:
+            r.raise_for_status()
+            total_size = int(r.headers.get("content-length", 0))
+            print(f"Downloading {target_path.name} ({total_size / (1024 * 1024):.2f} MB) from {url}...")
 
-    Returns:
-        The image (as a numpy array) with mask overlays and points.
-    """
-    img_np = image.data.copy()  # Work on a copy
+            with progress:
+                task_id = progress.add_task("download", total=total_size, filename=target_path.name)
+                with target_path.open("wb") as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                            progress.update(task_id, advance=len(chunk))
 
-    # Ensure image is 3-channel BGR
-    if img_np.ndim == 2:
-        img_np = cv2.cvtColor(img_np, cv2.COLOR_GRAY2BGR)
-    elif img_np.shape[2] == 4:  # RGBA
-        img_np = cv2.cvtColor(img_np, cv2.COLOR_RGBA2BGR)
+            if not disable_progress and total_size > 0:
+                progress.update(task_id, completed=total_size)
 
-    # Create a combined mask from all classes
-    combined_mask_np = np.zeros((img_np.shape[0], img_np.shape[1]), dtype=np.uint8)
-    for mask_tensor in masks.data.values():
-        if mask_tensor.numel() == 0:
-            continue
-        class_combined_mask_tensor = torch.any(mask_tensor, dim=0)
-        mask_np = class_combined_mask_tensor.cpu().numpy().astype(np.uint8)
-
-        if mask_np.ndim == 3:
-            mask_np = mask_np.squeeze()
-
-        if mask_np.shape != (img_np.shape[0], img_np.shape[1]):
-            mask_np = cv2.resize(
-                mask_np,
-                (img_np.shape[1], img_np.shape[0]),
-                interpolation=cv2.INTER_NEAREST,
-            )
-
-        # Combine with the overall mask using logical OR
-        combined_mask_np = np.logical_or(combined_mask_np, mask_np).astype(np.uint8)
-
-    # Create a 3-channel BGR image from the final combined mask (white where mask is > 0)
-    final_mask_img = np.zeros_like(img_np, dtype=np.uint8)
-    final_mask_img[combined_mask_np > 0] = (255, 255, 255)
-
-    # Blend the original image with the final 3-channel mask image using fixed weights
-    overlay_image = cv2.addWeighted(img_np, 0.7, final_mask_img, 0.3, 0)
-
-    # Draw points on top of the blended image
-    color_idx = 0
-    for points_per_map_tensor in points.data.values():
-        color = COLORS[color_idx % len(COLORS)]
-        color_idx += 1
-        for points_tensor in points_per_map_tensor:
-            for point in points_tensor:
-                # Use .item() to get scalar value from tensor
-                x, y = int(point[0].item()), int(point[1].item())
-                cv2.circle(
-                    overlay_image,
-                    (x, y),
-                    radius=5,
-                    color=color,
-                    thickness=-1,
-                )  # Filled circle
-                # Optional: Add a border for better visibility
-                cv2.circle(
-                    overlay_image,
-                    (x, y),
-                    radius=5,
-                    color=(0, 0, 0),
-                    thickness=1,
-                )
-
-    return overlay_image
-
-
-def mask_image_to_polygon_prompts(mask_image: np.array) -> list[Prompt]:
-    """Convert a mask image to a list of polygon prompts.
-
-    Args:
-        mask_image: Mask image
-
-    Returns:
-        List[Prompt]
-
-    """
-    mask = mask_image.astype(np.uint8)
-    mask = np.stack((mask, np.zeros_like(mask), np.zeros_like(mask)), axis=-1)
+        print(f"Downloaded model weights successfully to {target_path}")
+    except Exception as e:
+        # Catch other potential errors (e.g., file writing issues)
+        print(f"\nAn unexpected error occurred during download: {e}")
+        if target_path.exists():
+            try:
+                target_path.unlink()
+            except OSError as unlink_e:
+                print(f"Error removing file {target_path} after error: {unlink_e}")
+        raise
 
 
 def get_colors(n: int) -> np.ndarray:
@@ -169,47 +110,9 @@ def get_colors(n: int) -> np.ndarray:
     Returns:
         Colors for a mask
     """
-    HSV_tuples = [(x / n, 0.5, 0.5) for x in range(n)]
-    RGB_tuples = (colorsys.hsv_to_rgb(*x) for x in HSV_tuples)
-    return (np.array(list(RGB_tuples)) * 255).astype(np.uint8)
-
-
-def transform_point_prompts_to_dict(
-    prompts: list[Prompt],
-) -> dict[int, list[list[int]]]:
-    """Transform point prompts into a dictionary of points per class.
-
-    Args:
-        prompts: List[Prompt]
-
-    Returns:
-        Dict[int, list[list[int]]]  where the key is the class index and the value is the list of points
-    """
-    result = {}
-    for prompt in prompts:
-        label = prompt.label
-        coords = prompt.data.tolist()
-        if label not in result:
-            result[label] = []
-        result[label].append(coords)
-    return result
-
-
-def transform_mask_prompts_to_dict(prompts: list[Prompt]) -> dict[int, np.array]:
-    """Transform masks into a dictionary of masks per class.
-
-    Args:
-        prompts: List[Prompt]
-
-    Returns:
-        Dict[int, np.array]  where the key is the class index and the value is the mask
-    """
-    result = {}
-    for prompt in prompts:
-        label = prompt.label
-        mask = prompt.data
-        result[label] = mask
-    return result
+    hsv_tuples = [(x / n, 0.5, 0.5) for x in range(n)]
+    rgb_tuples = (colorsys.hsv_to_rgb(*x) for x in hsv_tuples)
+    return (np.array(list(rgb_tuples)) * 255).astype(np.uint8)
 
 
 def prepare_target_guided_prompting(
@@ -318,80 +221,6 @@ def cluster_points(points: np.ndarray, n_clusters: int = 8) -> np.ndarray:
     return np.array(prototypes).astype(np.int64)
 
 
-def similarity_maps_to_visualization(
-    similarity_maps: np.ndarray | torch.Tensor,
-    points: np.ndarray | None = None,
-    bg_points: np.ndarray | None = None,
-) -> np.ndarray:
-    """Convert similarity maps to visualization with optional point overlays.
-
-    Args:
-        similarity_maps: Either a 2D array (H,W) or 3D array (N,H,W) of similarity maps
-        points: Optional foreground points to visualize as white dots (N,2)
-        bg_points: Optional background points to visualize as red dots (N,2)
-    """
-    if isinstance(similarity_maps, torch.Tensor):
-        similarity_maps = similarity_maps.cpu().numpy()
-
-    if len(similarity_maps.shape) == 2:
-        # Handle single 2D similarity map
-        similarity = np.zeros((*similarity_maps.shape, 3), dtype=np.uint8)
-        similarity[:, :] = np.expand_dims(similarity_maps * 255, axis=2)
-
-        # Draw points if provided
-        if points is not None:
-            _draw_points(
-                similarity,
-                points[:, 0],
-                points[:, 1],
-                size=15,
-                color=(255, 255, 255),
-            )
-        if bg_points is not None:
-            _draw_points(
-                similarity,
-                bg_points[:, 0],
-                bg_points[:, 1],
-                size=15,
-                color=(0, 0, 255),
-            )
-    else:
-        # Handle stack of similarity maps - arrange horizontally
-        n_maps, height, width = similarity_maps.shape
-        # Create a wide image to hold all maps side by side
-        similarity = np.zeros((height, width * n_maps, 3), dtype=np.uint8)
-
-        for i in range(n_maps):
-            # Create individual map visualization
-            single_map = np.zeros((height, width, 3), dtype=np.uint8)
-            single_map[:, :] = np.expand_dims(similarity_maps[i] * 255, axis=2)
-
-            # Draw points on individual map if provided
-            if points is not None:
-                _draw_points(
-                    single_map,
-                    points[:, 0],
-                    points[:, 1],
-                    size=15,
-                    color=(255, 255, 255),
-                )
-            if bg_points is not None:
-                _draw_points(
-                    single_map,
-                    bg_points[:, 0],
-                    bg_points[:, 1],
-                    size=15,
-                    color=(0, 0, 255),
-                )
-
-            # Place the map with points in its position
-            start_x = i * width
-            end_x = (i + 1) * width
-            similarity[:, start_x:end_x] = single_map
-
-    return similarity
-
-
 def gen_colors(n: int) -> np.ndarray:
     """Generate colors for a mask.
 
@@ -422,84 +251,6 @@ def color_overlay(image: np.ndarray, mask: np.ndarray) -> np.ndarray:
     color_mask[mask == 0] = image[mask == 0]  # set background to original color
     image_vis = cv2.addWeighted(image, 0.2, color_mask, 0.8, 0)
     return image_vis[:, :, ::-1]  # BGR2RGB
-
-
-def show_cosine_distance(reference_features: dict[int, torch.Tensor]) -> None:
-    """Show pair wise cosine distance between reference features for each class in a formatted table.
-
-    Args:
-        reference_features: Dictionary mapping class labels to their reference features tensors
-    """
-    if isinstance(reference_features, VisualPromptingFeatures):
-        # modelAPI does not support multiple reference features
-        return
-
-    for label, features in reference_features.items():
-        if len(features) > 10:
-            print(f"Skipping class {label} with {len(features)} features")
-            continue
-        if features.shape[0] > 1:
-            n_features = features.shape[0]
-            high_similarity_found = False
-
-            # Print header with class label
-            print(f"\nCosine Similarity Matrix for class {label} reference features:")
-            print("-" * 50)
-            header = "    " + "".join(f"  [{i}]  " for i in range(n_features))
-            print(header)
-            print("-" * 50)
-
-            # Print similarity matrix
-            for i in range(n_features):
-                row = f"[{i}]"
-                for j in range(n_features):
-                    if j < i:
-                        sim = torch.nn.functional.cosine_similarity(
-                            features[i].squeeze(),
-                            features[j].squeeze(),
-                            dim=0,
-                        ).item()
-                        if sim > 0.9:
-                            high_similarity_found = True
-                        row += f" {sim:6.3f}"
-                    elif j == i:
-                        row += "  1.000"
-                    else:
-                        row += "      -"
-                print(row)
-            print("-" * 50)
-
-            if high_similarity_found:
-                print(
-                    "\nWarning: Some reference features have similarity > 0.9",
-                    "This indicates very similar semantic information between points,",
-                    "which might not contribute to better performance.",
-                )
-
-
-def _compute_wasserstein_distance(a, b, weights=None) -> float:
-    """Computes the Wasserstein distance between two distributions a and b.
-
-    Lower distance is better match.
-
-    Args:
-        a: First distribution
-        b: Second distribution
-        weights: Weights for the second distribution
-
-    Returns:
-        Wasserstein distance
-    """
-    n_a = a.shape[0]
-    a_hist = ot.unif(n_a)
-    if weights is not None:
-        b_hist = weights / np.sum(weights)
-    else:
-        n_b = b.shape[0]
-        b_hist = ot.unif(n_b)
-
-    M = ot.dist(a, b)
-    return ot.emd2(a_hist, b_hist, M, numItermax=10000000)
 
 
 def visualize_feature_clusters(
@@ -671,36 +422,3 @@ def sample_points(
         sample_list.append(sample)
         label_list.append(label)
     return sample_list, label_list
-
-
-def parse_experiment_args(args: argparse.Namespace) -> tuple[list[str], list[str], list[str]]:
-    """Parse experiment arguments.
-
-    Args:
-        args: Arguments
-
-    Returns:
-        tuple containing:
-            - datasets_to_run: List of datasets to run
-            - pipelines_to_run: List of pipelines to run
-            - backbones_to_run: List of backbones to run
-    """
-    if args.dataset_name == "all":
-        valid_datasets = [d for d in DATASETS if d != "all"]
-    else:
-        datasets_to_run = [d.strip() for d in args.dataset_name.split(",")]
-        valid_datasets = [d for d in datasets_to_run if d in DATASETS]
-
-    if args.pipeline == "all":
-        valid_pipelines = [p for p in PIPELINES if p != "all"]
-    else:
-        pipelines_to_run = [p.strip() for p in args.pipeline.split(",")]
-        valid_pipelines = [p for p in pipelines_to_run if p in PIPELINES]
-
-    if args.sam_name == "all":
-        valid_backbones = [b for b in list(MODEL_MAP.keys()) if b != "all"]
-    else:
-        backbones_to_run = [b.strip() for b in args.sam_name.split(",")]
-        valid_backbones = [b for b in backbones_to_run if b in MODEL_MAP]
-
-    return valid_datasets, valid_pipelines, valid_backbones
