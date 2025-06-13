@@ -1,18 +1,42 @@
+"""Dataset iterators."""
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-import math
-from collections.abc import Iterator
+from __future__ import annotations
 
-import numpy as np
+import math
+from typing import TYPE_CHECKING
 
 from visionprompt.datasets.dataset_iterator_base import DatasetIter
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    import numpy as np
+
+    from visionprompt.datasets import Dataset
+
 
 class IndexIter(DatasetIter):
-    """Standard PyTorch style iterator producing batches of images and masks."""
+    """Standard PyTorch style iterator producing batches of images and masks.
 
-    def __init__(self, parent: "Dataset") -> None:  # noqa: F821
+    Examples:
+        >>> from visionprompt.datasets.dataset_iterators import IndexIter
+        >>> from visionprompt.datasets import Dataset
+        >>>
+        >>> class MyDataset(Dataset):
+        ...     def __len__(self) -> int:
+        ...         return 1
+        ...
+        ...     def __getitem__(self, index: int) -> tuple:
+        ...         return (np.zeros((10, 10, 3)), {})
+        >>>
+        >>> dataset = MyDataset(iterator_type=IndexIter)
+        >>> iterator = IndexIter(parent=dataset)
+        >>> item = iterator[0]
+    """
+
+    def __init__(self, parent: Dataset) -> None:
         super().__init__(parent)
         self.index = 0
 
@@ -69,9 +93,29 @@ class IndexIter(DatasetIter):
 
 
 class CategoryIter(DatasetIter):
-    """This class iterates over categories and return images and masks."""
+    """This class iterates over categories and return images and masks.
 
-    def __init__(self, parent: "Dataset") -> None:  # noqa: F821
+    Examples:
+        >>> from visionprompt.datasets.dataset_iterators import CategoryIter
+        >>> from visionprompt.datasets import Dataset
+        >>> import numpy as np
+        >>>
+        >>> class MyDataset(Dataset):
+        ...     def get_images_by_category(self, *args, **kwargs) -> list[np.ndarray]:
+        ...         return [np.zeros((10, 10, 3))]
+        ...
+        ...     def get_masks_by_category(self, *args, **kwargs) -> list[np.ndarray]:
+        ...         return [np.zeros((10, 10))]
+        ...
+        ...     def get_category_count(self) -> int:
+        ...         return 1
+        >>>
+        >>> dataset = MyDataset(iterator_type=CategoryIter)
+        >>> iterator = CategoryIter(parent=dataset)
+        >>> images, masks = iterator[0]
+    """
+
+    def __init__(self, parent: Dataset) -> None:
         super().__init__(parent)
         self.index = 0
 
@@ -130,36 +174,34 @@ class CategoryIter(DatasetIter):
 
 
 class BatchedSingleCategoryIter(DatasetIter):
-    """This class iterates over batches of images and masks of a given category."""
+    """This class iterates over batches of images and masks of a given category.
 
-    def __init__(self, parent: "Dataset", batch_size: int, category_index: int) -> None:  # noqa: F821
+    Examples:
+        >>> from visionprompt.datasets.dataset_iterators import BatchedSingleCategoryIter
+        >>> from visionprompt.datasets import Dataset
+        >>> import numpy as np
+        >>>
+        >>> class MyDataset(Dataset):
+        ...     def get_images_by_category(self, *args, **kwargs) -> list[np.ndarray]:
+        ...         return [np.zeros((10, 10, 3))]
+        ...
+        ...     def get_masks_by_category(self, *args, **kwargs) -> list[np.ndarray]:
+        ...         return [np.zeros((10, 10))]
+        ...
+        ...     def get_image_count_per_category(self, *args, **kwargs) -> int:
+        ...         return 1
+        >>>
+        >>> dataset = MyDataset(iterator_type=BatchedSingleCategoryIter,
+        ...     iterator_kwargs={"batch_size": 1, "category_index": 0})
+        >>> iterator = BatchedSingleCategoryIter(parent=dataset, batch_size=1, category_index=0)
+        >>> images, masks = iterator[0]
+    """
+
+    def __init__(self, parent: Dataset, batch_size: int, category_index: int) -> None:
         super().__init__(parent)
         self._batch_size = batch_size
         self._category_index = category_index
         self._batch_index = 0
-
-    def __getitem__(
-        self,
-        batch_index: int,
-    ) -> tuple[list[np.ndarray], list[np.ndarray]]:
-        """Get an item from the dataset.
-
-        Args:
-            batch_index: Index of the batch
-
-        Returns:
-            Tuple of images and masks
-        """
-        self._parent.get_images_by_category(
-            self._category_index,
-            start=self._batch_index * self._batch_size,
-            end=(batch_index + 1) * self._batch_size,
-        )
-        self._parent.get_masks_by_category(
-            self._category_index,
-            start=self._batch_index * self._batch_size,
-            end=(batch_index + 1) * self._batch_size,
-        )
 
     def __getitem__(
         self,
@@ -236,9 +278,22 @@ class BatchedSingleCategoryIter(DatasetIter):
 
 
 class BatchedCategoryIter(DatasetIter):
-    """This class iterates over categories and returns a new iterator for creating batches per category."""
+    """This class iterates over categories and returns a new iterator for creating batches per category.
 
-    def __init__(self, parent: "Dataset", batch_size: int) -> None:  # noqa: F821
+    Examples:
+        >>> from visionprompt.datasets.dataset_iterators import BatchedCategoryIter
+        >>> from visionprompt.datasets import Dataset
+        >>>
+        >>> class MyDataset(Dataset):
+        ...     def get_category_count(self) -> int:
+        ...         return 1
+        >>>
+        >>> dataset = MyDataset(iterator_type=BatchedCategoryIter, iterator_kwargs={"batch_size": 1})
+        >>> iterator = BatchedCategoryIter(parent=dataset, batch_size=1)
+        >>> batch_iterator = iterator[0]
+    """
+
+    def __init__(self, parent: Dataset, batch_size: int) -> None:
         super().__init__(parent)
         self._batch_size = batch_size
         self._category_index = 0

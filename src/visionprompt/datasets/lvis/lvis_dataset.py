@@ -1,3 +1,4 @@
+"""LVIS dataset."""
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
@@ -51,6 +52,12 @@ class LVISAnnotation(Annotation):
         width: The width of the image
         segments: The segments of the annotation
         category_id: The category id of the annotation
+
+    Examples:
+        >>> from visionprompt.datasets.lvis import LVISAnnotation
+        >>>
+        >>> annotation = LVISAnnotation(height=10, width=10, segments=[], category_id=0)
+        >>> # mask = annotation.get_mask()
     """
 
     def __init__(
@@ -80,6 +87,12 @@ class LVISImage(Image):
         filename: The filename of the image
         height: The height of the image
         width: The width of the image
+
+    Examples:
+        >>> from visionprompt.datasets.lvis import LVISImage
+        >>>
+        >>> image = LVISImage(filename="test.jpg", height=10, width=10)
+        >>> # img_array = image.get_image() # This would read the file
     """
 
     def __init__(
@@ -152,6 +165,12 @@ class LVISDataset(Dataset):
                     COCO dataset to the LVIS dataset folders.
                     If copy_files is True, then after copying, download_full_dataset can be set to false.
         iterator_kwargs: Keyword arguments passed to the iterator_type
+
+    Examples:
+        >>> from visionprompt.datasets.lvis import LVISDataset
+        >>>
+        >>> dataset = LVISDataset(root_path="<path_to_lvis_dataset>")
+        >>> item = dataset[0]
     """
 
     def __init__(

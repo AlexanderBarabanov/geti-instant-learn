@@ -1,12 +1,13 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
-
+# ruff: noqa: E402
 import argparse
 import shutil
 import warnings
 from pathlib import Path
 
 warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 from logging import getLogger
 
@@ -22,15 +23,19 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-from visionprompt.context_learner.pipelines import Pipeline
-from visionprompt.context_learner.processes.calculators import SegmentationMetrics
-from visionprompt.context_learner.processes.visualizations import ExportMaskVisualization
-from visionprompt.context_learner.types import Image, Masks, Priors
 from visionprompt.datasets import BatchedSingleCategoryIter, Dataset
+from visionprompt.models.models import load_pipeline
+from visionprompt.pipelines import Pipeline
+from visionprompt.processes.calculators import SegmentationMetrics
+from visionprompt.processes.visualizations import ExportMaskVisualization
+from visionprompt.types import Image, Masks, Priors
 from visionprompt.utils import setup_logger
 from visionprompt.utils.args import get_arguments, parse_experiment_args
-from visionprompt.utils.data import get_filename_categories, get_image_and_mask_from_filename, load_dataset
-from visionprompt.utils.models import load_pipeline
+from visionprompt.utils.data import (
+    get_filename_categories,
+    get_image_and_mask_from_filename,
+    load_dataset,
+)
 
 logger = getLogger("Vision Prompt")
 
@@ -140,7 +145,9 @@ def infer_all_batches(
     batches.reset()  # reset batch iterator because it was consumed
     num_batches_to_process = len(batches) if number_of_batches is None else min(len(batches), number_of_batches + 1)
     batches_task = progress.add_task(
-        f"[magenta]Infer step: {category_name}", total=num_batches_to_process, transient=True
+        f"[magenta]Infer step: {category_name}",
+        total=num_batches_to_process,
+        transient=True,
     )
     time_sum = 0
     time_count = 0
@@ -396,10 +403,13 @@ def predict_on_dataset(  # noqa: C901
                 # Learn using the priors (currently only use the first masks)
                 reference_priors = [Priors(masks=priors_masks2[i]) for i in range(len(priors_masks2))]
                 try:
-                    pipeline.learn(reference_images=priors_images2, reference_priors=reference_priors)
+                    pipeline.learn(
+                        reference_images=priors_images2,
+                        reference_priors=reference_priors,
+                    )
                     progress.update(priors_task, advance=1)
-                except ValueError as e:
-                    logger.exception(e)
+                except ValueError:
+                    logger.exception("Failed to learn from priors.")
                     progress.update(priors_task, advance=1)
                     continue
 
@@ -499,12 +509,9 @@ def main() -> None:
     all_results = []
     avg_result_dataframe = None
     datasets_to_run, pipelines_to_run, backbones_to_run = parse_experiment_args(args)
-    datasets_str = "-".join(datasets_to_run)
-    pipelines_str = "-".join(pipelines_to_run)
-    backbones_str = "-".join(backbones_to_run)
 
     for dataset_name in datasets_to_run:
-        dataset = load_dataset(dataset_name, whitelist=args.class_name)
+        dataset = load_dataset(dataset_name, whitelist=args.class_name, batch_size=args.batch_size)
         for pipeline_name in pipelines_to_run:
             for bidx, backbone_name in enumerate(backbones_to_run):
                 if pipeline_name == "PerSAMModular" and backbone_name == "EfficientViT-SAM":
@@ -547,18 +554,12 @@ def main() -> None:
                 all_results.append(all_metrics_df)
 
     all_result_dataframe = pd.concat(all_results, ignore_index=True)
-    if args.experiment_name:
-        output_path = output_path / args.experiment_name
-    all_results_dataframe_filename = (
-        output_path / f"models-{backbones_str}_datasets-{datasets_str}_algorithms-{pipelines_str}_all_results.csv"
-    )
+    all_results_dataframe_filename = output_path / "all_results.csv"
     all_results_dataframe_filename.parent.mkdir(parents=True, exist_ok=True)
     all_result_dataframe.to_csv(str(all_results_dataframe_filename))
     logger.info(f"Saved all results to: {all_results_dataframe_filename}")
 
-    avg_results_dataframe_filename = (
-        output_path / f"models-{backbones_str}_datasets-{datasets_str}_algorithms-{pipelines_str}_avg_results.csv"
-    )
+    avg_results_dataframe_filename = output_path / "avg_results.csv"
     avg_results_dataframe_filename.parent.mkdir(parents=True, exist_ok=True)
     avg_result_dataframe = all_result_dataframe.groupby(
         ["dataset_name", "pipeline_name", "backbone_name"],

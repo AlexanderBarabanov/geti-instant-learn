@@ -1,3 +1,4 @@
+"""PerSeg dataset."""
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
@@ -21,6 +22,12 @@ class PerSegAnnotation(Annotation):
     Args:
         filename: The filename of the annotation
         category_id: The category id of the annotation
+
+    Examples:
+        >>> from visionprompt.datasets.perseg import PerSegAnnotation
+        >>>
+        >>> annotation = PerSegAnnotation(filename="test.png", category_id=0)
+        >>> # mask = annotation.get_mask() # This would read the file
     """
 
     def __init__(self, filename: str, category_id: int) -> None:
@@ -44,6 +51,12 @@ class PerSegImage(Image):
 
     Args:
         filename: The filename of the image
+
+    Examples:
+        >>> from visionprompt.datasets.perseg import PerSegImage
+        >>>
+        >>> image = PerSegImage(filename="test.jpg")
+        >>> # img_array = image.get_image() # This would read the file
     """
 
     def __init__(self, filename: str) -> None:
@@ -78,6 +91,12 @@ class PerSegDataset(Dataset):
         iterator_type: The iterator type
         iterator_kwargs: Keyword arguments passed to the iterator_type
         whitelist: Optional list of category names to load. If None, load all.
+
+    Examples:
+        >>> from visionprompt.datasets.perseg import PerSegDataset
+        >>>
+        >>> dataset = PerSegDataset(root_path="<path_to_perseg_dataset>")
+        >>> item = dataset[0]
     """
 
     def __init__(

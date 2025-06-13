@@ -10,6 +10,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import PIL
 import requests
 import torch
 import umap
@@ -25,6 +26,7 @@ from rich.progress import (
 from sklearn.cluster import KMeans
 from sklearn.manifold import TSNE
 from torch.nn import functional as F
+from torchvision import transforms
 
 logger = getLogger("Vision Prompt")
 
@@ -370,6 +372,23 @@ def generate_combinations(n: int, k: int) -> list[list[int]]:
     for i in range(n):
         res.extend([*j, i] for j in generate_combinations(i, k - 1))
     return res
+
+
+class MaybeToTensor(transforms.ToTensor):
+    """Convert a ``PIL Image`` or ``numpy.ndarray`` to tensor, or keep as is if already a tensor."""
+
+    def __call__(self, pic: PIL.Image.Image | np.ndarray | torch.Tensor) -> torch.Tensor:
+        """Convert a ``PIL Image`` or ``numpy.ndarray`` to tensor, or keep as is if already a tensor.
+
+        Args:
+            pic: Image to be converted to tensor.
+
+        Returns:
+            Tensor: Converted image.
+        """
+        if isinstance(pic, torch.Tensor):
+            return pic
+        return super().__call__(pic)
 
 
 def sample_points(

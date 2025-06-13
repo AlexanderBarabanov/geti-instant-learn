@@ -56,80 +56,101 @@ uv sync --extra full
 
 The power of this repository lies in its modularity. You can easily modify pipelines by changing which components are instantiated within their class definition.
 
-For instance, here is the complete definition for the `PerSam` pipeline from [`context_learner/pipelines/persam_pipeline.py`](src/visionprompt/context_learner/pipelines/persam_pipeline.py). It shows how different processing components are instantiated within the `__init__` method to define the pipeline's behavior. 
+For instance, here is the complete definition for the `PerSam` pipeline from [`context_learner/pipelines/persam_pipeline.py`](src/visionprompt/context_learner/pipelines/persam_pipeline.py). It shows how different processing components are instantiated within the `__init__` method to define the pipeline's behavior.
 
 ```python
-# src/visionprompt/context_learner/pipelines/persam_pipeline.py
-
+# src/visionprompt/pipelines/persam_pipeline.py
 
 class PerSam(Pipeline):
+    """This is the PerSam algorithm pipeline.
+
+    It's based on the paper "Personalize Segment Anything Model with One Shot"
+    https://arxiv.org/abs/2305.03048.
+
+    It matches reference objects to target images by comparing their features extracted by SAM
+    and using Cosine Similarity. A grid prompt generator is used to generate prompts for the
+    segmenter and to allow for multi object target images.
     """
-    This is the PerSam algorithm pipeline. It is based on the paper "Personalize Segment Anything Model with One Shot"
-    https://arxiv.org/abs/2305.03048
 
-    It matches reference objects to target images by comparing their features extracted by SAM and using Cosine Similarity.
-    A grid prompt generator is used to generate prompts for the segmenter and to support multi-object target images.
-    """
-
-    def __init__(self, sam_predictor: SamPredictor, args: argparse.Namespace):
-        super().__init__(args)
-
-        self.encoder: Encoder = SamEncoder(self._state, sam_predictor)
-        # self.feature_selector: FeatureSelector = AverageFeatures(self._state)
-        self.feature_selector: FeatureSelector = ClusterFeatures(
-            self._state, num_clusters=self.args.num_clusters
-        )
-        self.similarity_matcher: SimilarityMatcher = CosineSimilarity(self._state)
+    def __init__(
+        self,
+        sam_predictor: SamPredictor,
+        num_foreground_points: int,
+        num_background_points: int,
+        apply_mask_refinement: bool,
+        skip_points_in_existing_masks: bool,
+        num_grid_cells: int,
+        similarity_threshold: float,
+        mask_similarity_threshold: float,
+        image_size: int | tuple[int, int] | None = None,
+    ) -> None:
+        super().__init__(image_size=image_size)
+        self.encoder: Encoder = SamEncoder(sam_predictor=sam_predictor)
+        self.feature_selector: FeatureSelector = AverageFeatures()
+        self.similarity_matcher: SimilarityMatcher = CosineSimilarity()
         self.prompt_generator: PromptGenerator = GridPromptGenerator(
-            self._state,
-            similarity_threshold=self.args.similarity_threshold,
-            num_bg_points=self.args.num_background_points,
+            num_grid_cells=num_grid_cells,
+            similarity_threshold=similarity_threshold,
+            num_bg_points=num_background_points,
+        )
+        self.point_filter: PriorFilter = MaxPointFilter(
+            max_num_points=num_foreground_points,
         )
         self.segmenter: Segmenter = SamDecoder(
-            self._state,
             sam_predictor=sam_predictor,
-            apply_mask_refinement=self.args.apply_mask_refinement,
+            apply_mask_refinement=apply_mask_refinement,
+            mask_similarity_threshold=mask_similarity_threshold,
+            skip_points_in_existing_masks=skip_points_in_existing_masks,
         )
-        self.mask_processor: MaskProcessor = MasksToPolygons(self._state)
-        self.class_overlap_mask_filter: MaskFilter = ClassOverlapMaskFilter(self._state)
+        self.mask_processor: MaskProcessor = MasksToPolygons()
+        self.class_overlap_mask_filter: MaskFilter = ClassOverlapMaskFilter()
+        self.reference_features = None
 
-    def learn(self, reference_images: List[Image], reference_priors: List[Priors]):
-        s: State = self._state
-        s.reference_images = reference_images
-        s.reference_priors = reference_priors
+    def learn(self, reference_images: list[Image], reference_priors: list[Priors]) -> Results:
+        """Perform learning step on the reference images and priors."""
+        reference_images = self.resize_images(reference_images)
+        reference_priors = self.resize_masks(reference_priors)
 
         # Start running the pipeline
-        s.reference_features, s.processed_reference_masks = self.encoder(
-            s.reference_images, s.reference_priors
+        reference_features, _ = self.encoder(
+            reference_images,
+            reference_priors,
         )
-        s.reference_features = self.feature_selector(s.reference_features)
+        self.reference_features = self.feature_selector(reference_features)
+        return Results()
 
-    def infer(self, target_images: List[Image]):
-        s: State = self._state
-        s.target_images = target_images
+    def infer(self, target_images: list[Image]) -> Results:
+        """Perform inference step on the target images."""
+        target_images = self.resize_images(target_images)
 
         # Start running the pipeline
-        s.target_features, _ = self.encoder(s.target_images)
-        s.similarities = self.similarity_matcher(
-            s.reference_features, s.target_features
+        target_features, _ = self.encoder(target_images)
+        similarities = self.similarity_matcher(
+            self.reference_features,
+            target_features,
+            target_images,
         )
-        s.priors = self.prompt_generator(s.similarities)
-        s.masks, s.used_points = self.segmenter(s.target_images, s.priors)
-        s.masks = self.class_overlap_mask_filter(s.masks, s.used_points)
-        s.annotations = self.mask_processor(s.masks)
+        priors = self.prompt_generator(similarities, target_images)
+        priors = self.point_filter(priors)
+        masks, used_points = self.segmenter(target_images, priors)
+        masks = self.class_overlap_mask_filter(masks, used_points)
+        annotations = self.mask_processor(masks)
 
-        return s.annotations
+        # write output
+        results = Results()
+        results.priors = priors
+        results.used_points = used_points
+        results.masks = masks
+        results.annotations = annotations
+        results.similarities = similarities
+        return results
 ```
 
-To experiment with a different component, such as using `AverageFeatures` instead of `ClusterFeatures` for the feature selection step, you would simply modify the `__init__` method:
+To experiment with a different component, such as using `ClusterFeatures` instead of `AverageFeatures` for the feature selection step, you would simply modify the `__init__` method:
 
 ```python
 # Simply swap out the feature selector:
-
-# self.feature_selector: FeatureSelector = ClusterFeatures(
-#     self._state, num_clusters=self.args.num_clusters
-# )
-self.feature_selector: FeatureSelector = AverageFeatures(self._state)
+self.feature_selector: FeatureSelector = ClusterFeatures()
 ```
 
 By editing the pipeline definition file directly, you control the specific combination of processing steps used, allowing for rapid prototyping and comparison.
@@ -138,13 +159,22 @@ After that, it's simply a question of calling `learn()` on your reference images
 
 ```python
 # Example usage
-pipeline = PerSam(sam_predictor, args)  
+pipeline = PerSam(
+    sam_predictor=sam_predictor,
+    num_foreground_points=10,
+    num_background_points=5,
+    apply_mask_refinement=True,
+    skip_points_in_existing_masks=True,
+    num_grid_cells=16,
+    similarity_threshold=0.5,
+    mask_similarity_threshold=0.7,
+)
 
 # Learn from reference images
-pipeline.learn(reference_images, reference_priors)
+results = pipeline.learn(reference_images, reference_priors)
 
 # Run inference on target images
-annotations = pipeline.infer(target_images)
+results = pipeline.infer(target_images)
 ```
 
 ## Component Overview
@@ -154,31 +184,23 @@ The following diagram shows the main components of the pipeline and their relati
 ```mermaid
 classDiagram
     class Pipeline {
-        +State _state
-        +argparse.Namespace args
-        +learn(List~Image~, List~Priors~) None
-        +infer(List~Image~) List~Annotations~
-        +get_state() State
-        +reset_state() None
+        +image_size: int | tuple[int, int] | None
+        +resize_images(List~Image~) List~Image~
+        +resize_masks(List~Priors~) List~Priors~
+        +learn(List~Image~, List~Priors~) Results
+        +infer(List~Image~) Results
     }
 
     class Process {
-        +State _state
         +__call__(*args) Any
     }
 
-    class State {
-        +List~Image~ reference_images
-        +List~Priors~ reference_priors
-        +List~Features~ reference_features
-        +List~Masks~ processed_reference_masks
-        +List~Image~ target_images
-        +List~Features~ target_features
-        +List~Similarities~ similarities
-        +List~Priors~ priors
-        +List~Masks~ masks
-        +List~Annotations~ annotations
-        +List~Points~ used_points
+    class Results {
+        +priors: List~Priors~
+        +used_points: List~Points~
+        +masks: List~Masks~
+        +annotations: List~Annotations~
+        +similarities: List~Similarities~
     }
 
     class Encoder~Process~ {
@@ -191,11 +213,15 @@ classDiagram
     }
     class SimilarityMatcher~Process~ {
         <<Interface>>
-        +__call__(List~Features~, List~Features~) List~Similarities~
+        +__call__(List~Features~, List~Features~, List~Image~) List~Similarities~
     }
     class PromptGenerator~Process~ {
         <<Interface>>
-        +__call__(List~Similarities~) List~Priors~
+        +__call__(List~Similarities~, List~Image~) List~Priors~
+    }
+    class PriorFilter~Process~ {
+        <<Interface>>
+        +__call__(List~Priors~) List~Priors~
     }
     class Segmenter~Process~ {
         <<Interface>>
@@ -203,24 +229,27 @@ classDiagram
     }
     class MaskProcessor~Process~ {
         <<Interface>>
-         +__call__(List~Masks~) List~Annotations~
+        +__call__(List~Masks~) List~Annotations~
     }
     class MaskFilter~Process~ {
-       <<Interface>>
+        <<Interface>>
         +__call__(List~Masks~, List~Points~) List~Masks~
     }
-     class PriorFilter~Process~ {
-       <<Interface>>
-        +__call__(List~Priors~) List~Priors~
-    }
 
-
-    Pipeline --> State : uses
-    Process --> State : uses
-
+    Pipeline --> Process : uses
+    Process --> Results : produces
 
     class PerSam {
         +SamPredictor sam_predictor
+        +Encoder encoder
+        +FeatureSelector feature_selector
+        +SimilarityMatcher similarity_matcher
+        +PromptGenerator prompt_generator
+        +PriorFilter point_filter
+        +Segmenter segmenter
+        +MaskProcessor mask_processor
+        +MaskFilter class_overlap_mask_filter
+        +List~Features~ reference_features
     }
 
     Pipeline <|-- PerSam
@@ -234,10 +263,9 @@ classDiagram
     PerSam o--> MaskProcessor : uses
     PerSam o--> MaskFilter : uses
 
-
     class SamEncoder
-    class ClusterFeatures
     class AverageFeatures
+    class ClusterFeatures
     class CosineSimilarity
     class GridPromptGenerator
     class MaxPointFilter
@@ -245,10 +273,9 @@ classDiagram
     class MasksToPolygons
     class ClassOverlapMaskFilter
 
-
     Encoder <|-- SamEncoder
-    FeatureSelector <|-- ClusterFeatures
     FeatureSelector <|-- AverageFeatures
+    FeatureSelector <|-- ClusterFeatures
     SimilarityMatcher <|-- CosineSimilarity
     PromptGenerator <|-- GridPromptGenerator
     PriorFilter <|-- MaxPointFilter
@@ -257,8 +284,8 @@ classDiagram
     MaskFilter <|-- ClassOverlapMaskFilter
 
     SamEncoder --|> Process
-    ClusterFeatures --|> Process
     AverageFeatures --|> Process
+    ClusterFeatures --|> Process
     CosineSimilarity --|> Process
     GridPromptGenerator --|> Process
     MaxPointFilter --|> Process
@@ -323,4 +350,3 @@ This project builds upon and utilizes code from several excellent open-source re
 ## License
 
 This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
-

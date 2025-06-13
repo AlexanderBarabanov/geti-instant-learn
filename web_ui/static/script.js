@@ -226,7 +226,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // --- UI Update for Loading State --- 
+    // --- UI Update for Loading State ---
     const originalButtonText = processButton.innerHTML;
     processButton.disabled = true;
     processButton.innerHTML = `
@@ -247,7 +247,7 @@ document.addEventListener("DOMContentLoaded", () => {
     Object.keys(groundTruthMaskImageCache).forEach((key) => delete groundTruthMaskImageCache[key]);
     if (referenceContainer) referenceContainer.innerHTML = '';
 
-    // --- Fetch and Process Streamed Response --- 
+    // --- Fetch and Process Streamed Response ---
     let totalTargets = 0;
     let resultsCount = 0;
     let errorOccurred = false;
@@ -280,7 +280,7 @@ document.addEventListener("DOMContentLoaded", () => {
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
-      // --- Stream Reading Logic --- 
+      // --- Stream Reading Logic ---
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -360,7 +360,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (errorOccurred) break;
       }
-      // --- End Stream Reading Logic --- 
+      // --- End Stream Reading Logic ---
 
       if (!errorOccurred) {
         if (resultsCount === 0 && totalTargets === 0 && !isFirstChunk) {
@@ -578,7 +578,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
 
-      // --- Ground Truth Toggle --- 
+      // --- Ground Truth Toggle ---
       const gtToggleDiv = document.createElement("div");
       gtToggleDiv.classList.add("gt-toggle-control", "mt-4", "flex", "items-center");
 
@@ -724,7 +724,7 @@ document.addEventListener("DOMContentLoaded", () => {
         currentlyPointHoveredMaskIndex: null, // For point hover tracking
       };
 
-      // Similarity Map Display 
+      // Similarity Map Display
       console.log(
         `[Canvas ${canvasId}] Checking for similarity maps:`,
         result.similarity_maps,

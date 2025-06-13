@@ -17,17 +17,17 @@ import cv2
 import numpy as np
 import torch
 
-from visionprompt.context_learner.pipelines.pipeline_base import Pipeline
-from visionprompt.context_learner.types import (
+from visionprompt.datasets.dataset_base import Dataset
+from visionprompt.models.models import load_pipeline
+from visionprompt.pipelines.pipeline_base import Pipeline
+from visionprompt.types import (
     Image,
     Masks,
     Points,
     Priors,
     Similarities,
 )
-from visionprompt.datasets.dataset_base import Dataset
 from visionprompt.utils.data import load_dataset
-from visionprompt.utils.models import load_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +98,9 @@ def process_points_for_web(points_obj: Points) -> list[dict[str, Any]]:
     return processed_points
 
 
-def process_similarity_maps_for_web(similarities_obj: Similarities) -> list[dict[str, Any]]:
+def process_similarity_maps_for_web(
+    similarities_obj: Similarities,
+) -> list[dict[str, Any]]:
     """Converts Similarity object maps to JSON-serializable list of data URIs."""
     processed_maps = []
     if not similarities_obj or not hasattr(similarities_obj, "data") or not similarities_obj.data:
@@ -197,7 +199,11 @@ def parse_request_and_check_reload(
         new_args.sam_name = new_sam_name
 
     # Precision
-    precision_map = {"float": torch.float32, "float16": torch.float16, "bfloat16": torch.bfloat16}
+    precision_map = {
+        "float": torch.float32,
+        "float16": torch.float16,
+        "bfloat16": torch.bfloat16,
+    }
     new_precision_str = request_data.get("precision", "bfloat16")
     if (new_precision := precision_map.get(new_precision_str)) != new_args.precision:
         reload_needed = True
@@ -440,7 +446,10 @@ def stream_inference(
     """Generator function to process targets in chunks and yield results as JSON strings."""
     total_targets = len(target_indices)
 
-    initial_message = {"total_targets": total_targets, "reference_data": prepared_reference_data}
+    initial_message = {
+        "total_targets": total_targets,
+        "reference_data": prepared_reference_data,
+    }
     yield json.dumps(initial_message) + "\n"
 
     for chunk_start_idx in range(0, total_targets, chunk_size):

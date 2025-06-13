@@ -8,11 +8,14 @@ python -m web_ui.app
 """
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
+# ruff: noqa: E402
 
 import argparse
 import logging
 import warnings
 
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
 import torch
 from flask import (
     Flask,
@@ -63,7 +66,11 @@ def index() -> str:
         default_sam_name=initial_default_args.sam_name,
         precision=next(
             k
-            for k, v in {"float": torch.float32, "float16": torch.float16, "bfloat16": torch.bfloat16}.items()
+            for k, v in {
+                "float": torch.float32,
+                "float16": torch.float16,
+                "bfloat16": torch.bfloat16,
+            }.items()
             if v == initial_default_args.precision
         ),
     )
@@ -189,4 +196,4 @@ def run_processing() -> Response:
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", debug=True, port=5050)
+    app.run(host="0.0.0.0", debug=True, port=5050)  # noqa: S104,S201

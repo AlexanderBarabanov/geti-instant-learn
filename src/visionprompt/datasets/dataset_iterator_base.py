@@ -1,10 +1,16 @@
+"""Base class for dataset iterators."""
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-from collections.abc import Iterable, Iterator, Sized
-from typing import NoReturn
+from __future__ import annotations
 
-import numpy as np
+from collections.abc import Iterable, Iterator, Sized
+from typing import TYPE_CHECKING, NoReturn
+
+if TYPE_CHECKING:
+    import numpy as np
+
+    from visionprompt.datasets import Dataset
 
 
 class DatasetIter(Sized, Iterable):
@@ -12,9 +18,32 @@ class DatasetIter(Sized, Iterable):
 
     Args:
         parent: Parent dataset
+
+    Examples:
+        >>> from visionprompt.datasets import Dataset
+        >>> from visionprompt.datasets.dataset_iterator_base import DatasetIter
+        >>> import numpy as np
+        >>>
+        >>> class MyDatasetIter(DatasetIter):
+        ...     def __len__(self) -> int:
+        ...         return 1
+        ...
+        ...     def __getitem__(self, index: int) -> tuple[np.ndarray, dict[int, np.ndarray]]:
+        ...         return (np.zeros((10, 10, 3)), {})
+        >>>
+        >>> class MyDataset(Dataset):
+        ...     def __len__(self) -> int:
+        ...         return 1
+        ...
+        ...     def __getitem__(self, index: int) -> tuple:
+        ...         return (np.zeros((10, 10, 3)), {})
+        >>>
+        >>> dataset = MyDataset(iterator_type=MyDatasetIter)
+        >>> iterator = MyDatasetIter(parent=dataset)
+        >>> item = iterator[0]
     """
 
-    def __init__(self, parent: "Dataset", *args, **kwargs) -> None:  # noqa: F821
+    def __init__(self, parent: Dataset, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._parent = parent
 

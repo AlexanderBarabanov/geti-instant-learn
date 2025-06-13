@@ -1,3 +1,4 @@
+"""Base class for datasets."""
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
@@ -21,6 +22,16 @@ class Annotation:
     Args:
         height: Height of the annotation
         width: Width of the annotation
+
+    Examples:
+        >>> from visionprompt.datasets.dataset_base import Annotation
+        >>>
+        >>> class MyAnnotation(Annotation):
+        ...     def get_mask(self) -> np.ndarray:
+        ...         return np.zeros((self.height, self.width))
+        >>>
+        >>> annotation = MyAnnotation(height=10, width=10)
+        >>> mask = annotation.get_mask()
     """
 
     def __init__(self, height: int, width: int) -> None:
@@ -42,6 +53,17 @@ class Image:
     Args:
         height: Height of the image
         width: Width of the image
+
+    Examples:
+        >>> from visionprompt.datasets.dataset_base import Image
+        >>> import numpy as np
+        >>>
+        >>> class MyImage(Image):
+        ...     def get_image(self) -> np.ndarray:
+        ...         return np.zeros((self.height, self.width, 3))
+        >>>
+        >>> image = MyImage(height=10, width=10)
+        >>> img_array = image.get_image()
     """
 
     def __init__(self, height: int, width: int) -> None:
@@ -63,6 +85,20 @@ class Dataset(torch.utils.data.Dataset, Iterable, ABC):  # noqa: PLR0904
     Args:
         iterator_type: Iterator type
         iterator_kwargs: Iterator kwargs
+
+    Examples:
+        >>> from visionprompt.datasets.dataset_base import Dataset
+        >>> from visionprompt.datasets.dataset_iterators import DatasetIter
+        >>>
+        >>> class MyDataset(Dataset):
+        ...     def __len__(self) -> int:
+        ...         return 1
+        ...
+        ...     def __getitem__(self, index: int) -> tuple:
+        ...         return (np.zeros((10, 10, 3)), {})
+        >>>
+        >>> dataset = MyDataset(iterator_type=DatasetIter)
+        >>> item = dataset[0]
     """
 
     def __init__(self, iterator_type: type[DatasetIter], iterator_kwargs: dict | None = None) -> None:
