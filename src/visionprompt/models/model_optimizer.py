@@ -1,5 +1,4 @@
 """This file contains several methods to optimize a model for inference."""
-
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
@@ -32,7 +31,7 @@ def optimize_model(
     precision: torch.dtype,
     compile_models: bool,
     verbose: bool = True,
-    backend: str = "openvino",
+    backend: str = "inductor",
 ) -> AutoModel:
     """This method optimizes a HuggingFace model.
 
