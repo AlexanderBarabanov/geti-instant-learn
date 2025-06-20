@@ -146,6 +146,15 @@ class SamDecoder(Segmenter):
                     if self.skip_points_in_existing_masks:
                         is_covered = False
                         for mask in all_masks.get(class_id):
+                            if int(y) < 0 or int(x) < 0:
+                                continue
+
+                            # move edge points inside mask
+                            if int(y) == mask.shape[0]:
+                                y -= 1
+                            if int(x) == mask.shape[1]:
+                                x -= 1
+
                             if mask[int(y), int(x)]:
                                 is_covered = True
                                 break
