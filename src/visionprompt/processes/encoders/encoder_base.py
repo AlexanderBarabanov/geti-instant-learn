@@ -4,11 +4,8 @@
 # SPDX-License-Identifier: Apache-2.0
 from abc import abstractmethod
 
-from src.visionprompt.types.features import Features
-from src.visionprompt.types.masks import Masks
-
 from visionprompt.processes.process_base import Process
-from visionprompt.types import Annotations, Image
+from visionprompt.types import Annotations, Features, Image, Masks
 
 
 class Encoder(Process):

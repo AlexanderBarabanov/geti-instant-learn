@@ -5,12 +5,9 @@
 import numpy as np
 from model_api.models import SAMLearnableVisualPrompter
 from model_api.models.visual_prompting import VisualPromptingFeatures
-from src.visionprompt.types.features import Features
 
 from visionprompt.processes.segmenters.segmenter_base import Segmenter
-from visionprompt.types.image import Image
-from visionprompt.types.masks import Masks
-from visionprompt.types.points import Points
+from visionprompt.types import Features, Image, Masks, Points
 
 
 class SamMAPIDecoder(Segmenter):
