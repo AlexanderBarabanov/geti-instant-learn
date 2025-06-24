@@ -14,13 +14,22 @@ class Encoder(Process):
     Examples:
         >>> from visionprompt.processes.encoders import Encoder
         >>> from visionprompt.types import Features, Image, Masks
+        >>> import numpy as np
         >>>
+        >>> # As Encoder is an abstract class, you must subclass it.
         >>> class MyEncoder(Encoder):
         ...     def __call__(self, images: list[Image] | None = None) -> tuple[list[Features], list[Masks]]:
-        ...         return [], []
+        ...         # A real implementation would return Features and Masks for each image.
+        ...         return [Features()] * len(images), [Masks()] * len(images)
         >>>
         >>> my_encoder = MyEncoder()
-        >>> features, masks = my_encoder([Image()])
+        >>> sample_image = np.zeros((10, 10, 3), dtype=np.uint8)
+        >>> features, masks = my_encoder([Image(sample_image)])
+        >>>
+        >>> len(features), len(masks)
+        (1, 1)
+        >>> isinstance(features[0], Features) and isinstance(masks[0], Masks)
+        True
     """
 
     def __init__(self) -> None:

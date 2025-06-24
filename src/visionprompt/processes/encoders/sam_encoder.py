@@ -17,13 +17,23 @@ class SamEncoder(Encoder):
     It can be used to extract reference/local features.
 
     Examples:
-        >>> from visionprompt.models.per_segment_anything import SamPredictor
         >>> from visionprompt.processes.encoders import SamEncoder
-        >>> from visionprompt.types import Image, Priors
+        >>> from visionprompt.types import Image, Priors, Features
+        >>> from visionprompt.models.models import load_sam_model
+        >>> import numpy as np
+        >>> import torch
         >>>
-        >>> sam_predictor = SamPredictor(...)
-        >>> encoder = SamEncoder(sam_predictor)
-        >>> features, masks = encoder([Image()], priors_per_image=[Priors()])
+        >>> sam_predictor = load_sam_model(backbone_name="MobileSAM")
+        >>> encoder = SamEncoder(sam_predictor=sam_predictor)
+        >>> image_size = encoder.encoder_input_size
+        >>> sample_image = np.zeros((image_size, image_size, 3), dtype=np.uint8)
+        >>> features, masks = encoder([Image(sample_image)], priors_per_image=[Priors()])
+        >>> len(features), len(masks)
+        (1, 1)
+        >>> isinstance(features[0], Features) and isinstance(masks[0], Masks)
+        True
+        >>> features[0].global_features.shape
+        torch.Size([64, 64, 256])
     """
 
     def __init__(self, sam_predictor: SamPredictor) -> None:

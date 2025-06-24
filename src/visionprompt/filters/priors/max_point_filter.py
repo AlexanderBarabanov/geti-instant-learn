@@ -14,15 +14,38 @@ class MaxPointFilter(PriorFilter):
     This selects the points with the highest scores.
 
     Example:
-        >>> filter = MaxPointFilter(max_num_points=40)
-        >>> filtered_priors = filter(priors)
+        >>> import torch
+        >>> from visionprompt.types import Priors
+        >>> from visionprompt.filters.priors.max_point_filter import MaxPointFilter
+        >>> filter = MaxPointFilter(max_num_points=2)
+        >>> priors = Priors()
+        >>> fg_points_1 = torch.tensor([
+        ...     [10, 10, 0.9, 1],
+        ...     [20, 20, 0.8, 1],
+        ...     [30, 30, 0.7, 1],
+        ... ])
+        >>> bg_points_1 = torch.tensor([
+        ...     [1, 1, 0.1, 0],
+        ...     [2, 2, 0.2, 0],
+        ... ])
+        >>> points_1 = torch.cat([fg_points_1, bg_points_1])
+        >>> priors.points.add(points_1, class_id=1)
+        >>> filtered_priors_list = filter([priors])
+        >>> filtered_priors = filtered_priors_list[0]
+        >>> points_per_class = filtered_priors.points.get(1)
+        >>> len(points_per_class)
+        1
+        >>> filtered_points_1 = points_per_class[0]
+        >>> len(filtered_points_1)
+        4
+        >>> int((filtered_points_1[:, 3] == 1).sum())
+        2
     """
 
     def __init__(self, max_num_points: int = 40) -> None:
         """Initialize the max point filter.
 
         Args:
-            state: The state object
             max_num_points: Maximum number of points to keep per class
         """
         super().__init__()
@@ -51,7 +74,7 @@ class MaxPointFilter(PriorFilter):
         """Filter a single list of points based on scores. This method adds all background points.
 
         Args:
-            points: Tensor of points with shape (N, 3) where each row is [x, y, score]
+            points: Tensor of points with shape (N, 4) where each row is [x, y, score, label]
 
         Returns:
             Filtered points tensor

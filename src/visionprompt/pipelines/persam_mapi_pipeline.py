@@ -26,10 +26,19 @@ class PerSamMAPI(Pipeline):
     Examples:
         >>> from visionprompt.pipelines import PerSamMAPI
         >>> from visionprompt.types import Image, Priors
+        >>> import numpy as np
+        >>> import torch
         >>>
         >>> persam_mapi = PerSamMAPI()
-        >>> persam_mapi.learn([Image()], [Priors()])
-        >>> results = persam_mapi.infer([Image()])
+        >>> sample_image = np.zeros((1024, 1024, 3), dtype=np.uint8)
+        >>> ref_priors = Priors()
+        >>> ref_priors.masks.add(torch.ones(30, 30, dtype=torch.bool))
+        >>> learn_results = persam_mapi.learn([Image(sample_image)], [ref_priors])
+        >>> infer_results = persam_mapi.infer([Image(sample_image)])
+        >>> isinstance(learn_results, Results) and isinstance(infer_results, Results)
+        True
+        >>> infer_results.masks is not None and infer_results.annotations is not None
+        True
     """
 
     def __init__(self) -> None:

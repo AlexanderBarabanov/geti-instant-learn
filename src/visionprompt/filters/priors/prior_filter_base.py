@@ -10,9 +10,16 @@ class PriorFilter(Filter):
     """This is the base class for all prior filters.
 
     Example:
+        >>> import torch
+        >>> from visionprompt.types import Priors
         >>> filter = PriorFilter()
-        >>> filtered_priors = filter(priors)
+        >>> priors = Priors()
+        >>> priors.points.add(torch.tensor([[1, 2, 0.5, 1]]), class_id=1)
+        >>> filtered_priors = filter([priors])
+        >>> isinstance(filtered_priors, list)
+        True
     """
 
     def __call__(self, priors: list[Priors]) -> list[Priors]:
         """Filter the priors."""
+        return priors

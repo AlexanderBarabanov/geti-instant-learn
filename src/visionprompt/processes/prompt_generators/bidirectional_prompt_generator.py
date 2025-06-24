@@ -17,20 +17,44 @@ class BidirectionalPromptGenerator(FeaturePromptGenerator):
     This is based on the similarities between the reference and target images.
 
     Examples:
+        >>> import torch
         >>> from visionprompt.processes.prompt_generators import BidirectionalPromptGenerator
-        >>> from visionprompt.types import Features, Image, Masks
+        >>> from visionprompt.types import Features, Image, Masks, Priors, Similarities
         >>>
+        >>> # Setup
+        >>> encoder_input_size=224
+        >>> encoder_patch_size=14
+        >>> encoder_feature_size=16
+        >>> feature_dim = 64
+        >>> num_patches = encoder_feature_size * encoder_feature_size
+        >>>
+        >>> # Create inputs
+        >>> ref_feats = Features(torch.rand(num_patches, feature_dim))
+        >>> ref_feats.add_local_features(ref_feats.global_features[:6], 1)
+        >>> target_feats = Features(torch.rand(num_patches, feature_dim))
+        >>> mask = torch.zeros(num_patches); mask[:6] = 1
+        >>> ref_masks = Masks(); ref_masks.add(mask, 1)
+        >>> image = Image(torch.zeros(encoder_input_size, encoder_input_size, 3))
+        >>>
+        >>> # Instantiate generator
         >>> prompt_generator = BidirectionalPromptGenerator(
-        ...     encoder_input_size=1024,
-        ...     encoder_patch_size=16,
-        ...     encoder_feature_size=64,
+        ...     encoder_input_size=encoder_input_size,
+        ...     encoder_patch_size=encoder_patch_size,
+        ...     encoder_feature_size=encoder_feature_size,
+        ...     num_background_points=2,
         ... )
+        >>>
+        >>> # Run
         >>> priors, similarities = prompt_generator(
-        ...    reference_features=[Features()],
-        ...    target_features=[Features()],
-        ...    reference_masks=[Masks()],
-        ...    target_images=[Image()],
+        ...    reference_features=[ref_feats],
+        ...    target_features=[target_feats],
+        ...    reference_masks=[ref_masks],
+        ...    target_images=[image],
         ... )
+        >>> isinstance(priors[0], Priors) and priors[0].points.get(1) is not None
+        True
+        >>> isinstance(similarities[0], Similarities) and similarities[0].get(1) is not None
+        True
     """
 
     def __init__(

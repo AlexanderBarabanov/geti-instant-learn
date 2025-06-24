@@ -2,6 +2,7 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+
 from visionprompt.processes.similarity_matchers.similarity_matcher_base import (
     SimilarityMatcher,
 )
@@ -13,14 +14,24 @@ class CosineSimilarity(SimilarityMatcher):
 
     Examples:
         >>> from visionprompt.processes.similarity_matchers import CosineSimilarity
-        >>> from visionprompt.types import Features, Image
+        >>> from visionprompt.types import Features, Image, Similarities
+        >>> import torch
+        >>> import numpy as np
         >>>
-        >>> matcher = CosineSimilarity()
-        >>> similarities = matcher(
-        ...     reference_features=[Features()],
-        ...     target_features=[Features()],
-        ...     target_images=[Image()],
+        >>> similarity_matcher = CosineSimilarity()
+        >>> ref_features = Features()
+        >>> ref_features.local_features = {1: [torch.randn(1, 256)]}
+        >>> target_features = Features(global_features=torch.randn(64, 64, 256))
+        >>> target_image = Image(np.zeros((1024, 1024, 3), dtype=np.uint8))
+        >>>
+        >>> similarities = similarity_matcher(
+        ...     reference_features=[ref_features],
+        ...     target_features=[target_features],
+        ...     target_images=[target_image],
         ... )
+        >>>
+        >>> isinstance(similarities[0], Similarities) and similarities[0]._data[1].shape == (1, 1024, 1024)
+        True
     """
 
     def __init__(self) -> None:

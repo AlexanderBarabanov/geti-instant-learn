@@ -32,6 +32,8 @@ class Annotation:
         >>>
         >>> annotation = MyAnnotation(height=10, width=10)
         >>> mask = annotation.get_mask()
+        >>> isinstance(mask, np.ndarray)
+        True
     """
 
     def __init__(self, height: int, width: int) -> None:

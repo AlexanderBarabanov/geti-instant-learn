@@ -94,8 +94,7 @@ class PerSegDataset(Dataset):
 
     Examples:
         >>> from visionprompt.datasets.perseg import PerSegDataset
-        >>>
-        >>> dataset = PerSegDataset(root_path="<path_to_perseg_dataset>")
+        >>> dataset = PerSegDataset()
         >>> item = dataset[0]
     """
 

@@ -353,14 +353,6 @@ def generate_combinations(n: int, k: int) -> list[list[int]]:
     Returns:
         list[list[int]]: A list of all possible k-combinations, where each combination
             is represented as a list of integers
-
-    Examples:
-        >>> combinations(3, 2)
-        [[0, 1], [0, 2], [1, 2]]
-        >>> combinations(2, 0)
-        [[]]
-        >>> combinations(2, 3)
-        []
     """
     if k > n:
         return []

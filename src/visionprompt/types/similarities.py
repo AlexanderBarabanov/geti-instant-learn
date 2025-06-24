@@ -21,7 +21,12 @@ class Similarities(Data):
         similarities: torch.Tensor,
         class_id: int,
     ) -> None:
-        """Add similarities to the class."""
+        """Add similarities to the class.
+
+        Args:
+            similarities: The similarities to add.
+            class_id: The class ID to add similarities for.
+        """
         if class_id not in self._data:
             self._data[class_id] = similarities
         else:
@@ -30,3 +35,14 @@ class Similarities(Data):
                 [self._data[class_id], similarities],
                 dim=0,
             )
+
+    def get(self, class_id: int) -> torch.Tensor | None:
+        """Get similarities for a class.
+
+        Args:
+            class_id: The class ID to get similarities for.
+
+        Returns:
+            The similarities for the class.
+        """
+        return self._data.get(class_id)

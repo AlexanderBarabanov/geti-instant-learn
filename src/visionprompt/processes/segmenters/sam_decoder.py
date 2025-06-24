@@ -21,17 +21,28 @@ class SamDecoder(Segmenter):
     """This Segmenter uses SAM to create masks based on points.
 
     Examples:
-        >>> from visionprompt.models.per_segment_anything import SamPredictor
+        >>> from visionprompt.models.models import load_sam_model
         >>> from visionprompt.processes.segmenters import SamDecoder
-        >>> from visionprompt.types import Image, Priors, Similarities
-        >>>
-        >>> sam_predictor = SamPredictor(...)
-        >>> segmenter = SamDecoder(sam_predictor)
-        >>> masks, points = segmenter(
-        ...     images=[Image()],
-        ...     priors=[Priors()],
-        ...     similarities=[Similarities()],
+        >>> from visionprompt.types import Image, Masks, Points, Priors, Similarities
+        >>> import torch
+        >>> import numpy as np
+        >>> sam_predictor = load_sam_model(backbone_name="MobileSAM")
+        >>> segmenter = SamDecoder(sam_predictor=sam_predictor)
+        >>> image = Image(np.zeros((1024, 1024, 3), dtype=np.uint8))
+        >>> priors = Priors()
+        >>> points = torch.tensor([[512, 512, 0.9, 1], [100, 100, 0.8, 0]]) # fg, bg
+        >>> priors.points.add(points, class_id=1)
+        >>> similarities = Similarities()
+        >>> similarities.add(torch.ones(1, 1024, 1024), class_id=1)
+        >>> masks, used_points = segmenter(
+        ...     images=[image],
+        ...     priors=[priors],
+        ...     similarities=[similarities],
         ... )
+        >>> isinstance(masks, list) and isinstance(masks[0], Masks) and len(masks[0].get(1)) == 1
+        True
+        >>> isinstance(used_points, list) and isinstance(used_points[0], Points) and len(used_points[0].get(1)[0]) == 2
+        True
     """
 
     def __init__(

@@ -37,7 +37,7 @@ from visionprompt.utils.args import get_arguments
 from visionprompt.utils.constants import DATASETS, MODEL_MAP, PIPELINES
 from visionprompt.utils.data import load_dataset
 
-CHUNK_SIZE = 10
+CHUNK_SIZE = 5
 
 warnings.filterwarnings("ignore", category=UserWarning)
 

@@ -20,15 +20,33 @@ class SamMAPIEncoder(Encoder):
     """This is a wrapper around the ModelAPI SAM encoder.
 
     This encoder extracts features from images using a SAM model. It can be used to extract reference/local features.
+    The ModelAPI implementation only returns a single feature vector per image.
 
     Examples:
         >>> from model_api.models.visual_prompting import SAMLearnableVisualPrompter
+        >>> from model_api.models.model import Model
         >>> from visionprompt.processes.encoders import SamMAPIEncoder
-        >>> from visionprompt.types import Image, Priors
+        >>> from visionprompt.types import Image, Priors, Features, Masks
+        >>> from visionprompt.utils.constants import MAPI_ENCODER_PATH, MAPI_DECODER_PATH
+        >>> import numpy as np
+        >>> import torch
         >>>
-        >>> model = SAMLearnableVisualPrompter(...)
+        >>> encoder = Model.create_model(MAPI_ENCODER_PATH)
+        >>> decoder = Model.create_model(MAPI_DECODER_PATH)
+        >>> model = SAMLearnableVisualPrompter(encoder, decoder)
         >>> encoder = SamMAPIEncoder(model)
-        >>> features, masks = encoder([Image()], priors_per_image=[Priors()])
+        >>> sample_image = np.zeros((1024, 1024, 3), dtype=np.uint8)
+        >>> sample_mask = np.zeros((1, 1024, 1024), dtype=np.uint8)
+        >>> sample_mask[0, 50:100, 50:100] = 1  # A single square
+        >>> sample_prior = Priors()
+        >>> sample_prior.masks.add(sample_mask)
+        >>> features, masks = encoder([Image(sample_image)], priors_per_image=[sample_prior])
+        >>> len(features), len(masks)
+        (1, 1)
+        >>> isinstance(features[0], Features) and isinstance(masks[0], Masks)
+        True
+        >>> features[0].global_features.shape
+        torch.Size([1, 1, 256])
     """
 
     def __init__(self, model: SAMLearnableVisualPrompter) -> None:

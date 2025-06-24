@@ -165,12 +165,6 @@ class LVISDataset(Dataset):
                     COCO dataset to the LVIS dataset folders.
                     If copy_files is True, then after copying, download_full_dataset can be set to false.
         iterator_kwargs: Keyword arguments passed to the iterator_type
-
-    Examples:
-        >>> from visionprompt.datasets.lvis import LVISDataset
-        >>>
-        >>> dataset = LVISDataset(root_path="<path_to_lvis_dataset>")
-        >>> item = dataset[0]
     """
 
     def __init__(

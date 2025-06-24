@@ -50,6 +50,30 @@ class FeatureSelector(Process):
 
         Returns:
             A dictionary of features for each class.
+
+        Examples:
+            >>> import torch
+            >>> from visionprompt.types import Features
+            >>> from visionprompt.processes.feature_selectors import FeatureSelector
+            >>> features1 = Features()
+            >>> features1.local_features={
+            ...         1: [torch.randn(1, 4), torch.randn(1, 4)],
+            ...         2: [torch.randn(1, 4)],
+            ...     }
+            >>> features2 = Features()
+            >>> features2.local_features={
+            ...         1: [torch.randn(1, 4)],
+            ...         3: [torch.randn(1, 4), torch.randn(1, 4)],
+            ...     }
+            >>> all_features = FeatureSelector.get_all_local_class_features([features1, features2])
+            >>> sorted(all_features.keys())
+            [1, 2, 3]
+            >>> len(all_features[1])
+            3
+            >>> len(all_features[2])
+            1
+            >>> len(all_features[3])
+            2
         """
         all_features_per_class = {}
 

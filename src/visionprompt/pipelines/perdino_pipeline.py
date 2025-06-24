@@ -5,6 +5,7 @@
 from typing import TYPE_CHECKING
 
 import torch
+import numpy as np
 
 from visionprompt.filters.masks import ClassOverlapMaskFilter, MaskFilter
 from visionprompt.filters.priors.max_point_filter import MaxPointFilter
@@ -40,27 +41,47 @@ class PerDino(Pipeline):
     It is very similar to the PerSam pipeline but uses DinoV2 for encoding the images.
 
     Examples:
+        >>> import torch
+        >>> import numpy as np
         >>> from visionprompt.pipelines import PerDino
-        >>> from visionprompt.types import Image, Priors
+        >>> from visionprompt.types import Image, Priors, Results
+        >>> from visionprompt.models.models import load_sam_model
         >>>
-        >>> perdino = PerDino(...)
-        >>> perdino.learn([Image()], [Priors()])
-        >>> results = perdino.infer([Image()])
+        >>> # Load a real SAM model for the doctest
+        >>> sam_predictor = load_sam_model(backbone_name="MobileSAM")
+        >>> perdino = PerDino(sam_predictor=sam_predictor)
+        >>>
+        >>> # Create mock inputs
+        >>> ref_image = np.zeros((1024, 1024, 3), dtype=np.uint8)
+        >>> target_image = np.zeros((1024, 1024, 3), dtype=np.uint8)
+        >>> ref_priors = Priors()
+        >>> ref_priors.masks.add(torch.ones(30, 30, dtype=torch.bool), class_id=1)
+        >>>
+        >>> # Run learn and infer
+        >>> learn_results = perdino.learn([Image(ref_image)], [ref_priors])
+        >>> infer_results = perdino.infer([Image(target_image)])
+        >>>
+        >>> isinstance(learn_results, Results) and isinstance(infer_results, Results)
+        True
+        >>> infer_results.masks is not None
+        True
+        >>> infer_results.annotations is not None
+        True
     """
 
     def __init__(
         self,
         sam_predictor: SamPredictor,
-        num_foreground_points: int,
-        num_background_points: int,
-        apply_mask_refinement: bool,
-        skip_points_in_existing_masks: bool,
-        num_grid_cells: int,
-        similarity_threshold: float,
-        mask_similarity_threshold: float | None,
-        precision: torch.dtype,
-        compile_models: bool,
-        verbose: bool,
+        num_foreground_points: int = 40,
+        num_background_points: int = 2,
+        apply_mask_refinement: bool = True,
+        skip_points_in_existing_masks: bool = True,
+        num_grid_cells: int = 16,
+        similarity_threshold: float = 0.65,
+        mask_similarity_threshold: float | None = 0.42,
+        precision: torch.dtype = torch.bfloat16,
+        compile_models: bool = False,
+        verbose: bool = False,
         image_size: int | tuple[int, int] | None = None,
     ) -> None:
         """Initialize the PerDino pipeline.

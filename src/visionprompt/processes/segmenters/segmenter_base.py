@@ -3,6 +3,7 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 from abc import abstractmethod
+import numpy as np
 
 from visionprompt.processes import Process
 from visionprompt.types import Image, Masks
@@ -14,13 +15,19 @@ class Segmenter(Process):
     Examples:
         >>> from visionprompt.processes.segmenters import Segmenter
         >>> from visionprompt.types import Image, Masks
+        >>> import numpy as np
         >>>
         >>> class MySegmenter(Segmenter):
         ...     def __call__(self, images: list[Image], **kwargs) -> list[Masks]:
-        ...         return []
+        ...         return [Masks() for _ in images]
         >>>
         >>> my_segmenter = MySegmenter()
-        >>> masks = my_segmenter([Image()])
+        >>> sample_image = np.zeros((10, 10, 3), dtype=np.uint8)
+        >>> masks = my_segmenter([Image(sample_image)])
+        >>> len(masks)
+        1
+        >>> isinstance(masks[0], Masks)
+        True
     """
 
     @abstractmethod

@@ -14,11 +14,33 @@ class AllFeaturesSelector(FeatureSelector):
     """This class selects all features over all prior images without averaging.
 
     Examples:
+        >>> import torch
         >>> from visionprompt.processes.feature_selectors import AllFeaturesSelector
         >>> from visionprompt.types import Features
         >>>
         >>> selector = AllFeaturesSelector()
-        >>> features = selector([Features()])
+        >>> features1 = Features()
+        >>> features1.global_features=torch.randn(1, 4)
+        >>> features1.local_features={
+        ...         1: [torch.randn(1, 4), torch.randn(1, 4)],
+        ...         2: [torch.randn(1, 4)],
+        ...     }
+        >>> features2 = Features()
+        >>> features2.global_features=torch.randn(1, 4)
+        >>> features2.local_features={
+        ...         1: [torch.randn(1, 4)],
+        ...         3: [torch.randn(1, 4), torch.randn(1, 4)],
+        ...     }
+        >>> all_features = selector([features1, features2])
+        >>> len(all_features)
+        1
+        >>> result = all_features[0]
+        >>> result.global_features.shape
+        torch.Size([2, 1, 4])
+        >>> sorted(result.local_features.keys())
+        [1, 2, 3]
+        >>> len(result.local_features[1])
+        3
     """
 
     def __init__(self) -> None:

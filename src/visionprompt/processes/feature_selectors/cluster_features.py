@@ -22,11 +22,29 @@ class ClusterFeatures(FeatureSelector):
     https://arxiv.org/abs/2403.05433.
 
     Examples:
+        >>> import torch
         >>> from visionprompt.processes.feature_selectors import ClusterFeatures
         >>> from visionprompt.types import Features
         >>>
-        >>> selector = ClusterFeatures(num_clusters=3)
-        >>> features = selector([Features()])
+        >>> selector = ClusterFeatures(num_clusters=2)
+        >>> # Create features that are clearly in two clusters
+        >>> cluster1 = [torch.ones(1, 4) * i for i in range(1, 5)]
+        >>> cluster2 = [torch.ones(1, 4) * i for i in range(10, 15)]
+        >>> features1 = Features()
+        >>> features1.local_features = {1: cluster1}
+        >>> features2 = Features()
+        >>> features2.local_features = {1: cluster2}
+        >>>
+        >>> clustered_features = selector([features1, features2])
+        >>> len(clustered_features)
+        1
+        >>> result = clustered_features[0]
+        >>> sorted(result.local_features.keys())
+        [1]
+        >>> len(result.local_features[1])
+        1
+        >>> result.local_features[1][0].shape
+        torch.Size([2, 4])
     """
 
     def __init__(self, num_clusters: int = 3) -> None:

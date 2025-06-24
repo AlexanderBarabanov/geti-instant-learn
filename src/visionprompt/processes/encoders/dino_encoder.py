@@ -22,11 +22,23 @@ class DinoEncoder(Encoder):
 
     Examples:
         >>> from visionprompt.processes.encoders import DinoEncoder
-        >>> from visionprompt.types import Image, Priors
+        >>> from visionprompt.types import Image, Priors, Features
         >>> import torch
+        >>> import numpy as np
         >>>
+        >>> # Create a sample image
+        >>> sample_image = np.zeros((224, 224, 3), dtype=np.uint8)
         >>> encoder = DinoEncoder(precision=torch.float32, compile_models=False, verbose=False)
-        >>> features, masks = encoder([Image()], priors_per_image=[Priors()])
+        >>> features, masks = encoder([Image(sample_image)], priors_per_image=[Priors()])
+        >>> len(features), len(masks)
+        (1, 1)
+        >>> # Each image gets a Features object with global features and a Masks object
+        >>> isinstance(features[0], Features), isinstance(masks[0], Masks)
+        (True, True)
+        >>> # DINOv2-large outputs 1024-dimensional feature vectors
+        >>> features[0].global_features.shape
+        torch.Size([1369, 1024])
+        
     """
 
     def __init__(

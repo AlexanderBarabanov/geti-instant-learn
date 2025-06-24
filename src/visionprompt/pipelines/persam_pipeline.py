@@ -40,24 +40,42 @@ class PerSam(Pipeline):
     segmenter and to allow for multi object target images.
 
     Examples:
+        >>> import torch
+        >>> import numpy as np
         >>> from visionprompt.pipelines import PerSam
-        >>> from visionprompt.types import Image, Priors
+        >>> from visionprompt.types import Image, Priors, Results
+        >>> from visionprompt.models.models import load_sam_model
         >>>
-        >>> persam = PerSam(...)
-        >>> persam.learn([Image()], [Priors()])
-        >>> results = persam.infer([Image()])
+        >>> # Load a real SAM model for the doctest
+        >>> sam_predictor = load_sam_model(backbone_name="MobileSAM")
+        >>> persam = PerSam(sam_predictor=sam_predictor)
+        >>>
+        >>> # Create mock inputs
+        >>> ref_image = np.zeros((1024, 1024, 3), dtype=np.uint8)
+        >>> target_image = np.zeros((1024, 1024, 3), dtype=np.uint8)
+        >>> ref_priors = Priors()
+        >>> ref_priors.masks.add(torch.ones(30, 30, dtype=torch.bool), class_id=1)
+        >>>
+        >>> # Run learn and infer
+        >>> learn_results = persam.learn([Image(ref_image)], [ref_priors])
+        >>> infer_results = persam.infer([Image(target_image)])
+        >>>
+        >>> isinstance(learn_results, Results) and isinstance(infer_results, Results)
+        True
+        >>> infer_results.masks is not None and infer_results.annotations is not None
+        True
     """
 
     def __init__(
         self,
         sam_predictor: SamPredictor,
-        num_foreground_points: int,
-        num_background_points: int,
-        apply_mask_refinement: bool,
-        skip_points_in_existing_masks: bool,
-        num_grid_cells: int,
-        similarity_threshold: float,
-        mask_similarity_threshold: float,
+        num_foreground_points: int = 40,
+        num_background_points: int = 2,
+        apply_mask_refinement: bool = True,
+        skip_points_in_existing_masks: bool = True,
+        num_grid_cells: int = 16,
+        similarity_threshold: float = 0.65,
+        mask_similarity_threshold: float | None = 0.42,
         image_size: int | tuple[int, int] | None = None,
     ) -> None:
         super().__init__(image_size=image_size)

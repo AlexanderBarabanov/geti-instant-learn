@@ -17,9 +17,26 @@ class MasksToPolygons(MaskProcessor):
     Examples:
         >>> from visionprompt.processes.mask_processors import MasksToPolygons
         >>> from visionprompt.types import Masks
+        >>> import torch
         >>>
         >>> processor = MasksToPolygons()
-        >>> annotations = processor([Masks()])
+        >>>
+        >>> # Create a simple square mask.
+        >>> mask_tensor = torch.zeros((1, 10, 10), dtype=torch.bool)
+        >>> mask_tensor[0, 2:8, 2:8] = True
+        >>> sample_mask = Masks()
+        >>> sample_mask.add(mask_tensor, class_id=0)
+        >>>
+        >>> annotations = processor([sample_mask])
+        >>>
+        >>> # The output should be a single annotation object with one polygon.
+        >>> len(annotations)
+        1
+        >>> len(annotations[0].polygons[0])
+        1
+        >>> # The polygon should have 4 points (a square).
+        >>> len(annotations[0].polygons[0][0])
+        4
     """
 
     def __init__(self) -> None:

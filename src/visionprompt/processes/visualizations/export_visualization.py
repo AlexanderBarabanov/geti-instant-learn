@@ -18,16 +18,23 @@ class ExportMaskVisualization(Visualization):
     """The class exports the images for visualization.
 
     Examples:
+        >>> import os
+        >>> import numpy as np
         >>> from visionprompt.processes.visualizations import ExportMaskVisualization
         >>> from visionprompt.types import Image, Masks, Points
         >>>
         >>> visualizer = ExportMaskVisualization(output_folder="visualizations")
+        >>> sample_image = Image(np.zeros((10, 10, 3), dtype=np.uint8))
         >>> visualizer(
-        ...     images=[Image()],
+        ...     images=[sample_image],
         ...     masks=[Masks()],
         ...     names=["test.png"],
         ...     points=[Points()],
         ... )
+        >>> # Check if the visualization was saved
+        >>> os.path.exists("visualizations/test.png")
+        True
+        >>> os.remove("visualizations/test.png")
     """
 
     def __init__(self, output_folder: str) -> None:

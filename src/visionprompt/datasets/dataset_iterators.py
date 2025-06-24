@@ -22,21 +22,25 @@ class IndexIter(DatasetIter):
 
     Examples:
         >>> from visionprompt.datasets.dataset_iterators import IndexIter
-        >>> from visionprompt.datasets import Dataset
+        >>> from visionprompt.datasets.dataset_base import Dataset
+        >>> import numpy as np
         >>>
         >>> class MyDataset(Dataset):
         ...     def __len__(self) -> int:
         ...         return 1
+        ...     def get_image_by_index(self, index: int) -> np.ndarray:
+        ...         return np.zeros((10, 10, 3), dtype=np.uint8)
+        ...     def get_masks_by_index(self, index: int) -> dict:
+        ...         return {}
         ...
-        ...     def __getitem__(self, index: int) -> tuple:
-        ...         return (np.zeros((10, 10, 3)), {})
-        >>>
         >>> dataset = MyDataset(iterator_type=IndexIter)
         >>> iterator = IndexIter(parent=dataset)
         >>> item = iterator[0]
+        >>> isinstance(item, tuple)
+        True
     """
 
-    def __init__(self, parent: Dataset) -> None:
+    def __init__(self, parent: "Dataset") -> None:
         super().__init__(parent)
         self.index = 0
 

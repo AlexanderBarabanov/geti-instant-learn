@@ -15,12 +15,24 @@ class SamMAPIDecoder(Segmenter):
 
     Examples:
         >>> from model_api.models import SAMLearnableVisualPrompter
+        >>> from model_api.models.model import Model
+        >>> from visionprompt.utils.constants import MAPI_ENCODER_PATH, MAPI_DECODER_PATH
         >>> from visionprompt.processes.segmenters import SamMAPIDecoder
-        >>> from visionprompt.types import Features, Image
+        >>> from visionprompt.types import Features, Image, Masks, Points
+        >>> import torch
+        >>> import numpy as np
         >>>
-        >>> model = SAMLearnableVisualPrompter(...)
-        >>> segmenter = SamMAPIDecoder(model)
-        >>> masks, points = segmenter(images=[Image()], reference_features=[Features()])
+        >>> encoder = Model.create_model(MAPI_ENCODER_PATH)
+        >>> decoder = Model.create_model(MAPI_DECODER_PATH)
+        >>> model = SAMLearnableVisualPrompter(encoder, decoder)
+        >>> segmenter = SamMAPIDecoder(model=model)
+        >>> image = Image(np.zeros((20, 20, 3), dtype=np.uint8))
+        >>> features = Features(global_features=torch.randn(1, 256))
+        >>> masks, points = segmenter(images=[image], reference_features=[features])
+        >>> isinstance(masks, list) and isinstance(masks[0], Masks) and masks[0].get(0) is not None
+        True
+        >>> isinstance(points, list) and isinstance(points[0], Points) and points[0].get(0) is not None
+        True
     """
 
     def __init__(

@@ -14,11 +14,38 @@ class AverageFeatures(FeatureSelector):
     """This class averages features across all reference images and their masks for each class.
 
     Examples:
+        >>> import torch
         >>> from visionprompt.processes.feature_selectors import AverageFeatures
         >>> from visionprompt.types import Features
         >>>
         >>> selector = AverageFeatures()
-        >>> features = selector([Features()])
+        >>> features1 = Features()
+        >>> features1.local_features={
+        ...         1: [torch.ones(1, 4), torch.ones(1, 4)],
+        ...         2: [torch.ones(1, 4)],
+        ...     }
+        >>> features2 = Features()
+        >>> features2.local_features={
+        ...         1: [torch.ones(1, 4)],
+        ...         3: [torch.ones(1, 4), torch.ones(1, 4)],
+        ...     }
+        >>> avg_features = selector([features1, features2])
+        >>> len(avg_features)
+        1
+        >>> result = avg_features[0]
+        >>> sorted(result.local_features.keys())
+        [1, 2, 3]
+        >>> len(result.local_features[1])
+        1
+        >>> result.local_features[1][0].shape
+        torch.Size([1, 4])
+        >>> # Check if the features are correctly averaged and normalized
+        >>> torch.allclose(result.local_features[1][0], torch.ones(1, 4) / 2.0)
+        True
+        >>> torch.allclose(result.local_features[2][0], torch.ones(1, 4) / 2.0)
+        True
+        >>> torch.allclose(result.local_features[3][0], torch.ones(1, 4) / 2.0)
+        True
     """
 
     def __init__(self) -> None:

@@ -20,14 +20,30 @@ class SegmentationMetrics(Calculator):
     Examples:
         >>> from visionprompt.processes.calculators import SegmentationMetrics
         >>> from visionprompt.types import Masks
+        >>> import torch
         >>>
-        >>> calculator = SegmentationMetrics(categories=["class_a"])
+        >>> calculator = SegmentationMetrics(categories=["car"])
+        >>>
+        >>> # Create a perfect match scenario for prediction and reference masks.
+        >>> mask_tensor = torch.zeros((1, 10, 10), dtype=torch.bool)
+        >>> mask_tensor[0, 2:8, 2:8] = True
+        >>> reference = Masks()
+        >>> reference.add(mask_tensor, class_id=0)
+        >>> prediction = Masks()
+        >>> prediction.add(mask_tensor.clone(), class_id=0)
+        >>>
         >>> calculator(
-        ...     predictions=[Masks()],
-        ...     references=[Masks()],
-        ...     mapping={0: "class_a"},
+        ...     predictions=[prediction],
+        ...     references=[reference],
+        ...     mapping={0: "car"},
         ... )
         >>> metrics = calculator.get_metrics()
+        >>>
+        >>> # For a perfect match, IoU should be 1.0.
+        >>> metrics["category"][0]
+        'car'
+        >>> round(metrics["iou"][0], 1)
+        1.0
     """
 
     def __init__(self, categories: list[str]) -> None:

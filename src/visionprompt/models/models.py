@@ -2,6 +2,7 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+import torch
 from argparse import Namespace
 from logging import getLogger
 from typing import TYPE_CHECKING
@@ -46,14 +47,19 @@ if TYPE_CHECKING:
 logger = getLogger("Vision Prompt")
 
 
-def _load_sam_model(
-    backbone_name: str, args: Namespace
+def load_sam_model(
+    backbone_name: str,
+    precision: torch.dtype = torch.float32,
+    compile_models: bool = False,
+    verbose: bool = False,
 ) -> SamPredictor | SamHQPredictor | SamFastPredictor | EfficientViTSamPredictor:
     """Load and optimize a SAM model.
 
     Args:
         backbone_name: The name of the backbone model.
-        args: The arguments to load the model.
+        precision: The precision of the model.
+        compile_models: Whether to compile the model.
+        verbose: Whether to print verbose output.
 
     Returns:
         The loaded model.
@@ -96,9 +102,9 @@ def _load_sam_model(
 
     return optimize_sam_model(
         sam_predictor=predictor,
-        precision=args.precision,
-        compile_models=args.compile_models,
-        verbose=args.verbose,
+        precision=precision,
+        compile_models=compile_models,
+        verbose=verbose,
     )
 
 
@@ -117,7 +123,7 @@ def load_pipeline(  # noqa: C901, PLR0911
     Returns:
         The pipeline.
     """
-    sam_model = _load_sam_model(backbone_name, args)
+    sam_model = load_sam_model(backbone_name, args.precision, args.compile_models, args.verbose)
 
     logger.info(f"Constructing pipeline: {pipeline_name}")
     match pipeline_name:

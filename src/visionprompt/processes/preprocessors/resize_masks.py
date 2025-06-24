@@ -4,17 +4,26 @@
 
 from visionprompt.processes import Process
 from visionprompt.types import Priors
+import numpy as np
+import torch
 
 
 class ResizeMasks(Process):
     """This process resizes the masks to the given size.
 
     Examples:
+        >>> import numpy as np
+        >>> import torch
         >>> from visionprompt.processes.preprocessors import ResizeMasks
-        >>> from visionprompt.types import Priors
+        >>> from visionprompt.types import Priors, Masks
         >>>
-        >>> resizer = ResizeMasks(size=512)
-        >>> resized_priors = resizer([Priors()])
+        >>> resizer = ResizeMasks(size=(10, 20))
+        >>> masks = Masks()
+        >>> masks.add(np.zeros((100, 100), dtype=np.uint8))
+        >>> priors = Priors(masks=masks)
+        >>> resized_priors = resizer([priors])
+        >>> resized_priors[0].masks.shape
+        torch.Size([1, 20, 10])
     """
 
     def __init__(self, size: int | tuple[int, int] | None = None) -> None:

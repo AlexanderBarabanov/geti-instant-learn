@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 from abc import ABC, abstractmethod
 from logging import getLogger
+import numpy as np
 
 from visionprompt.processes.preprocessors import ResizeImages, ResizeMasks
 from visionprompt.processes.process_base import Process
@@ -16,18 +17,25 @@ class Pipeline(ABC):
     """This class is the base class for all pipelines.
 
     Examples:
+        >>> import numpy as np
         >>> from visionprompt.pipelines import Pipeline
         >>> from visionprompt.types import Image, Priors, Results
         >>>
         >>> class MyPipeline(Pipeline):
         ...     def learn(self, reference_images: list[Image], reference_priors: list[Priors]) -> Results:
+        ...         self.resize_masks(reference_priors)
         ...         return Results()
         ...     def infer(self, target_images: list[Image]) -> Results:
+        ...         self.resize_images(images=target_images)
         ...         return Results()
         >>>
         >>> my_pipeline = MyPipeline(image_size=512)
-        >>> my_pipeline.learn([Image()], [Priors()])
-        >>> results = my_pipeline.infer([Image()])
+        >>> sample_image = np.zeros((10, 10, 3), dtype=np.uint8)
+        >>> learn_results = my_pipeline.learn([Image(sample_image)], [Priors()])
+        >>> infer_results = my_pipeline.infer([Image(sample_image)])
+        >>>
+        >>> isinstance(learn_results, Results) and isinstance(infer_results, Results)
+        True
     """
 
     def __init__(self, image_size: int | tuple[int, int] | None = None) -> None:

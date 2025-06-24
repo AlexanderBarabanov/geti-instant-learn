@@ -4,6 +4,7 @@
 
 from visionprompt.processes import Process
 from visionprompt.types import Image
+import numpy as np
 
 
 class ResizeImages(Process):
@@ -12,9 +13,13 @@ class ResizeImages(Process):
     Examples:
         >>> from visionprompt.processes.preprocessors import ResizeImages
         >>> from visionprompt.types import Image
+        >>> import numpy as np
         >>>
         >>> resizer = ResizeImages(size=512)
-        >>> resized_images = resizer([Image()])
+        >>> sample_image = Image(np.zeros((10, 10, 3), dtype=np.uint8))
+        >>> resized_images = resizer([sample_image])
+        >>> resized_images[0].size
+        (512, 512)
     """
 
     def __init__(self, size: int | tuple[int, int] | None = None) -> None:

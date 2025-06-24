@@ -11,7 +11,21 @@ from visionprompt.types import Features, Priors, Similarities
 
 
 class PromptGenerator(Process):
-    """This class generates priors."""
+    """This class generates priors.
+
+    Examples:
+        >>> from visionprompt.processes.prompt_generators import PromptGenerator
+        >>> from visionprompt.types import Priors
+        >>>
+        >>> class MyPromptGenerator(PromptGenerator):
+        ...     def __call__(self) -> list[Priors]:
+        ...         return [Priors()]
+        ...
+        >>> my_prompt_generator = MyPromptGenerator()
+        >>> priors = my_prompt_generator()
+        >>> isinstance(priors[0], Priors)
+        True
+    """
 
     @abstractmethod
     def __call__(self) -> list[Priors]:
@@ -100,14 +114,20 @@ class SimilarityPromptGenerator(PromptGenerator):
 
     Examples:
         >>> from visionprompt.processes.prompt_generators import SimilarityPromptGenerator
-        >>> from visionprompt.types import Similarities
+        >>> from visionprompt.types import Priors, Similarities
         >>>
         >>> class MySimilarityPromptGenerator(SimilarityPromptGenerator):
         ...     def __call__(self, target_similarities: list[Similarities] | None = None, **kwargs) -> tuple:
-        ...         return tuple()
-        >>>
+        ...         if not target_similarities:
+        ...             return tuple()
+        ...         return tuple([Priors() for _ in range(len(target_similarities))])
+        ...
         >>> my_prompt_generator = MySimilarityPromptGenerator()
         >>> priors = my_prompt_generator([Similarities()])
+        >>> isinstance(priors, tuple)
+        True
+        >>> isinstance(priors[0], Priors)
+        True
     """
 
     @abstractmethod
@@ -129,7 +149,7 @@ class FeaturePromptGenerator(PromptGenerator):
 
     Examples:
         >>> from visionprompt.processes.prompt_generators import FeaturePromptGenerator
-        >>> from visionprompt.types import Features
+        >>> from visionprompt.types import Features, Priors
         >>>
         >>> class MyFeaturePromptGenerator(FeaturePromptGenerator):
         ...     def __call__(
@@ -138,10 +158,16 @@ class FeaturePromptGenerator(PromptGenerator):
         ...         target_features: list[Features] | None = None,
         ...         **kwargs,
         ...     ) -> tuple:
-        ...         return tuple()
-        >>>
+        ...         if not target_features:
+        ...             return tuple()
+        ...         return tuple([Priors() for _ in range(len(target_features))])
+        ...
         >>> my_prompt_generator = MyFeaturePromptGenerator()
-        >>> priors = my_prompt_generator(reference_features=[Features()], target_features=[Features()])
+        >>> priors = my_prompt_generator(target_features=[Features()])
+        >>> isinstance(priors, tuple)
+        True
+        >>> isinstance(priors[0], Priors)
+        True
     """
 
     @abstractmethod

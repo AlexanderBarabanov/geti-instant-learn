@@ -13,12 +13,18 @@ class Calculator(Process):
     Examples:
         >>> from visionprompt.processes.calculators import Calculator
         >>>
+        >>> # As Calculator is an abstract class, you must subclass it.
         >>> class MyCalculator(Calculator):
-        ...     def __call__(self, *args, **kwargs):
-        ...         pass
-        >>>
+        ...     def __init__(self):
+        ...         super().__init__()
+        ...         self.value = 0
+        ...     def __call__(self, value_to_add: int):
+        ...         self.value += value_to_add
+        ...
         >>> my_calculator = MyCalculator()
-        >>> my_calculator()
+        >>> my_calculator(5)
+        >>> my_calculator.value
+        5
     """
 
     def __init__(self) -> None:
