@@ -1,4 +1,4 @@
-# Vision Prompt
+# VisionPrompt
 
 **A flexible and modular framework for exploring, developing, and evaluating visual prompting algorithms.**
 
