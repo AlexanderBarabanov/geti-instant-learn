@@ -4,6 +4,7 @@
 import cv2
 import numpy as np
 import torch
+from PIL import Image as PILImage
 
 from visionprompt.types.data import Data
 
@@ -59,6 +60,10 @@ class Image(Data):
     def to_numpy(self) -> np.ndarray:
         """Get the image data as a numpy array."""
         return self._data.copy()
+
+    def to_pil(self) -> PILImage:
+        """Return a PIL image."""
+        return PILImage.fromarray(self.to_numpy())
 
     def resize_inplace(self, size: int | tuple[int, int] | None = None) -> None:
         """Resizes the image in place.

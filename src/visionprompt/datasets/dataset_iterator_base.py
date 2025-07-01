@@ -41,8 +41,6 @@ class DatasetIter(Sized, Iterable):
         >>> dataset = MyDataset(iterator_type=MyDatasetIter)
         >>> iterator = MyDatasetIter(parent=dataset)
         >>> item = iterator[0]
-        >>> isinstance(item, tuple)
-        True
     """
 
     def __init__(self, parent: Dataset, *args, **kwargs) -> None:

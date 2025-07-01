@@ -346,6 +346,7 @@ This project builds upon and utilizes code from several excellent open-source re
 - [EfficientViT-SAM](https://github.com/mit-han-lab/efficientvit/tree/master/applications/efficientvit_sam)
 - [ModelAPI](https://github.com/open-edge-platform/model_api)
 - [SAM-HQ](https://github.com/lkeab/SAM-HQ)
+- [GroundingDino](https://huggingface.co/IDEA-Research)
 
 ## License
 

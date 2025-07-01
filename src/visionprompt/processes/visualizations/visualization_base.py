@@ -76,5 +76,5 @@ class Visualization(Process):
             masks.append(m)
         return masks
 
-    def __call__(self, *args, **kwargs) -> None:
+    def __call__(self) -> None:
         """Call visualization process."""

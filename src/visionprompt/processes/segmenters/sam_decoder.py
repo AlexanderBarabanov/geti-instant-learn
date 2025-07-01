@@ -13,8 +13,7 @@ import torch.nn.functional as F
 
 from visionprompt.models.per_segment_anything import SamPredictor
 from visionprompt.processes.segmenters.segmenter_base import Segmenter
-from visionprompt.types import Image, Masks, Points, Priors
-from visionprompt.types.similarities import Similarities
+from visionprompt.types import Boxes, Image, Masks, Points, Priors, Similarities
 
 
 class SamDecoder(Segmenter):
@@ -80,7 +79,7 @@ class SamDecoder(Segmenter):
         images: list[Image],
         priors: list[Priors] | None = None,
         similarities: list[Similarities] | None = None,
-    ) -> tuple[list[Masks], list[Points]]:
+    ) -> tuple[list[Masks], list[Points] | list[Boxes]]:
         """Create masks from priors using SAM.
 
         Args:
@@ -102,18 +101,79 @@ class SamDecoder(Segmenter):
         ):
             if priors_per_image is None:
                 continue
-            masks, points_used = self._predict_by_individual_point(
-                image,
-                priors_per_image.points,
-                similarities_per_image,
-                image_id=self.image_counter + i,
-            )
+            if not priors_per_image.points.is_empty():
+                masks, points_used = self._predict_by_individual_point(
+                    image,
+                    priors_per_image.points,
+                    similarities_per_image,
+                    image_id=self.image_counter + i,
+                )
+                points_per_image.append(points_used)
+            elif not priors_per_image.boxes.is_empty():
+                masks = self._predict_by_individual_box(
+                    image,
+                    priors_per_image.boxes,
+                    similarities_per_image,
+                    image_id=self.image_counter + i,
+                )
+            else:
+                masks = Masks()
             masks_per_image.append(masks)
-            points_per_image.append(points_used)
 
         self.image_counter += len(images)
 
         return masks_per_image, points_per_image
+
+    def _predict_by_individual_box(
+        self,
+        image: Image,
+        boxes: Boxes,
+        similarities: list[Similarities] | None = None,
+        image_id: int = 0,
+    ) -> Masks:
+        """Predict masks from a list boxes.
+
+        Args:
+            image: The image to predict masks from.
+            boxes: The points to predict masks from.
+            similarities: The similarities to use for filtering.
+            image_id: ID to identify which image is being processed.
+
+        Returns:
+            A tuple of generated masks and actual points used.
+        """
+        all_masks = Masks()
+        self.predictor.set_image(image.data)
+        for class_id, boxes_per_map in boxes.data.items():
+            # iterate over each point list of each similarity map
+            for all_boxes in boxes_per_map:
+                if len(all_boxes) == 0:
+                    # no boxes for this class
+                    continue
+
+                # predict masks
+                for box in all_boxes:
+                    x1, y1, x2, y2, _, _ = box
+
+                    masks, mask_scores, *_ = self.predictor.predict(
+                        box=np.array([x1, y1, x2, y2]),
+                        multimask_output=False,
+                    )
+
+                    final_mask = masks[np.argmax(mask_scores)]
+
+                    # Filter the mask based on average similarity
+                    if similarities is not None and not self._filter_mask(
+                        final_mask,
+                        similarities.data[class_id],
+                        image_id,
+                        class_id,
+                    ):
+                        continue
+
+                    all_masks.add(final_mask, class_id)
+
+        return all_masks
 
     def _predict_by_individual_point(  # noqa: C901
         self,
@@ -154,6 +214,8 @@ class SamDecoder(Segmenter):
                 # predict masks
                 for _i, (x, y, score, label) in enumerate(foreground_points):
                     # filter out points that lie inside a previously found mask
+                    inner_x = x
+                    inner_y = y
                     if self.skip_points_in_existing_masks:
                         is_covered = False
                         for mask in all_masks.get(class_id):
@@ -161,12 +223,12 @@ class SamDecoder(Segmenter):
                                 continue
 
                             # move edge points inside mask
-                            if int(y) == mask.shape[0]:
-                                y -= 1
-                            if int(x) == mask.shape[1]:
-                                x -= 1
+                            if int(inner_x) == mask.shape[1]:
+                                inner_x = inner_x - 1
+                            if int(inner_y) == mask.shape[0]:
+                                inner_y = inner_y - 1
 
-                            if mask[int(y), int(x)]:
+                            if mask[int(inner_y), int(inner_x)]:
                                 is_covered = True
                                 break
                         if is_covered:
@@ -174,7 +236,7 @@ class SamDecoder(Segmenter):
 
                     point_coords = np.concatenate(
                         (
-                            np.array([[x, y]]),
+                            np.array([[inner_x, inner_y]]),
                             background_points[:, :2],
                         ),
                         axis=0,
@@ -189,7 +251,7 @@ class SamDecoder(Segmenter):
                         point_coords=point_coords,
                         point_labels=point_labels,
                         multimask_output=False,
-                        # TODO(Daankrol): target guided attention and target-semantic prompting
+                        # TD(Daankrol): target guided attention and target-semantic prompting
                     )
 
                     if not self.apply_mask_refinement:
@@ -211,7 +273,7 @@ class SamDecoder(Segmenter):
                         continue
 
                     all_masks.add(final_mask, class_id)
-                    points_used.append([x, y, score, label])
+                    points_used.append([inner_x, inner_y, score, label])
 
                 points_used.extend(background_points)
                 # save the points used for the current

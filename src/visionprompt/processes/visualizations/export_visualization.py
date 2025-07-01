@@ -10,7 +10,7 @@ import numpy as np
 from visionprompt.processes.visualizations.visualization_base import (
     Visualization,
 )
-from visionprompt.types import Image, Masks, Points
+from visionprompt.types import Annotations, Image, Masks, Points
 from visionprompt.utils import get_colors
 
 
@@ -46,6 +46,7 @@ class ExportMaskVisualization(Visualization):
         image: np.ndarray,
         masks: np.ndarray,
         points: list[Points] | None = None,
+        polygons: list[Points] | None = None,
         scores: list[float] | None = None,
         types: list[int] | None = None,
     ) -> np.ndarray:
@@ -55,6 +56,9 @@ class ExportMaskVisualization(Visualization):
             image: RGB image as numpy array
             masks: Segmentation mask object with containing instance masks
             points: Optional points to visualize
+            scores: Optional confidence scores for the points
+            polygons: Optional polygons to visualize
+            boxes: Optional boxes to visualize
             scores: Optional confidence scores for the points
             types: The type of point (usually, 0 for background, 1 for foreground)
         """
@@ -74,7 +78,7 @@ class ExportMaskVisualization(Visualization):
                 for i, point in enumerate(points):
                     # Draw star marker
                     x, y = int(point[0]), int(point[1])
-                    size = int(image.shape[0] / 50)  # Scale marker size with image
+                    size = int(image.shape[0] / 100)  # Scale marker size with image
                     cv2.drawMarker(
                         image_vis,
                         (x, y),
@@ -94,6 +98,24 @@ class ExportMaskVisualization(Visualization):
                         (255, 255, 255),
                         1,
                     )
+
+            # Draw the polygon and the vertices
+            if polygons is not None:
+                for polygon in polygons:
+                    poly = np.array(polygon, np.int32)
+                    poly = poly.reshape((-1, 1, 2))
+                    cv2.polylines(image_vis, [poly], isClosed=True, color=(255, 0, 255))
+                    for point in polygon:
+                        x, y = int(point[0]), int(point[1])
+                        size = int(image.shape[0] / 200)  # Scale marker size with image
+                        cv2.drawMarker(
+                            image_vis,
+                            (x, y),
+                            (0, 255, 0),
+                            cv2.MARKER_SQUARE,
+                            size,
+                        )
+
         return image_vis
 
     def __call__(
@@ -102,6 +124,7 @@ class ExportMaskVisualization(Visualization):
         masks: list[Masks] | None = None,
         names: list[str] | None = None,
         points: list[Points] | None = None,
+        annotations: list[Annotations] | None = None,
     ) -> None:
         """This method exports the visualization images.
 
@@ -110,6 +133,7 @@ class ExportMaskVisualization(Visualization):
             masks: List of input masks
             names: List of filenames
             points: List of points to visualize
+            annotations: List of annotations to visualize
         """
         # Generate overlay
         if names is None:
@@ -134,8 +158,9 @@ class ExportMaskVisualization(Visualization):
             image_vis = image_np
 
             for class_id in masks_per_class.class_ids():
+                # Get masks
                 mask_np = masks_per_class.to_numpy(class_id)
-                if points is not None and i < len(points) and points[i] is not None:
+                if points is not None and i < len(points) and points[i] is not None and not points[i].is_empty():
                     current_points = points[i].data[class_id][0]
                     yxs, scores, types = (
                         current_points.cpu().numpy()[:, :2],
@@ -144,13 +169,24 @@ class ExportMaskVisualization(Visualization):
                     )
                 else:
                     yxs = scores = types = None
+
+                polygons = self._get_polygons(annotations[i]) if annotations is not None else None
+
                 image_vis = self.create_overlay(
                     image=image_np,
                     masks=mask_np,
                     points=yxs,
+                    polygons=polygons,
                     scores=scores,
                     types=types,
                 )
 
             # Save visualization
             cv2.imwrite(output_filename, cv2.cvtColor(image_vis, cv2.COLOR_RGB2BGR))
+
+    @staticmethod
+    def _get_polygons(annotations_per_class: Annotations) -> list[np.ndarray]:
+        if not annotations_per_class.polygons.is_empy():
+            msg = "Multiple class annotations not supported yet."
+            raise RuntimeError(msg)
+        return annotations_per_class.polygons[0]

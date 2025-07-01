@@ -51,3 +51,7 @@ class Prompt(Data):
     def shape(self) -> tuple[int, int, int]:
         """Get the shape of the data."""
         return self.get().shape
+
+    def class_ids(self) -> list[int]:
+        """Get the number of classes."""
+        return list(self._data.keys())

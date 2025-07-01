@@ -8,11 +8,11 @@ import torch
 from visionprompt.types.prompts import Prompt
 
 
-class Points(Prompt):
-    """This class represent point prompts for a single image.
+class Boxes(Prompt):
+    """This class represent box prompts for a single image.
 
-    Since there can be varying amount of points for each similarity map, we use a list of tensors to store the points.
-    The points have a shape of (npoints, 4) where each row is [x, y, score, label].
+    Since there can be varying amount of boxes, we use a list of tensors to store the boxes.
+    The points have a shape of (nboxes, 6) where each row is [x1, y1, x2, y2, score, label].
     """
 
     def __init__(
@@ -39,12 +39,12 @@ class Points(Prompt):
     def only_foreground(self) -> dict[int, list[torch.Tensor]]:
         """Get a copy of data containing only the foreground points."""
         # filter out all points with label p[3] == 0
-        return {k: [p[p[:, 3] > 0] for p in v] for k, v in self._data.items()}
+        return {k: [p[p[:, 5] > 0] for p in v] for k, v in self._data.items()}
 
     def only_background(self) -> dict[int, list[torch.Tensor]]:
         """Get a copy of data containing only the background points."""
-        return {k: [p[p[:, 3] == 0] for p in v] for k, v in self._data.items()}
+        return {k: [p[p[:, 5] == 0] for p in v] for k, v in self._data.items()}
 
     def is_empty(self) -> bool:
-        """Check if the points are empty."""
+        """Check if the boxes are empty."""
         return len(self._data) == 0

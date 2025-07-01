@@ -53,6 +53,7 @@ PIPELINES = [
     "SoftMatcherRFFSamplingModular",
     "SoftMatcherBiDirectionalSamplingModular",
     "SoftMatcherRFFBiDirectionalSamplingModular",
+    "GroundingDinoSAM",
 ]
 MAPI_ENCODER_PATH = DATA_PATH.joinpath("otx_models", "sam_vit_b_zsl_encoder.xml")
 MAPI_DECODER_PATH = DATA_PATH.joinpath("otx_models", "sam_vit_b_zsl_decoder.xml")

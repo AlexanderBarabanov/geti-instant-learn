@@ -1,11 +1,11 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
-
-
+from visionprompt.types.boxes import Boxes
 from visionprompt.types.data import Data
 from visionprompt.types.masks import Masks
 from visionprompt.types.points import Points
 from visionprompt.types.prompts import Prompt
+from visionprompt.types.text import Text
 
 
 class Priors(Data):
@@ -17,14 +17,16 @@ class Priors(Data):
     def __init__(
         self,
         points: Points | None = None,
-        boxes: Prompt | None = None,
+        boxes: Boxes | None = None,
         masks: Masks | None = None,
         polygons: Prompt | None = None,
+        text: Text | None = None,
     ) -> None:
         self._points: Points = points if points is not None else Points()
-        self._boxes: Prompt = boxes if boxes is not None else Prompt()
+        self._boxes: Boxes = boxes if boxes is not None else Boxes()
         self._masks: Masks = masks if masks is not None else Masks()
         self._polygons: Prompt = polygons if polygons is not None else Prompt()
+        self._text: Text = text if text is not None else Text()
 
     @property
     def points(self) -> Points:
@@ -32,7 +34,7 @@ class Priors(Data):
         return self._points
 
     @property
-    def boxes(self) -> Prompt:
+    def boxes(self) -> Boxes:
         """Get the boxes."""
         return self._boxes
 
@@ -45,3 +47,8 @@ class Priors(Data):
     def polygons(self) -> Prompt:
         """Get the polygons."""
         return self._polygons
+
+    @property
+    def text(self) -> Text:
+        """Get the text."""
+        return self._text

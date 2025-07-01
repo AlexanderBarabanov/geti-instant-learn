@@ -1,12 +1,12 @@
 """Models and pipelines can be constructed using the methods in this file."""
+
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
-
-import torch
 from argparse import Namespace
 from logging import getLogger
 from typing import TYPE_CHECKING
 
+import torch
 from efficientvit.models.efficientvit import EfficientViTSamPredictor
 from efficientvit.sam_model_zoo import create_efficientvit_sam_model
 from segment_anything_fast import sam_model_fast_registry
@@ -20,6 +20,7 @@ from visionprompt.models.per_segment_anything import (
     sam_model_registry,
 )
 from visionprompt.pipelines import (
+    GroundingDinoSAM,
     Matcher,
     PerDino,
     PerSam,
@@ -275,6 +276,8 @@ def load_pipeline(  # noqa: C901, PLR0911
                 verbose=args.verbose,
                 image_size=args.image_size,
             )
+        case "GroundingDinoSAM":
+            return GroundingDinoSAM(sam_model, apply_mask_refinement=args.apply_mask_refinement, device="cuda:0")
     msg = f"Algorithm {pipeline_name} not implemented yet"
     raise NotImplementedError(msg)
 

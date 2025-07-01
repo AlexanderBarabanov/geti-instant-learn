@@ -3,7 +3,6 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 from abc import abstractmethod
-import numpy as np
 
 from visionprompt.processes import Process
 from visionprompt.types import Image, Masks
@@ -31,12 +30,11 @@ class Segmenter(Process):
     """
 
     @abstractmethod
-    def __call__(self, images: list[Image], **kwargs) -> list[Masks]:
+    def __call__(self, images: list[Image]) -> list[Masks]:
         """This method extracts segmentation masks.
 
         Args:
             images: The images to segment.
-            kwargs: Additional arguments
 
         Returns:
             Segmentation masks.

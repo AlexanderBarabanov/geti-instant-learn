@@ -28,7 +28,7 @@ from visionprompt.models.models import load_pipeline
 from visionprompt.pipelines import Pipeline
 from visionprompt.processes.calculators import SegmentationMetrics
 from visionprompt.processes.visualizations import ExportMaskVisualization
-from visionprompt.types import Image, Masks, Priors
+from visionprompt.types import Image, Masks, Priors, Text
 from visionprompt.utils import setup_logger
 from visionprompt.utils.args import get_arguments, parse_experiment_args
 from visionprompt.utils.data import (
@@ -169,7 +169,7 @@ def infer_all_batches(
         ]
         export_paths_all_points = [
             str(
-                Path("predictions_all_points")
+                Path("predictions_debug")
                 / f"priors_batch_{priors_batch_index}"
                 / category_name
                 / Path(batches.get_image_filename(batch_index, image_index)).name
@@ -271,7 +271,7 @@ def infer_all_images(
     ]
     export_paths_all_points = [
         str(
-            Path("predictions_all_points")
+            Path("predictions_debug")
             / f"priors_batch_{priors_batch_index}"
             / category_name
             / Path(filenames[image_index]).name
@@ -298,6 +298,7 @@ def infer_all_images(
         masks=results.masks,
         names=export_paths_all_points,
         points=visualizer.points_from_priors(results.priors),
+        annotations=results.annotations,
     )
     gt_masks = visualizer.arrays_to_masks(masks)
     visualizer(
@@ -400,8 +401,10 @@ def predict_on_dataset(  # noqa: C901
                     args.n_shot,
                 )
 
-                # Learn using the priors (currently only use the first masks)
-                reference_priors = [Priors(masks=priors_masks2[i]) for i in range(len(priors_masks2))]
+                # Learn using the priors
+                text_prior = Text()
+                text_prior.add(f"a {category_name} or similar object", class_id=0)
+                reference_priors = [Priors(masks=priors_masks2[i], text=text_prior) for i in range(len(priors_masks2))]
                 try:
                     pipeline.learn(
                         reference_images=priors_images2,
@@ -532,8 +535,8 @@ def main() -> None:
                         output_path / args.experiment_name / f"{dataset_name}_{backbone_name}_{pipeline_name}"
                     )
                 elif args.dataset_filenames is not None:
-                    fn_str = f"{args.dataset_filenames}".replace("/", "_")
-                    unique_output_path = output_path / f"{dataset_name}_{backbone_name}_{pipeline_name}_{fn_str}"
+                    fn_str = " ".join(args.dataset_filenames).replace("/", "-")
+                    unique_output_path = output_path / f"{dataset_name}_{backbone_name}_{pipeline_name} {fn_str}"
                 else:
                     unique_output_path = output_path / f"{dataset_name}_{backbone_name}_{pipeline_name}"
 
@@ -548,8 +551,8 @@ def main() -> None:
                     backbone_name=backbone_name,
                     number_of_priors_tests=args.num_priors,
                     number_of_batches=args.num_batches,
-                    dataset_filenames=args.dataset_filenames.split(",") if args.dataset_filenames else None,
                     image_size=args.image_size,
+                    dataset_filenames=args.dataset_filenames,
                 )
                 all_results.append(all_metrics_df)
 

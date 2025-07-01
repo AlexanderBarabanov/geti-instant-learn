@@ -42,10 +42,10 @@ def get_arguments(arg_list: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--dataset_filenames",
         type=str,
-        help="Only perform inference on these "
-        "files from the dataset (This "
-        "argument in incompatible with "
-        "multiple datasets)",
+        nargs="+",
+        help="Only perform inference on these files from the dataset. "
+        "Filename ambiguity can be solved by including subfolders. "
+        "For example: can/01.jpg instead of 01.jpg",
     )
     parser.add_argument("--save", action="store_true", help="Save results to disk")
     parser.add_argument(

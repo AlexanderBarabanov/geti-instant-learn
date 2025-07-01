@@ -2,6 +2,7 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+from .grounding_dino import GroundingDinoSAM
 from .matcher_pipeline import Matcher
 from .perdino_pipeline import PerDino
 from .persam_mapi_pipeline import PerSamMAPI
@@ -40,4 +41,5 @@ __all__ = [
     "SoftMatcherRFFSpatialSampling",
     "SoftMatcherSampling",
     "SoftMatcherSpatialSampling",
+    "GroundingDinoSAM",
 ]

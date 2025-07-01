@@ -5,6 +5,7 @@
 
 from .bidirectional_prompt_generator import BidirectionalPromptGenerator
 from .grid_prompt_generator import GridPromptGenerator
+from .grounding_dino_box_generator import GroundingDinoBoxGenerator
 from .prompt_generator_base import (
     FeaturePromptGenerator,
     PromptGenerator,
@@ -19,4 +20,5 @@ __all__ = [
     "FeaturePromptGenerator",
     "SimilarityPromptGenerator",
     "SoftmatcherPromptGenerator",
+    "GroundingDinoBoxGenerator",
 ]

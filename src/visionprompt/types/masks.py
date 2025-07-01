@@ -106,7 +106,7 @@ class Masks(Prompt):
 
     def class_ids(self) -> list[int]:
         """Return the class ids."""
-        return self._data.keys()
+        return list(self._data.keys())
 
     @property
     def mask_shape(self) -> tuple[int, int]:

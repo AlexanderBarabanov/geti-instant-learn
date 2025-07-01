@@ -5,7 +5,7 @@
 import torch
 
 from visionprompt.filters import Filter
-from visionprompt.types import Masks
+from visionprompt.types.masks import Masks
 
 
 class MaskFilter(Filter):
