@@ -1,9 +1,6 @@
 default_language_version:
   node: 22.10.0
 
-# Exclude third-party directory from all hooks
-exclude: ^third_party/
-
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
