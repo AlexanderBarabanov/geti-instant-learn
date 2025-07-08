@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: Apache-2.0
 from abc import ABC, abstractmethod
 from logging import getLogger
-import numpy as np
 
 from visionprompt.processes.preprocessors import ResizeImages, ResizeMasks
 from visionprompt.processes.process_base import Process

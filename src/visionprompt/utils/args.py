@@ -2,15 +2,15 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import argparse
+from enum import Enum
+from typing import TypeVar
 
-import torch
-
-from visionprompt.utils.constants import DATASETS, MODEL_MAP, PIPELINES
+from visionprompt.utils.constants import DatasetName, PipelineName, SAMModelName
 
 # Generate help strings with choices
-AVAILABLE_MODELS = ", ".join(MODEL_MAP.keys())
-AVAILABLE_PIPELINES = ", ".join(PIPELINES)
-AVAILABLE_DATASETS = ", ".join(DATASETS)
+AVAILABLE_MODELS = ", ".join([model.value for model in SAMModelName])
+AVAILABLE_PIPELINES = ", ".join([p.value for p in PipelineName])
+AVAILABLE_DATASETS = ", ".join([d.value for d in DatasetName])
 
 HELP_SAM_NAME = (
     f"Backbone segmentation model name or comma-separated list. Use 'all' to run all. Available: [{AVAILABLE_MODELS}]"
@@ -19,26 +19,36 @@ HELP_PIPELINE = f"Pipeline name or comma-separated list. Use 'all' to run all. A
 HELP_DATASET_NAME = f"Dataset name or comma-separated list. Use 'all' to run all. Available: [{AVAILABLE_DATASETS}]"
 
 
-def get_arguments(arg_list: list[str] | None = None) -> argparse.Namespace:
-    """Get arguments.
-
-    Args:
-        arg_list: List of arguments
-
-    Returns:
-        Arguments
-    """
-    parser = argparse.ArgumentParser()
+def populate_benchmark_parser(parser: argparse.ArgumentParser) -> None:
+    """Populate the argument parser with benchmark arguments."""
     parser.add_argument("--log_level", type=str, default="INFO", help="Log level")
-    parser.add_argument("--sam_name", type=str, default="MobileSAM", help=HELP_SAM_NAME)
-    parser.add_argument("--pipeline", type=str, default="MatcherModular", help=HELP_PIPELINE)
+    parser.add_argument(
+        "--sam_name",
+        type=str,
+        default="MobileSAM",
+        choices=["all"] + [model.value for model in SAMModelName],
+        help=HELP_SAM_NAME,
+    )
+    parser.add_argument(
+        "--pipeline",
+        type=str,
+        default="Matcher",
+        choices=["all"] + [p.value for p in PipelineName],
+        help=HELP_PIPELINE,
+    )
     parser.add_argument(
         "--n_shot",
         type=int,
         default=1,
         help="Number of prior images to use as references",
     )
-    parser.add_argument("--dataset_name", type=str, default="lvis", help=HELP_DATASET_NAME)
+    parser.add_argument(
+        "--dataset_name",
+        type=str,
+        default="lvis",
+        choices=["all"] + [d.value for d in DatasetName],
+        help=HELP_DATASET_NAME,
+    )
     parser.add_argument(
         "--dataset_filenames",
         type=str,
@@ -143,8 +153,8 @@ def get_arguments(arg_list: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--precision",
         type=str,
-        default="bfloat16",
-        choices=["float", "float16", "bfloat16"],
+        default="bf16",
+        choices=["fp32", "fp16", "bf16"],
         help="The precision to use for the models. Maps to torch.float32, torch.float16, or torch.bfloat16",
     )
     parser.add_argument(
@@ -159,15 +169,58 @@ def get_arguments(arg_list: list[str] | None = None) -> argparse.Namespace:
         help="Whether to show the inference time of the optimized models",
     )
 
-    args = parser.parse_args(arg_list)
 
-    precision_map = {"float": torch.float32, "float16": torch.float16, "bfloat16": torch.bfloat16}
-    args.precision = precision_map[args.precision]
+def get_arguments(arg_list: list[str] | None = None) -> argparse.Namespace:
+    """Get arguments.
 
-    return args
+    Args:
+        arg_list: List of arguments
+
+    Returns:
+        Arguments
+    """
+    parser = argparse.ArgumentParser()
+    populate_benchmark_parser(parser)
+
+    return parser.parse_args(arg_list)
 
 
-def parse_experiment_args(args: argparse.Namespace) -> tuple[list[str], list[str], list[str]]:
+TEnum = TypeVar("TEnum", bound=Enum)
+
+
+def _parse_enum_list(arg_str: str, enum_cls: type[TEnum], arg_name: str) -> list[TEnum]:
+    """Parses a comma-separated string of enum values, returning a list of valid enum members."""
+    if arg_str == "all":
+        return list(enum_cls)
+
+    items_to_run = [p.strip() for p in arg_str.split(",")]
+    valid_enum_values = {e.value for e in enum_cls}
+
+    invalid_items = [item for item in items_to_run if item not in valid_enum_values]
+    if invalid_items:
+        msg = f"Invalid {arg_name}(s): {invalid_items}. Available {arg_name}s: {[e.value for e in enum_cls]}"
+        raise ValueError(msg)
+
+    return [enum_cls(item) for item in items_to_run]
+
+
+def _parse_str_list(arg_str: str, all_values: list[str], arg_name: str) -> list[str]:
+    """Parses a comma-separated string of values, returning a list of valid values."""
+    if arg_str == "all":
+        return [v for v in all_values if v != "all"]
+
+    items_to_run = [p.strip() for p in arg_str.split(",")]
+    valid_items = [item for item in items_to_run if item in all_values]
+    invalid_items = [item for item in items_to_run if item not in all_values]
+
+    if invalid_items:
+        msg = f"Invalid {arg_name}(s): {invalid_items}. Available {arg_name}s: {[v for v in all_values if v != 'all']}"
+        raise ValueError(msg)
+
+    return valid_items
+
+
+def parse_experiment_args(args: argparse.Namespace) -> tuple[list[DatasetName], list[PipelineName], list[SAMModelName]]:
     """Parse experiment arguments.
 
     Args:
@@ -175,26 +228,25 @@ def parse_experiment_args(args: argparse.Namespace) -> tuple[list[str], list[str
 
     Returns:
         tuple containing:
-            - datasets_to_run: List of datasets to run
-            - pipelines_to_run: List of pipelines to run
-            - backbones_to_run: List of backbones to run
+            - datasets_to_run: List of dataset enums to run
+            - pipelines_to_run: List of pipeline enums to run
+            - backbones_to_run: List of SAM model enums to run
+
+    Raises:
+        ValueError: If any invalid arguments are provided or if no valid arguments remain after filtering
     """
-    if args.dataset_name == "all":
-        valid_datasets = [d for d in DATASETS if d != "all"]
-    else:
-        datasets_to_run = [d.strip() for d in args.dataset_name.split(",")]
-        valid_datasets = [d for d in datasets_to_run if d in DATASETS]
+    valid_datasets = _parse_enum_list(args.dataset_name, DatasetName, "dataset")
+    valid_pipelines = _parse_enum_list(args.pipeline, PipelineName, "pipeline")
+    valid_backbones = _parse_enum_list(args.sam_name, SAMModelName, "SAM model")
 
-    if args.pipeline == "all":
-        valid_pipelines = [p for p in PIPELINES if p != "all"]
-    else:
-        pipelines_to_run = [p.strip() for p in args.pipeline.split(",")]
-        valid_pipelines = [p for p in pipelines_to_run if p in PIPELINES]
-
-    if args.sam_name == "all":
-        valid_backbones = [b for b in list(MODEL_MAP.keys()) if b != "all"]
-    else:
-        backbones_to_run = [b.strip() for b in args.sam_name.split(",")]
-        valid_backbones = [b for b in backbones_to_run if b in MODEL_MAP]
+    if not valid_datasets:
+        msg = f"No valid datasets found from '{args.dataset_name}'. Available: {[d.value for d in DatasetName]}"
+        raise ValueError(msg)
+    if not valid_pipelines:
+        msg = f"No valid pipelines found from '{args.pipeline}'. Available: {[p.value for p in PipelineName]}"
+        raise ValueError(msg)
+    if not valid_backbones:
+        msg = f"No valid SAM models found from '{args.sam_name}'. Available: {[m.value for m in SAMModelName]}"
+        raise ValueError(msg)
 
     return valid_datasets, valid_pipelines, valid_backbones

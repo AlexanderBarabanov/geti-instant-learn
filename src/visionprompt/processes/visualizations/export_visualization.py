@@ -7,9 +7,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from visionprompt.processes.visualizations.visualization_base import (
-    Visualization,
-)
+from visionprompt.processes.visualizations.visualization_base import Visualization
 from visionprompt.types import Annotations, Boxes, Image, Masks, Points
 from visionprompt.utils import get_colors
 
@@ -185,7 +183,7 @@ class ExportMaskVisualization(Visualization):
             for class_id in masks_per_class.class_ids():
                 # Get masks
                 mask_np = masks_per_class.to_numpy(class_id)
-                if points is not None and i < len(points) and points[i] is not None and not points[i].is_empty():
+                if points is not None and i < len(points) and points[i] is not None and not points[i].is_empty:
                     current_points = points[i].data[class_id][0]
                     point_yxs, point_scores, point_types = (
                         current_points.cpu().numpy()[:, :2],
@@ -195,7 +193,7 @@ class ExportMaskVisualization(Visualization):
                 else:
                     point_yxs = point_scores = point_types = None
 
-                if boxes is not None and i < len(boxes) and boxes[i] is not None and not boxes[i].is_empty():
+                if boxes is not None and i < len(boxes) and boxes[i] is not None and not boxes[i].is_empty:
                     current_boxes = boxes[i].data[class_id][0]
                     box_rects, box_scores, box_types = (
                         current_boxes.cpu().numpy()[:, :4],

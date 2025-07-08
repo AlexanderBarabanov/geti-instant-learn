@@ -1,24 +1,18 @@
-"""SoftMatcherRFF pipeline."""
+"""SoftMatcher RFF pipeline."""
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 from typing import TYPE_CHECKING
 
-import torch
-
-from visionprompt.models.per_segment_anything import SamPredictor
-from visionprompt.pipelines import Matcher
-from visionprompt.processes.prompt_generators.softmatcher_prompt_generator import (
-    SoftmatcherPromptGenerator,
-)
+from visionprompt.pipelines.softmatcher.softmatcher_pipeline import SoftMatcher
+from visionprompt.processes.prompt_generators.softmatcher_prompt_generator import SoftmatcherPromptGenerator
+from visionprompt.utils.constants import SAMModelName
 
 if TYPE_CHECKING:
-    from visionprompt.processes.prompt_generators.prompt_generator_base import (
-        PromptGenerator,
-    )
+    from visionprompt.processes.prompt_generators.prompt_generator_base import PromptGenerator
 
 
-class SoftMatcherRFF(Matcher):
+class SoftMatcherRFF(SoftMatcher):
     """This is the SoftMatcherRFF pipeline.
 
     Instead of using a bidirectional prompt generator, this pipeline uses a soft matching algorithm to generate prompts
@@ -35,12 +29,11 @@ class SoftMatcherRFF(Matcher):
     Examples:
         >>> from visionprompt.pipelines.softmatcher import SoftMatcherRFF
         >>> from visionprompt.types import Image, Priors, Results
-        >>> from visionprompt.models.models import load_sam_model
         >>> import torch
         >>> import numpy as np
         >>>
-        >>> sam_predictor = load_sam_model(backbone_name="MobileSAM")
-        >>> soft_matcher = SoftMatcherRFF(sam_predictor=sam_predictor)
+        >>> soft_matcher_rff = SoftMatcherRFF()
+        >>>
         >>> # Create mock inputs
         >>> ref_image = np.zeros((1024, 1024, 3), dtype=np.uint8)
         >>> target_image = np.zeros((1024, 1024, 3), dtype=np.uint8)
@@ -48,8 +41,8 @@ class SoftMatcherRFF(Matcher):
         >>> ref_priors.masks.add(torch.ones(30, 30, dtype=torch.bool), class_id=1)
         >>>
         >>> # Run learn and infer
-        >>> learn_results = soft_matcher.learn([Image(ref_image)], [ref_priors])
-        >>> infer_results = soft_matcher.infer([Image(target_image)])
+        >>> learn_results = soft_matcher_rff.learn([Image(ref_image)], [ref_priors])
+        >>> infer_results = soft_matcher_rff.infer([Image(target_image)])
         >>>
         >>> isinstance(learn_results, Results) and isinstance(infer_results, Results)
         True
@@ -61,21 +54,21 @@ class SoftMatcherRFF(Matcher):
 
     def __init__(
         self,
-        sam_predictor: SamPredictor,
+        sam_name: SAMModelName = SAMModelName.SAM,
         num_foreground_points: int = 40,
         num_background_points: int = 2,
         apply_mask_refinement: bool = True,
         skip_points_in_existing_masks: bool = True,
         mask_similarity_threshold: float | None = 0.42,
-        precision: torch.dtype = torch.bfloat16,
+        precision: str = "bf16",
         compile_models: bool = False,
         verbose: bool = False,
         image_size: int | tuple[int, int] | None = None,
     ) -> None:
-        """Initialize the SoftMatcherRFF pipeline.
+        """Initialize the SoftMatcher RFF pipeline.
 
         Args:
-            sam_predictor: The SAM predictor to use.
+            sam_name: The name of the SAM model to use.
             num_foreground_points: The number of foreground points to use.
             num_background_points: The number of background points to use.
             apply_mask_refinement: Whether to apply mask refinement.
@@ -87,7 +80,7 @@ class SoftMatcherRFF(Matcher):
             image_size: The size of the image to use, if None, the image will not be resized.
         """
         super().__init__(
-            sam_predictor=sam_predictor,
+            sam_name=sam_name,
             num_foreground_points=num_foreground_points,
             num_background_points=num_background_points,
             apply_mask_refinement=apply_mask_refinement,

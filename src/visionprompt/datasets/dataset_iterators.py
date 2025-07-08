@@ -40,7 +40,7 @@ class IndexIter(DatasetIter):
         True
     """
 
-    def __init__(self, parent: "Dataset") -> None:
+    def __init__(self, parent: Dataset) -> None:
         super().__init__(parent)
         self.index = 0
 

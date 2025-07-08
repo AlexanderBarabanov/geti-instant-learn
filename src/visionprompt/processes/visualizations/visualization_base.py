@@ -40,6 +40,18 @@ class Visualization(Process):
         return [m.masks for m in priors]
 
     @staticmethod
+    def boxes_from_priors(priors: list[Priors]) -> list[Boxes]:
+        """Extracts boxes from priors.
+
+        Args:
+            priors: The list of priors to extract boxes from
+
+        Returns:
+            The list of boxes
+        """
+        return [m.boxes for m in priors]
+
+    @staticmethod
     def points_from_priors(priors: list[Priors]) -> list[Points]:
         """Extracts points from priors.
 
@@ -50,18 +62,6 @@ class Visualization(Process):
             The list of points
         """
         return [m.points for m in priors]
-
-    @staticmethod
-    def boxes_from_priors(priors: list[Priors]) -> list[Boxes]:
-        """Extracts points from priors.
-
-        Args:
-            priors: The list of priors to extract boxes from
-
-        Returns:
-            The list of boxes
-        """
-        return [m.boxes for m in priors]
 
     @staticmethod
     def arrays_to_masks(arrays: list[np.ndarray], class_id: int = 0) -> list[Masks]:

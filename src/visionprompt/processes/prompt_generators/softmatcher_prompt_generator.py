@@ -7,9 +7,7 @@ from logging import getLogger
 import torch
 from torch.nn import functional as F
 
-from visionprompt.processes.prompt_generators.bidirectional_prompt_generator import (
-    BidirectionalPromptGenerator,
-)
+from visionprompt.processes.prompt_generators.bidirectional_prompt_generator import BidirectionalPromptGenerator
 from visionprompt.types import Features, Masks, Priors, Similarities
 from visionprompt.types.image import Image
 
@@ -102,8 +100,9 @@ class SoftmatcherPromptGenerator(BidirectionalPromptGenerator):
         reference_masks: list[Masks] | None = None,
         target_images: list[Image] | None = None,
     ) -> tuple[list[Priors], list[Similarities]]:
-        """This generates prompt candidates (or priors) based on the similarities between the reference 
-        and target images.
+        """This class generates prompts for the segmenter.
+
+        This is based on the similarities between the reference and target images.
 
         It uses bidirectional matching to create prompts for the segmenter.
         This Prompt Generator computes the similarity map internally.

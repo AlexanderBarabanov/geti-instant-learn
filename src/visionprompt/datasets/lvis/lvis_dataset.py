@@ -3,10 +3,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import json
-import logging
 import pickle  # noqa: S403
 import shutil
 from collections import OrderedDict
+from logging import getLogger
 from pathlib import Path
 
 import cv2
@@ -18,6 +18,8 @@ from PIL import Image as PILImage
 from visionprompt.datasets.dataset_base import Annotation, Dataset, DatasetIter, Image
 from visionprompt.datasets.dataset_iterators import CategoryIter, IndexIter
 from visionprompt.utils import color_overlay
+
+logger = getLogger("Vision Prompt")
 
 
 def segment_to_mask(segment: list[float], height: int, width: int) -> np.ndarray:
@@ -137,13 +139,13 @@ class LVISImage(Image):
         if self.source_filename is not None:
             if self.copy_file:
                 if Path(self.source_filename).exists() and not Path(self.filename).exists():
-                    logging.info(f"Copy {self.source_filename} to {self.filename}")
+                    logger.info(f"Copy {self.source_filename} to {self.filename}")
                     shutil.copyfile(self.source_filename, self.filename)
             else:
                 image_filename = self.source_filename
 
         if not Path(image_filename).exists():
-            logging.info(f"Downloading {self.source_url}")
+            logger.info(f"Downloading {self.source_url}")
             img_data = requests.get(self.source_url, timeout=60).content
             Path(image_filename).parent.mkdir(parents=True, exist_ok=True)
             with Path(image_filename).open("wb") as handler:
@@ -169,7 +171,7 @@ class LVISDataset(Dataset):
 
     def __init__(
         self,
-        root_path: str = Path("~/data/lvis").expanduser(),
+        root_path: str | Path = "~/data/lvis",
         whitelist: str | list[str] | None = None,
         name: str = "training",
         iterator_type: type[DatasetIter] = IndexIter,
@@ -180,7 +182,7 @@ class LVISDataset(Dataset):
         if iterator_kwargs is None:
             iterator_kwargs = {}
         super().__init__(iterator_type=iterator_type, iterator_kwargs=iterator_kwargs)
-        self._root_path = root_path
+        self._root_path = Path(root_path).expanduser()
         Path(self._root_path).mkdir(parents=True, exist_ok=True)
 
         self._subset_files = {
@@ -244,13 +246,13 @@ class LVISDataset(Dataset):
 
         # Load metadata and data
         if valid:
-            logging.info(
+            logger.debug(
                 f"Using cached {self._cached_metadata} and {self._cached_data}",
             )
             self._load_metadata(self._cached_metadata)
             self._load_data(self._cached_data)
         else:
-            logging.info("Cache files have been invalidated, data is reloaded")
+            logger.info("Cache files have been invalidated, data is reloaded")
             categories_info, images_info, annotations_info = self._get_metadata()
             self._set_metadata(categories_info)
             self._set_data(images_info, annotations_info)

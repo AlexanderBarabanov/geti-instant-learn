@@ -52,6 +52,11 @@ class Prompt(Data):
         """Get the shape of the data."""
         return self.get().shape
 
+    @property
+    def is_empty(self) -> bool:
+        """Check if the prompts are empty."""
+        return not self._data
+
     def class_ids(self) -> list[int]:
         """Get the number of classes."""
         return list(self._data.keys())

@@ -7,6 +7,7 @@ from visionprompt.utils.utils import (
     color_overlay,
     download_file,
     get_colors,
+    precision_to_torch_dtype,
     prepare_target_guided_prompting,
     setup_logger,
 )
@@ -18,4 +19,5 @@ __all__ = [
     "prepare_target_guided_prompting",
     "setup_logger",
     "MaybeToTensor",
+    "precision_to_torch_dtype",
 ]

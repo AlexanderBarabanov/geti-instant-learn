@@ -21,3 +21,5 @@ node_modules/
 .venv/
 *.egg-info/
 flash_4_configs.p
+dist/
+build/

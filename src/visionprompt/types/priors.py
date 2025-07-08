@@ -38,10 +38,20 @@ class Priors(Data):
         """Get the boxes."""
         return self._boxes
 
+    @points.setter
+    def points(self, points: Points) -> None:
+        """Set the points."""
+        self._points = points
+
     @property
     def masks(self) -> Masks:
         """Get the masks."""
         return self._masks
+
+    @masks.setter
+    def masks(self, masks: Masks) -> None:
+        """Set the masks."""
+        self._masks = masks
 
     @property
     def polygons(self) -> Prompt:

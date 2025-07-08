@@ -4,45 +4,60 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from visionprompt.filters.masks import ClassOverlapMaskFilter, MaskFilter
-from visionprompt.models.per_segment_anything import SamPredictor
+from visionprompt.models.models import load_sam_model
 from visionprompt.pipelines.pipeline_base import Pipeline
 from visionprompt.processes.mask_processors import MaskProcessor, MasksToPolygons
 from visionprompt.processes.prompt_generators import GroundingDinoBoxGenerator
 from visionprompt.processes.segmenters import SamDecoder, Segmenter
 from visionprompt.types import Image, Priors, Results, Text
+from visionprompt.utils.constants import SAMModelName
 from visionprompt.utils.decorators import track_duration
 
 
 class GroundingDinoSAM(Pipeline):
-    """This Pipeline used GroundingDino to generate boxes for SAM.
-
-    It uses the HuggingFace implementation.
-    """
+    """This Pipeline uses GroundingDino (from Huggingface) to generate boxes for SAM."""
 
     def __init__(
         self,
-        sam_predictor: SamPredictor,
+        sam_name: SAMModelName,
         apply_mask_refinement: bool,
+        precision: str = "bf16",
+        compile_models: bool = False,
+        verbose: bool = False,
         box_threshold: float = 0.15,
         text_threshold: float = 0.15,
         device: str = "cuda",
+        image_size: int | tuple[int, int] | None = None,
     ) -> None:
         """Initialize the pipeline.
 
         Args:
-            sam_predictor: The SAM predictor.
+            sam_name: The SAM model name.
             apply_mask_refinement: Whether to apply mask refinement.
+            precision: The precision to use for the model.
+            compile_models: Whether to compile the models.
+            verbose: Whether to print verbose output of the model optimization process.
             box_threshold: The box threshold.
             text_threshold: The text threshold.
             device: The device to use.
+            image_size: The size of the image to use, if None, the image will not be resized.
         """
-        super().__init__()
+        super().__init__(image_size=image_size)
+        self.sam_predictor = load_sam_model(
+            sam_name, precision=precision, compile_models=compile_models, verbose=verbose
+        )
         self.prompt_generator: GroundingDinoBoxGenerator = GroundingDinoBoxGenerator(
-            device=device, box_threshold=box_threshold, text_threshold=text_threshold, size="tiny"
+            device=device,
+            box_threshold=box_threshold,
+            text_threshold=text_threshold,
+            size="tiny",
+            precision=precision,
+            compile_models=compile_models,
+            verbose=verbose,
         )
 
         self.segmenter: Segmenter = SamDecoder(
-            sam_predictor=sam_predictor,
+            sam_predictor=self.sam_predictor,
             apply_mask_refinement=apply_mask_refinement,
             skip_points_in_existing_masks=False,  # not relevant for boxes
         )
@@ -51,11 +66,8 @@ class GroundingDinoSAM(Pipeline):
         self.text_priors: Text | None = None
 
     @track_duration
-    def learn(self, reference_images: list[Image], reference_priors: list[Priors]) -> Results:
+    def learn(self, reference_images: list[Image], reference_priors: list[Priors]) -> Results:  # noqa: ARG002
         """Perform learning step on the reference images and priors."""
-        if len(reference_images) != len(reference_priors):
-            msg = "Reference images and reference_priors must have same length"
-            raise ValueError(msg)
         if not all(p.text is not None for p in reference_priors):
             msg = "reference_priors must have all text types"
             raise ValueError(msg)
@@ -63,6 +75,7 @@ class GroundingDinoSAM(Pipeline):
         if not all(p.text.data for p in reference_priors):
             msg = "Different image-level text priors not supported."
             raise ValueError(msg)
+
         self.text_priors = reference_priors[0].text
 
         return Results()
@@ -71,6 +84,7 @@ class GroundingDinoSAM(Pipeline):
     def infer(self, target_images: list[Image]) -> Results:
         """Perform inference step on the target images."""
         # Start running the pipeline
+        target_images = self.resize_images(target_images)
         priors = self.prompt_generator(target_images, [self.text_priors] * len(target_images))
         masks, used_points = self.segmenter(target_images, priors)
         annotations = self.mask_processor(masks)

@@ -4,7 +4,6 @@
 
 from visionprompt.processes import Process
 from visionprompt.types import Image
-import numpy as np
 
 
 class ResizeImages(Process):

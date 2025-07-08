@@ -101,7 +101,7 @@ class SamDecoder(Segmenter):
         ):
             if priors_per_image is None:
                 continue
-            if not priors_per_image.points.is_empty():
+            if not priors_per_image.points.is_empty:
                 masks, points_used = self._predict_by_individual_point(
                     image,
                     priors_per_image.points,
@@ -109,7 +109,7 @@ class SamDecoder(Segmenter):
                     image_id=self.image_counter + i,
                 )
                 points_per_image.append(points_used)
-            elif not priors_per_image.boxes.is_empty():
+            elif not priors_per_image.boxes.is_empty:
                 masks = self._predict_by_individual_box(
                     image,
                     priors_per_image.boxes,
@@ -213,13 +213,13 @@ class SamDecoder(Segmenter):
 
                 # predict masks
                 for _i, (x, y, score, label) in enumerate(foreground_points):
-                    # filter out points that lie inside a previously found mask
                     inner_x = x
                     inner_y = y
+                    # filter out points that lie inside a previously found mask
                     if self.skip_points_in_existing_masks:
                         is_covered = False
                         for mask in all_masks.get(class_id):
-                            if int(y) < 0 or int(x) < 0:
+                            if int(inner_y) < 0 or int(inner_x) < 0:
                                 continue
 
                             # move edge points inside mask
@@ -251,7 +251,7 @@ class SamDecoder(Segmenter):
                         point_coords=point_coords,
                         point_labels=point_labels,
                         multimask_output=False,
-                        # TD(Daankrol): target guided attention and target-semantic prompting
+                        # TODO(Daankrol): target guided attention and target-semantic prompting  # noqa: TD003
                     )
 
                     if not self.apply_mask_refinement:

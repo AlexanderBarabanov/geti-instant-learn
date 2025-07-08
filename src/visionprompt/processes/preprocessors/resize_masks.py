@@ -4,8 +4,6 @@
 
 from visionprompt.processes import Process
 from visionprompt.types import Priors
-import numpy as np
-import torch
 
 
 class ResizeMasks(Process):

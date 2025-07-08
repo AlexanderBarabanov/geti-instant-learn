@@ -8,6 +8,7 @@ from .perdino_pipeline import PerDino
 from .persam_mapi_pipeline import PerSamMAPI
 from .persam_pipeline import PerSam
 from .pipeline_base import Pipeline
+from .pipeline_factory import load_pipeline
 from .softmatcher import (
     SoftMatcher,
     SoftMatcherBiDirectional,
@@ -42,4 +43,5 @@ __all__ = [
     "SoftMatcherSampling",
     "SoftMatcherSpatialSampling",
     "GroundingDinoSAM",
+    "load_pipeline",
 ]

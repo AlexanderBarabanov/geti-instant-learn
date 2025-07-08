@@ -74,7 +74,7 @@ class PerSam(Pipeline):
 
     def __init__(
         self,
-        sam_predictor: SamPredictor,
+        sam_name: str = "SAM",
         num_foreground_points: int,
         num_background_points: int,
         apply_mask_refinement: bool,
@@ -82,9 +82,15 @@ class PerSam(Pipeline):
         num_grid_cells: int,
         similarity_threshold: float,
         mask_similarity_threshold: float,
+        precision: torch.dtype = torch.bfloat16,
+        compile_models: bool = False,
+        verbose: bool = False,
         image_size: int | tuple[int, int] | None = None,
     ) -> None:
         super().__init__(image_size=image_size)
+        self.sam_predictor = load_sam_model(
+            sam_name, precision=precision, compile_models=compile_models, verbose=verbose
+        )
         self.encoder: Encoder = SamEncoder(sam_predictor=sam_predictor)
         self.feature_selector: FeatureSelector = AverageFeatures()
         self.similarity_matcher: SimilarityMatcher = CosineSimilarity()
@@ -159,16 +165,7 @@ After that, it's simply a question of calling `learn()` on your reference images
 
 ```python
 # Example usage
-pipeline = PerSam(
-    sam_predictor=sam_predictor,
-    num_foreground_points=10,
-    num_background_points=5,
-    apply_mask_refinement=True,
-    skip_points_in_existing_masks=True,
-    num_grid_cells=16,
-    similarity_threshold=0.5,
-    mask_similarity_threshold=0.7,
-)
+pipeline = PerSam()
 
 # Learn from reference images
 results = pipeline.learn(reference_images, reference_priors)
@@ -294,44 +291,75 @@ classDiagram
     ClassOverlapMaskFilter --|> Process
 ```
 
-## User Interface
 
-A web-based user interface is available for interactive exploration and qualitative analysis.
+## Usage
 
+The project is structured around a command-line interface (CLI) with three subcommands: `run`, `benchmark`, and `ui`.
+
+You can get help for any command by using the `-h` or `--help` flag, for example, `visionprompt benchmark --help`.
+
+### Run a Pipeline
+
+The `run` subcommand allows you to execute a pipeline on your own set of images.
+
+**Example:**
 ```bash
-python -m web_ui.app
+# Run using predefined masks with default pipeline (Matcher)
+visionprompt run --reference_image_dir path/to/reference/images --target_image_dir path/to/target/images --reference_prompt_dir path/to/reference/masks
+
+# Run using points
+visionprompt run --reference_image_dir path/to/reference/images --target_image_dir path/to/target/images --points "[0:[640,640], -1:[200,200]]"
+
+# Run using text prompt
+visionprompt run --target_image_dir path/to/target/images --reference_text_prompt "can"
+
+# Run any other subclass of Pipeline (e.g. SoftMatcher) using MobileSAM
+visionprompt run --pipeline SoftMatcher --pipeline.sam_name MOBILE_SAM ...
 ```
-The UI allows selecting different pipelines, datasets, and images to inspect outputs like similarity maps, masks, and points.
+You can configure the pipeline's parameters using dot notation (e.g., `--pipeline.num_grid_cells`, `--pipeline.sam_name`).
 
-![Vision Prompt UI](docs/figs/VisionPromptUI.png)
+### Benchmark on Datasets
 
-## Evaluate on Datasets
-
-Use the main evaluation script [`main.py`](main.py) to benchmark performance.
+The `benchmark` subcommand is used to evaluate pipeline performance on various datasets. It can be used to test multiple pipelines, datasets, and hyperparameters all in one experiment.
 
 **Basic Usage:**
 
 ```bash
 # Evaluate the default pipeline (MatcherModular) on LVIS dataset with 1-shot
-python main.py
+visionprompt benchmark
 
 # Specify dataset and pipeline
-python main.py --dataset_name PerSeg --pipeline MatcherModular
+visionprompt benchmark --dataset_name PerSeg --pipeline MatcherModular
 
 # Change number of reference shots
-python main.py --n_shot 3
+visionprompt benchmark --n_shot 3
 
 # Select a different backbone
-python main.py --sam_name MobileSAM
+visionprompt benchmark --sam_name MobileSAM
 
 # Filter evaluation to a specific class
-python main.py --class_name cat
+visionprompt benchmark --class_name cat
 
 # Combine arguments
-python main.py --dataset_name PerSeg --pipeline MatcherModular --n_shot 3 --sam_name MobileSAM --class_name can
+visionprompt benchmark --dataset_name PerSeg --pipeline MatcherModular --n_shot 3 --sam_name MobileSAM --class_name can
+
+# Run all pipelines on all datasets
+visionprompt benchmark --pipeline all --dataset_name all
 ```
 
-See [`src/visionprompt/utils/args.py`](src/visionprompt/utils/args.py) or run `python main.py --help` for all available command-line options. Results (metrics and visualizations) are typically saved to `~/outputs/`.
+See [`src/visionprompt/utils/args.py`](src/visionprompt/utils/args.py) or run `visionprompt benchmark --help` for all available command-line options. Results (metrics and visualizations) are typically saved to `~/outputs/`.
+
+### Launch the Web UI
+
+An interactive web UI is available for qualitative analysis.
+
+```bash
+visionprompt ui
+```
+
+The UI allows you to select different pipelines, datasets, and images to inspect outputs like similarity maps, masks, and points. By default, it runs on `http://0.0.0.0:5050`. You can change this with `--host` and `--port` arguments.
+
+![Vision Prompt UI](docs/figs/VisionPromptUI.png)
 
 ## Acknowledgements
 

@@ -6,8 +6,10 @@ import numpy as np
 import torch
 from transformers import AutoModelForZeroShotObjectDetection, AutoProcessor
 
+from visionprompt.models.model_optimizer import optimize_model
 from visionprompt.processes.prompt_generators.prompt_generator_base import PromptGenerator
 from visionprompt.types import Boxes, Image, Priors, Text
+from visionprompt.utils import precision_to_torch_dtype
 
 
 class GroundingDinoBoxGenerator(PromptGenerator):
@@ -28,6 +30,9 @@ class GroundingDinoBoxGenerator(PromptGenerator):
         text_threshold: float,
         size: Size | str,
         device: str = "cuda",
+        precision: str = "bf16",
+        compile_models: bool = False,
+        verbose: bool = False,
     ) -> None:
         """Initialize the GroundingDinoBoxGenerator.
 
@@ -36,13 +41,28 @@ class GroundingDinoBoxGenerator(PromptGenerator):
             text_threshold: The text threshold.
             size: The size of the model.
             device: The device to use.
+            precision: The precision to use for the model.
+            compile_models: Whether to compile the models.
+            verbose: Whether to print verbose output of the model optimization process.
         """
         super().__init__()
         model_size = size.value if isinstance(size, self.Size) else size
         self.model_id = f"IDEA-Research/grounding-dino-{model_size}"
         self.device = device
-        self.processor = AutoProcessor.from_pretrained(self.model_id)
-        self.model = AutoModelForZeroShotObjectDetection.from_pretrained(self.model_id).to(self.device)
+        self.processor = AutoProcessor.from_pretrained(self.model_id)  # auto resizes to 800
+        self.model = (
+            AutoModelForZeroShotObjectDetection.from_pretrained(
+                self.model_id, torch_dtype=precision_to_torch_dtype(precision)
+            )
+            .to(self.device)
+            .eval()
+        )
+        self.model = optimize_model(
+            model=self.model,
+            precision=precision_to_torch_dtype(precision),
+            compile_models=compile_models,
+            verbose=verbose,
+        )
         self.box_threshold = box_threshold
         self.text_threshold = text_threshold
 
@@ -75,7 +95,8 @@ class GroundingDinoBoxGenerator(PromptGenerator):
 
         # Run the dino model
         inputs = self.processor(images=pil_images, text=text_labels, return_tensors="pt").to(self.device)
-        with torch.no_grad():
+        inputs["pixel_values"] = inputs["pixel_values"].to(self.model.dtype)
+        with torch.autocast(device_type=self.device, dtype=self.model.dtype):
             outputs = self.model(**inputs)
         results = self.processor.post_process_grounded_object_detection(
             outputs,

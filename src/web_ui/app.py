@@ -16,15 +16,11 @@ import warnings
 
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
-import torch
-from flask import (
-    Flask,
-    Response,
-    jsonify,
-    render_template,
-    request,
-    stream_with_context,
-)
+from flask import Flask, Response, jsonify, render_template, request, stream_with_context
+
+from visionprompt.utils.args import get_arguments
+from visionprompt.utils.constants import DatasetName, PipelineName, SAMModelName
+from visionprompt.utils.data import load_dataset
 from web_ui.helpers import (
     load_and_prepare_data,
     parse_request_and_check_reload,
@@ -32,10 +28,6 @@ from web_ui.helpers import (
     reload_pipeline_if_needed,
     stream_inference,
 )
-
-from visionprompt.utils.args import get_arguments
-from visionprompt.utils.constants import DATASETS, MODEL_MAP, PIPELINES
-from visionprompt.utils.data import load_dataset
 
 CHUNK_SIZE = 5
 
@@ -55,24 +47,16 @@ current_pipeline_name = initial_default_args.pipeline
 @app.route("/")
 def index() -> str:
     """Serves the main HTML page."""
-    ui_pipelines = [p for p in PIPELINES if p.lower() != "all"]
-    ui_datasets = [d for d in DATASETS if d.lower() != "all"]
+    ui_pipelines = [p.value for p in PipelineName]
+    ui_datasets = [d.value for d in DatasetName]
     return render_template(
         "index.html",
-        sam_names=list(MODEL_MAP.keys()),
+        sam_names=[model.value for model in SAMModelName],
         pipelines=ui_pipelines,
         datasets=ui_datasets,
         compile_models=initial_default_args.compile_models,
         default_sam_name=initial_default_args.sam_name,
-        precision=next(
-            k
-            for k, v in {
-                "float": torch.float32,
-                "float16": torch.float16,
-                "bfloat16": torch.bfloat16,
-            }.items()
-            if v == initial_default_args.precision
-        ),
+        precision=initial_default_args.precision,
     )
 
 

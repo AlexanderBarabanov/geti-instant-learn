@@ -12,7 +12,7 @@ from transformers import AutoImageProcessor, AutoModel
 from visionprompt.models.model_optimizer import optimize_model
 from visionprompt.processes.encoders.encoder_base import Encoder
 from visionprompt.types import Features, Image, Masks, Priors
-from visionprompt.utils import MaybeToTensor
+from visionprompt.utils import MaybeToTensor, precision_to_torch_dtype
 
 logger = getLogger("Vision Prompt")
 
@@ -38,12 +38,12 @@ class DinoEncoder(Encoder):
         >>> # DINOv2-large outputs 1024-dimensional feature vectors
         >>> features[0].global_features.shape
         torch.Size([1369, 1024])
-        
+
     """
 
     def __init__(
         self,
-        precision: torch.dtype,
+        precision: str,
         compile_models: bool,
         verbose: bool,
         model_id: str = "facebook/dinov2-large",
@@ -57,7 +57,7 @@ class DinoEncoder(Encoder):
 
         self.model = optimize_model(
             model=model,
-            precision=precision,
+            precision=precision_to_torch_dtype(precision),
             compile_models=compile_models,
             verbose=verbose,
         ).eval()

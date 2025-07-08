@@ -4,18 +4,12 @@
 
 from typing import TYPE_CHECKING
 
-import torch
-
-from visionprompt.models.per_segment_anything import SamPredictor
 from visionprompt.pipelines import Matcher
-from visionprompt.processes.prompt_generators.softmatcher_prompt_generator import (
-    SoftmatcherPromptGenerator,
-)
+from visionprompt.processes.prompt_generators.softmatcher_prompt_generator import SoftmatcherPromptGenerator
+from visionprompt.utils.constants import SAMModelName
 
 if TYPE_CHECKING:
-    from visionprompt.processes.prompt_generators.prompt_generator_base import (
-        PromptGenerator,
-    )
+    from visionprompt.processes.prompt_generators.prompt_generator_base import PromptGenerator
 
 
 class SoftMatcher(Matcher):
@@ -35,12 +29,11 @@ class SoftMatcher(Matcher):
     Examples:
         >>> from visionprompt.pipelines.softmatcher import SoftMatcher
         >>> from visionprompt.types import Image, Priors, Results
-        >>> from visionprompt.models.models import load_sam_model
         >>> import torch
         >>> import numpy as np
         >>>
-        >>> sam_predictor = load_sam_model(backbone_name="MobileSAM")
-        >>> soft_matcher = SoftMatcher(sam_predictor=sam_predictor)
+        >>> soft_matcher = SoftMatcher()
+        >>>
         >>> # Create mock inputs
         >>> ref_image = np.zeros((1024, 1024, 3), dtype=np.uint8)
         >>> target_image = np.zeros((1024, 1024, 3), dtype=np.uint8)
@@ -61,13 +54,13 @@ class SoftMatcher(Matcher):
 
     def __init__(
         self,
-        sam_predictor: SamPredictor,
+        sam_name: SAMModelName = SAMModelName.SAM,
         num_foreground_points: int = 40,
         num_background_points: int = 2,
         apply_mask_refinement: bool = True,
         skip_points_in_existing_masks: bool = True,
         mask_similarity_threshold: float | None = 0.42,
-        precision: torch.dtype = torch.bfloat16,
+        precision: str = "bf16",
         compile_models: bool = False,
         verbose: bool = False,
         image_size: int | tuple[int, int] | None = None,
@@ -75,7 +68,7 @@ class SoftMatcher(Matcher):
         """Initialize the SoftMatcher pipeline.
 
         Args:
-            sam_predictor: The SAM predictor to use.
+            sam_name: The name of the SAM model to use.
             num_foreground_points: The number of foreground points to use.
             num_background_points: The number of background points to use.
             apply_mask_refinement: Whether to apply mask refinement.
@@ -87,7 +80,7 @@ class SoftMatcher(Matcher):
             image_size: The size of the image to use, if None, the image will not be resized.
         """
         super().__init__(
-            sam_predictor=sam_predictor,
+            sam_name=sam_name,
             num_foreground_points=num_foreground_points,
             num_background_points=num_background_points,
             apply_mask_refinement=apply_mask_refinement,

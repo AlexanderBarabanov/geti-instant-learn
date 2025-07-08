@@ -10,6 +10,8 @@ from .dataset_iterators import (
     CategoryIter,
     IndexIter,
 )
+from .lvis import LVISDataset
+from .perseg import PerSegDataset
 
 __all__ = [
     "Dataset",
@@ -18,4 +20,6 @@ __all__ = [
     "BatchedSingleCategoryIter",
     "BatchedCategoryIter",
     "DatasetIter",
+    "LVISDataset",
+    "PerSegDataset",
 ]

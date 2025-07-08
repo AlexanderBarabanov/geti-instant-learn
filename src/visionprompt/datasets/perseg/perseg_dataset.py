@@ -100,7 +100,7 @@ class PerSegDataset(Dataset):
 
     def __init__(
         self,
-        root_path: str = Path("~/data/perseg").expanduser(),
+        root_path: str | Path = "~/data/perseg",
         iterator_type: type[DatasetIter] = IndexIter,
         iterator_kwargs: dict | None = None,
         whitelist: list[str] | None = None,
@@ -116,7 +116,7 @@ class PerSegDataset(Dataset):
         if iterator_kwargs is None:
             iterator_kwargs = {}
         super().__init__(iterator_type=iterator_type, iterator_kwargs=iterator_kwargs)
-        self._root_path = root_path
+        self._root_path = Path(root_path).expanduser()
         self._whitelist = whitelist
         Path(self._root_path).mkdir(parents=True, exist_ok=True)
         self._files = {

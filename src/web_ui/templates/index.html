@@ -145,9 +145,9 @@
           <label for="precisionSelect" class="block text-sm font-medium text-gray-700 mb-1">Precision:</label>
           <select id="precisionSelect"
             class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-            <option value="float" {% if precision=="float" %}selected{% endif %}>float</option>
-            <option value="float16" {% if precision=="float16" %}selected{% endif %}>float16</option>
-            <option value="bfloat16" {% if precision=="bfloat16" %}selected{% endif %}>bfloat16</option>
+            <option value="fp32" {% if precision=="fp32" %}selected{% endif %}>fp32</option>
+            <option value="fp16" {% if precision=="fp16" %}selected{% endif %}>fp16</option>
+            <option value="bf16" {% if precision=="bf16" %}selected{% endif %}>bf16</option>
           </select>
         </div>
         <div class="control-item flex flex-col">

@@ -1,6 +1,8 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+from pathlib import Path
+
 import cv2
 import numpy as np
 import torch
@@ -15,12 +17,24 @@ class Image(Data):
     The default data type is a numpy array because of the use of OpenCV.
     """
 
-    def __init__(self, image: torch.Tensor | np.ndarray) -> None:
+    def __init__(self, image: torch.Tensor | np.ndarray | None = None, image_path: Path | None = None) -> None:
         """Initialize the image.
 
         Args:
             image: The image data.
+            image_path: The path to the image.
         """
+        self._image_path = image_path
+        if image is None and image_path is None:
+            msg = "Either image or image_path must be provided."
+            raise ValueError(msg)
+
+        if image is None:
+            pil_image = PILImage.open(image_path).convert("RGB")
+            if pil_image is None:
+                msg = f"Failed to read image from {image_path}"
+                raise ValueError(msg)
+            image = np.array(pil_image)
         if isinstance(image, torch.Tensor):
             self._data = image.numpy()
         else:
@@ -52,6 +66,11 @@ class Image(Data):
     @sam_preprocessed_size.setter
     def sam_preprocessed_size(self, value: tuple[int, int]) -> None:
         self._sam_preprocessed_size = value
+
+    @property
+    def image_path(self) -> str | None:
+        """Get the path to the image."""
+        return self._image_path
 
     def __str__(self) -> str:
         """Get the string representation of the image."""

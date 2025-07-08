@@ -4,35 +4,23 @@
 
 from typing import TYPE_CHECKING
 
-import torch
-import numpy as np
-
 from visionprompt.filters.masks import ClassOverlapMaskFilter, MaskFilter
-from visionprompt.filters.priors.max_point_filter import MaxPointFilter
-from visionprompt.models.per_segment_anything import SamPredictor
+from visionprompt.filters.priors import MaxPointFilter, PriorFilter, PriorMaskFromPoints
+from visionprompt.models.models import load_sam_model
 from visionprompt.pipelines.pipeline_base import Pipeline
 from visionprompt.processes.encoders import DinoEncoder, Encoder
-from visionprompt.processes.feature_selectors import (
-    AverageFeatures,
-    FeatureSelector,
-)
+from visionprompt.processes.feature_selectors import AverageFeatures, FeatureSelector
 from visionprompt.processes.mask_processors import MaskProcessor, MasksToPolygons
-from visionprompt.processes.prompt_generators import (
-    GridPromptGenerator,
-)
+from visionprompt.processes.prompt_generators import GridPromptGenerator
 from visionprompt.processes.segmenters import SamDecoder, Segmenter
-from visionprompt.processes.similarity_matchers import (
-    CosineSimilarity,
-    SimilarityMatcher,
-)
+from visionprompt.processes.similarity_matchers import CosineSimilarity, SimilarityMatcher
 from visionprompt.types import Image, Priors, Results
+from visionprompt.utils.constants import SAMModelName
 from visionprompt.utils.decorators import track_duration
 
 if TYPE_CHECKING:
     from visionprompt.filters.priors.prior_filter_base import PriorFilter
-    from visionprompt.processes.prompt_generators.prompt_generator_base import (
-        PromptGenerator,
-    )
+    from visionprompt.processes.prompt_generators.prompt_generator_base import PromptGenerator
 
 
 class PerDino(Pipeline):
@@ -45,11 +33,8 @@ class PerDino(Pipeline):
         >>> import numpy as np
         >>> from visionprompt.pipelines import PerDino
         >>> from visionprompt.types import Image, Priors, Results
-        >>> from visionprompt.models.models import load_sam_model
         >>>
-        >>> # Load a real SAM model for the doctest
-        >>> sam_predictor = load_sam_model(backbone_name="MobileSAM")
-        >>> perdino = PerDino(sam_predictor=sam_predictor)
+        >>> perdino = PerDino()
         >>>
         >>> # Create mock inputs
         >>> ref_image = np.zeros((1024, 1024, 3), dtype=np.uint8)
@@ -71,7 +56,7 @@ class PerDino(Pipeline):
 
     def __init__(
         self,
-        sam_predictor: SamPredictor,
+        sam_name: SAMModelName = SAMModelName.SAM,
         num_foreground_points: int = 40,
         num_background_points: int = 2,
         apply_mask_refinement: bool = True,
@@ -79,7 +64,7 @@ class PerDino(Pipeline):
         num_grid_cells: int = 16,
         similarity_threshold: float = 0.65,
         mask_similarity_threshold: float | None = 0.42,
-        precision: torch.dtype = torch.bfloat16,
+        precision: str = "bf16",
         compile_models: bool = False,
         verbose: bool = False,
         image_size: int | tuple[int, int] | None = None,
@@ -87,7 +72,7 @@ class PerDino(Pipeline):
         """Initialize the PerDino pipeline.
 
         Args:
-            sam_predictor: The SAM predictor to use.
+            sam_name: The name of the SAM model to use.
             num_foreground_points: The number of foreground points to use.
             num_background_points: The number of background points to use.
             apply_mask_refinement: Whether to apply mask refinement.
@@ -101,7 +86,9 @@ class PerDino(Pipeline):
             image_size: The size of the image to use, if None, the image will not be resized.
         """
         super().__init__(image_size=image_size)
-
+        self.sam_predictor = load_sam_model(
+            sam_name, precision=precision, compile_models=compile_models, verbose=verbose
+        )
         self.encoder: Encoder = DinoEncoder(
             precision=precision,
             compile_models=compile_models,
@@ -118,11 +105,12 @@ class PerDino(Pipeline):
             max_num_points=num_foreground_points,
         )
         self.segmenter: Segmenter = SamDecoder(
-            sam_predictor=sam_predictor,
+            sam_predictor=self.sam_predictor,
             apply_mask_refinement=apply_mask_refinement,
             mask_similarity_threshold=mask_similarity_threshold,
             skip_points_in_existing_masks=skip_points_in_existing_masks,
         )
+        self.prior_mask_from_points: PriorFilter = PriorMaskFromPoints(segmenter=self.segmenter)
         self.mask_processor: MaskProcessor = MasksToPolygons()
         self.class_overlap_mask_filter: MaskFilter = ClassOverlapMaskFilter()
         self.reference_features = None
@@ -131,6 +119,7 @@ class PerDino(Pipeline):
     def learn(self, reference_images: list[Image], reference_priors: list[Priors]) -> Results:
         """Perform learning step on the reference images and priors."""
         reference_images = self.resize_images(reference_images)
+        reference_priors = self.prior_mask_from_points(reference_images, reference_priors)
         reference_priors = self.resize_masks(reference_priors)
 
         # Start running the pipeline

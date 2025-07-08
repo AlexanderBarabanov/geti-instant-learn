@@ -18,15 +18,9 @@ import numpy as np
 import torch
 
 from visionprompt.datasets.dataset_base import Dataset
-from visionprompt.models.models import load_pipeline
-from visionprompt.pipelines.pipeline_base import Pipeline
-from visionprompt.types import (
-    Image,
-    Masks,
-    Points,
-    Priors,
-    Similarities,
-)
+from visionprompt.pipelines import Pipeline, load_pipeline
+from visionprompt.types import Image, Masks, Points, Priors, Similarities
+from visionprompt.utils.constants import PipelineName, SAMModelName
 from visionprompt.utils.data import load_dataset
 
 logger = logging.getLogger(__name__)
@@ -199,16 +193,11 @@ def parse_request_and_check_reload(
         new_args.sam_name = new_sam_name
 
     # Precision
-    precision_map = {
-        "float": torch.float32,
-        "float16": torch.float16,
-        "bfloat16": torch.bfloat16,
-    }
-    new_precision_str = request_data.get("precision", "bfloat16")
-    if (new_precision := precision_map.get(new_precision_str)) != new_args.precision:
+    new_precision_str = request_data.get("precision", new_args.precision)
+    if new_precision_str != new_args.precision:
         reload_needed = True
         requested_values["precision"] = new_precision_str
-        new_args.precision = new_precision
+        new_args.precision = new_precision_str
 
     # Compile Models
     new_compile_models = request_data.get("compile_models", new_args.compile_models)
@@ -263,8 +252,8 @@ def reload_pipeline_if_needed(
         logger.info(f"Reloading pipeline due to changes in: {list(requested_values.keys())}")
         try:
             pipeline_instance = load_pipeline(
-                backbone_name=current_args.sam_name,
-                pipeline_name=requested_values.get("pipeline", current_args.pipeline),
+                sam_name=SAMModelName(current_args.sam_name),
+                pipeline_name=PipelineName(requested_values.get("pipeline", current_args.pipeline)),
                 args=current_args,
             )
             pipeline_name = requested_values.get("pipeline", current_args.pipeline)

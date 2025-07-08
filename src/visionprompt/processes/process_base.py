@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from abc import ABC, abstractmethod
-from typing import Any
 
 from visionprompt.utils.decorators import time_call
 
@@ -22,7 +21,7 @@ class Process(ABC):
         self._last_duration: float = 0.0
 
     @abstractmethod
-    def __call__(self, *args, **kwargs) -> Any:
+    def __call__(self, *args, **kwargs) -> None:
         """This method must be implemented by subclasses of Process."""
         msg = f"The __call__ method must be implemented by subclasses of Process ({self.__class__.__name__})"
         raise NotImplementedError(msg)

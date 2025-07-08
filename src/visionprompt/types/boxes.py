@@ -44,7 +44,3 @@ class Boxes(Prompt):
     def only_background(self) -> dict[int, list[torch.Tensor]]:
         """Get a copy of data containing only the background points."""
         return {k: [p[p[:, 5] == 0] for p in v] for k, v in self._data.items()}
-
-    def is_empty(self) -> bool:
-        """Check if the boxes are empty."""
-        return len(self._data) == 0

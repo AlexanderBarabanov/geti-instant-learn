@@ -278,7 +278,7 @@ class Dataset(torch.utils.data.Dataset, Iterable, ABC):  # noqa: PLR0904
     def _download(source: str, destination: str) -> None:
         """Helper function to download data with caching."""
         if Path(destination).is_file():
-            logging.info(f"Using cached downloaded file {destination}")
+            logging.debug(f"Using cached downloaded file {destination}")
             return
         logging.info(f"Downloading data from {source} to {destination}...")
 
@@ -294,7 +294,7 @@ class Dataset(torch.utils.data.Dataset, Iterable, ABC):  # noqa: PLR0904
     def _unzip(source: str, destination: str) -> None:
         """Helper function to unzip data with caching."""
         if Path(destination).exists():
-            logging.info(f"Using cached unzipped file or folder {destination}")
+            logging.debug(f"Using cached unzipped file or folder {destination}")
             return
 
         with zipfile.ZipFile(source, "r") as zf:

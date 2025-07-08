@@ -2,11 +2,8 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-
-from visionprompt.processes.similarity_matchers.similarity_matcher_base import (
-    SimilarityMatcher,
-)
-from visionprompt.types import Features, Similarities, Image
+from visionprompt.processes.similarity_matchers.similarity_matcher_base import SimilarityMatcher
+from visionprompt.types import Features, Image, Similarities
 
 
 class CosineSimilarity(SimilarityMatcher):

@@ -9,38 +9,28 @@ from pathlib import Path
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
+import itertools
 from logging import getLogger
 
 import cv2
 import numpy as np
 import pandas as pd
-from rich.progress import (
-    BarColumn,
-    Progress,
-    SpinnerColumn,
-    TextColumn,
-    TimeElapsedColumn,
-    TimeRemainingColumn,
-)
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn, TimeRemainingColumn
 
 from visionprompt.datasets import BatchedSingleCategoryIter, Dataset
-from visionprompt.models.models import load_pipeline
-from visionprompt.pipelines import Pipeline
+from visionprompt.pipelines import Pipeline, load_pipeline
 from visionprompt.processes.calculators import SegmentationMetrics
 from visionprompt.processes.visualizations import ExportMaskVisualization
 from visionprompt.types import Image, Masks, Priors, Text
 from visionprompt.utils import setup_logger
 from visionprompt.utils.args import get_arguments, parse_experiment_args
-from visionprompt.utils.data import (
-    get_filename_categories,
-    get_image_and_mask_from_filename,
-    load_dataset,
-)
+from visionprompt.utils.constants import DatasetName, PipelineName, SAMModelName
+from visionprompt.utils.data import get_filename_categories, get_image_and_mask_from_filename, load_dataset
 
 logger = getLogger("Vision Prompt")
 
 
-def handle_output_path(output_path: str, overwrite: bool) -> str:
+def handle_output_path(output_path: str, overwrite: bool) -> Path:
     """Handle output path to avoid overwriting existing data.
 
     Args:
@@ -54,17 +44,14 @@ def handle_output_path(output_path: str, overwrite: bool) -> str:
         if overwrite:
             shutil.rmtree(output_path_obj)
         else:
-            choice = input(
-                f"Output path {output_path_obj} already exists. Do you want to overwrite it? (y/n)\n",
+            msg = (
+                f"Output path {output_path_obj} already exists. "
+                "Set overwrite=True to overwrite it or change the output path."
             )
-            if choice == "y":
-                print("Removing existing output data")
-                shutil.rmtree(output_path_obj)
-            else:
-                output_path_obj = Path(f"{output_path}_1")
-                print(f"Output path set to {output_path_obj}")
+            raise ValueError(msg)
+
     output_path_obj.mkdir(parents=True, exist_ok=True)
-    return str(output_path_obj)
+    return output_path_obj
 
 
 def get_all_instances(images: list[np.ndarray], masks: list[np.ndarray], count: int) -> tuple[list[Image], list[Masks]]:
@@ -190,6 +177,7 @@ def infer_all_batches(
             masks=results.masks,
             names=export_paths,
             points=results.used_points,
+            boxes=visualizer.boxes_from_priors(results.priors),
         )
         visualizer(
             images=target_images,
@@ -293,6 +281,7 @@ def infer_all_images(
         masks=results.masks,
         names=export_paths,
         points=results.used_points,
+        boxes=visualizer.boxes_from_priors(results.priors),
     )
     visualizer(
         images=target_images,
@@ -300,6 +289,7 @@ def infer_all_images(
         names=export_paths_all_points,
         points=visualizer.points_from_priors(results.priors),
         annotations=results.annotations,
+        boxes=visualizer.boxes_from_priors(results.priors),
     )
     gt_masks = visualizer.arrays_to_masks(masks)
     visualizer(
@@ -322,7 +312,7 @@ def predict_on_dataset(  # noqa: C901
     pipeline: Pipeline,
     priors_dataset: Dataset,
     dataset: Dataset,
-    unique_output: str,
+    unique_output: Path,
     dataset_name: str,
     pipeline_name: str,
     backbone_name: str,
@@ -350,8 +340,7 @@ def predict_on_dataset(  # noqa: C901
     Returns: The timing
 
     """
-    unique_output_str = handle_output_path(unique_output, args.overwrite)
-    unique_output_path = Path(unique_output_str)
+    unique_output_path = handle_output_path(unique_output, args.overwrite)
     logger.info(f"Output path: {unique_output_path}")
 
     visualizer = ExportMaskVisualization(
@@ -494,68 +483,83 @@ def predict_on_dataset(  # noqa: C901
     return pd.DataFrame.from_dict(all_metrics)
 
 
-def main() -> None:
-    """Main function to run the experiments.
+def _generate_experiment_plan(
+    datasets: list[DatasetName],
+    pipelines: list[PipelineName],
+    backbones: list[SAMModelName],
+) -> list[tuple[DatasetName, PipelineName, SAMModelName]]:
+    """Generate a list of valid experiment configurations to run.
 
-    This function initializes the arguments, determines which models, datasets, and pipelines to process,
-    and then iterates over all combinations to run the predictions and evaluate them.
+    Args:
+        datasets: The datasets to run
+        pipelines: The pipelines to run
+        backbones: The backbones to run
+
+    Returns: A list of valid experiment configurations
     """
-    # Initialize
-    args = get_arguments()
-    output_path = Path("~").expanduser() / "outputs"
-    if args.experiment_name:
-        output_path = output_path / args.experiment_name
-    setup_logger(output_path, args.log_level)
+    all_combinations = list(itertools.product(datasets, pipelines, backbones))
+    valid_configs = []
+    persam_mapi_done_for_dataset = set()
 
-    output_path.mkdir(parents=True, exist_ok=True)
+    for dataset, pipeline, backbone in all_combinations:
+        # Skip unsupported combinations
+        if pipeline == PipelineName.PER_SAM and backbone == SAMModelName.EFFICIENT_VIT_SAM:
+            logger.info(f"Planning to skip {backbone.value} with {pipeline.value} (unsupported).")
+            continue
 
-    # Create data frame with results
-    all_results = []
-    avg_result_dataframe = None
-    datasets_to_run, pipelines_to_run, backbones_to_run = parse_experiment_args(args)
+        # Run PerSAMMAPI only once per dataset (it's backbone-independent)
+        if pipeline == PipelineName.PER_SAM_MAPI:
+            if dataset in persam_mapi_done_for_dataset:
+                continue
+            persam_mapi_done_for_dataset.add(dataset)
 
-    for dataset_name in datasets_to_run:
-        dataset = load_dataset(dataset_name, whitelist=args.class_name, batch_size=args.batch_size)
-        for pipeline_name in pipelines_to_run:
-            for bidx, backbone_name in enumerate(backbones_to_run):
-                if pipeline_name == "PerSAMModular" and backbone_name == "EfficientViT-SAM":
-                    logger.info(f"Skipping {backbone_name} {pipeline_name} because it is not supported")
-                    continue
-                if pipeline_name == "PerSAMMAPIModular" and bidx > 0:
-                    logger.info("Skipping because PerSAMMAPIModular is independent of the backbone")
-                    continue
+        valid_configs.append((dataset, pipeline, backbone))
 
-                pipeline = load_pipeline(
-                    backbone_name=backbone_name,
-                    pipeline_name=pipeline_name,
-                    args=args,
-                )
+    return valid_configs
 
-                if args.experiment_name:
-                    unique_output_path = (
-                        output_path / args.experiment_name / f"{dataset_name}_{backbone_name}_{pipeline_name}"
-                    )
-                elif args.dataset_filenames is not None:
-                    fn_str = " ".join(args.dataset_filenames).replace("/", "-")
-                    unique_output_path = output_path / f"{dataset_name}_{backbone_name}_{pipeline_name} {fn_str}"
-                else:
-                    unique_output_path = output_path / f"{dataset_name}_{backbone_name}_{pipeline_name}"
 
-                all_metrics_df = predict_on_dataset(
-                    args,
-                    pipeline,
-                    priors_dataset=dataset,
-                    dataset=dataset,
-                    unique_output=str(unique_output_path),
-                    dataset_name=dataset_name,
-                    pipeline_name=pipeline_name,
-                    backbone_name=backbone_name,
-                    number_of_priors_tests=args.num_priors,
-                    number_of_batches=args.num_batches,
-                    image_size=args.image_size,
-                    dataset_filenames=args.dataset_filenames,
-                )
-                all_results.append(all_metrics_df)
+def _get_output_path_for_experiment(
+    output_path: Path,
+    experiment_name: str | None,
+    dataset: DatasetName,
+    pipeline: PipelineName,
+    backbone: SAMModelName,
+    dataset_filenames: str | None,
+) -> Path:
+    """Construct a unique output path for an experiment.
+
+    Args:
+        output_path: The path to save the results
+        experiment_name: The name of the experiment
+        dataset: The dataset to run
+        pipeline: The pipeline to run
+        backbone: The backbone to run
+        dataset_filenames: The filenames to run
+
+    Returns: The path to save the results
+    """
+    combo_str = f"{dataset.value}_{backbone.value}_{pipeline.value}"
+
+    if experiment_name:
+        return output_path / experiment_name / combo_str
+
+    if dataset_filenames:
+        fn_str = dataset_filenames.replace("/", "_")
+        return output_path / f"{combo_str}_{fn_str}"
+
+    return output_path / combo_str
+
+
+def _save_results(all_results: list[pd.DataFrame], output_path: Path) -> None:
+    """Concatenate and save all experiment results.
+
+    Args:
+        all_results: The results to save
+        output_path: The path to save the results
+    """
+    if not all_results:
+        logger.warning("No experiments were run. Check your arguments.")
+        return
 
     all_result_dataframe = pd.concat(all_results, ignore_index=True)
     all_results_dataframe_filename = output_path / "all_results.csv"
@@ -573,5 +577,70 @@ def main() -> None:
     logger.info(f"\n\n Final Average Results:\n {avg_result_dataframe}")
 
 
+def perform_benchmark_experiment(args: argparse.Namespace | None = None) -> None:
+    """Main function to run the experiments.
+
+    This function initializes the arguments, determines which models, datasets, and pipelines to process,
+    and then iterates over all combinations to run the predictions and evaluate them.
+
+    Args:
+        args: The arguments to use.
+    """
+    # Initialization
+    if args is None:
+        args = get_arguments()
+
+    base_output_path = Path("~").expanduser() / "outputs"
+    # The final results path will include the experiment name if provided.
+    final_results_path = base_output_path / args.experiment_name if args.experiment_name else base_output_path
+
+    setup_logger(final_results_path, args.log_level)
+    final_results_path.mkdir(parents=True, exist_ok=True)
+
+    # Get experiment lists and generate a plan
+    datasets_to_run, pipelines_to_run, backbones_to_run = parse_experiment_args(args)
+    experiment_plan = _generate_experiment_plan(datasets_to_run, pipelines_to_run, backbones_to_run)
+
+    # Execute experiments
+    all_results = []
+    for dataset_enum, pipeline_enum, backbone_enum in experiment_plan:
+        logger.info(
+            f"Running experiment: Dataset={dataset_enum.value}, Pipeline={pipeline_enum.value}, "
+            f"Backbone={backbone_enum.value}",
+        )
+
+        dataset = load_dataset(dataset_enum.value, whitelist=args.class_name, batch_size=args.batch_size)
+        pipeline = load_pipeline(sam_name=backbone_enum, pipeline_name=pipeline_enum, args=args)
+
+        # Individual experiment artifacts are saved in a path derived from the base path.
+        unique_output_path = _get_output_path_for_experiment(
+            base_output_path,
+            args.experiment_name,
+            dataset_enum,
+            pipeline_enum,
+            backbone_enum,
+            args.dataset_filenames,
+        )
+
+        all_metrics_df = predict_on_dataset(
+            args,
+            pipeline,
+            priors_dataset=dataset,
+            dataset=dataset,
+            unique_output=unique_output_path,
+            dataset_name=dataset_enum.value,
+            pipeline_name=pipeline_enum.value,
+            backbone_name=backbone_enum.value,
+            number_of_priors_tests=args.num_priors,
+            number_of_batches=args.num_batches,
+            dataset_filenames=args.dataset_filenames.split(",") if args.dataset_filenames else None,
+            image_size=args.image_size,
+        )
+        all_results.append(all_metrics_df)
+
+    # Save aggregated results to the final results path
+    _save_results(all_results, final_results_path)
+
+
 if __name__ == "__main__":
-    main()
+    perform_benchmark_experiment()

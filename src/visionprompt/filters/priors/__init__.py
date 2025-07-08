@@ -4,5 +4,6 @@
 
 from .max_point_filter import MaxPointFilter
 from .prior_filter_base import PriorFilter
+from .prior_mask_from_points import PriorMaskFromPoints
 
-__all__ = ["MaxPointFilter", "PriorFilter"]
+__all__ = ["MaxPointFilter", "PriorFilter", "PriorMaskFromPoints"]

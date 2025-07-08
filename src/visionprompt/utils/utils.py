@@ -15,14 +15,7 @@ import requests
 import torch
 import umap
 from matplotlib import pyplot as plt
-from rich.progress import (
-    BarColumn,
-    DownloadColumn,
-    Progress,
-    TextColumn,
-    TimeRemainingColumn,
-    TransferSpeedColumn,
-)
+from rich.progress import BarColumn, DownloadColumn, Progress, TextColumn, TimeRemainingColumn, TransferSpeedColumn
 from sklearn.cluster import KMeans
 from sklearn.manifold import TSNE
 from torch.nn import functional as F
@@ -31,7 +24,7 @@ from torchvision import transforms
 logger = getLogger("Vision Prompt")
 
 
-def setup_logger(dir_path: Path, log_level: str) -> None:
+def setup_logger(dir_path: Path | None = None, log_level: str = "INFO") -> None:
     """Save logs to a directory and setup console logging."""
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level.upper())
@@ -40,11 +33,12 @@ def setup_logger(dir_path: Path, log_level: str) -> None:
     for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)
 
-    if not dir_path.exists():
-        dir_path.mkdir(parents=True, exist_ok=True)
-    file_handler = logging.FileHandler(dir_path / "logs.log")
-    file_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
-    root_logger.addHandler(file_handler)
+    if dir_path:
+        if not dir_path.exists():
+            dir_path.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.FileHandler(dir_path / "logs.log")
+        file_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+        root_logger.addHandler(file_handler)
 
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(logging.Formatter("%(levelname)s - %(name)s: \t%(message)s"))
@@ -52,6 +46,11 @@ def setup_logger(dir_path: Path, log_level: str) -> None:
 
     # Set PIL logger to a higher level to avoid verbose debug logs
     logging.getLogger("PIL").setLevel(logging.INFO)
+
+
+def precision_to_torch_dtype(precision: str) -> torch.dtype:
+    """Convert a precision string to a torch.dtype."""
+    return {"fp32": torch.float32, "fp16": torch.float16, "bf16": torch.bfloat16}[precision.lower()]
 
 
 def download_file(url: str, target_path: Path) -> None:

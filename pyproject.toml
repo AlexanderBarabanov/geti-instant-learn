@@ -43,6 +43,7 @@ dependencies = [
     "segment-anything-hq==0.3",
     "pytorch-labs-segment-anything-fast",
     "markupsafe==3.0.2",
+    "jsonargparse",
 ]
 
 [tool.uv.sources]
@@ -54,6 +55,9 @@ torchmetrics = { index = "pytorch" }
 efficientvit = { git = "https://github.com/mit-han-lab/efficientvit.git", rev = "71b35be" }
 pytorch-labs-segment-anything-fast = { git = "https://github.com/pytorch-labs/segment-anything-fast.git", rev = "e6aadeb"}
 
+[project.scripts]
+visionprompt = "visionprompt.cli:main"
+
 [[tool.uv.index]]
 name = "pypi"
 url = "https://pypi.org/simple"
@@ -63,7 +67,7 @@ name = "pytorch"
 url = "https://download.pytorch.org/whl/cu126"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/visionprompt"]
+packages = ["src/visionprompt", "src/web_ui"]
 
 [project.optional-dependencies]
 extras = [
@@ -73,14 +77,13 @@ dev = [
     "ruff==0.11.12",
     "pre-commit==4.2.0",
     "pytest==8.4.0",
+    "build>=1.2.2.post1",
+    "twine>=6.1.0",
 ]
 
 full = [
     "visionprompt[dev, extras]",
 ]
-
-[tool.hatch.build.target.wheel]
-packages = ["src/visionprompt/*"]
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # RUFF CONFIGURATION                                                          #
@@ -198,6 +201,9 @@ lint.ignore = [
 lint.fixable = ["ALL"]
 lint.unfixable = []
 
+# Allow unused variables when underscore-prefixed.
+lint.dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
 # Exclude a variety of commonly ignored directories.
 exclude = [
     ".bzr",
@@ -225,9 +231,6 @@ exclude = [
 
 # Same as Black.
 line-length = 120
-
-# Allow unused variables when underscore-prefixed.
-lint.dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 # Assume Python 3.10.
 target-version = "py310"
