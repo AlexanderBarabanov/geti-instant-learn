@@ -196,6 +196,7 @@ def infer_all_batches(
             masks=results.masks,
             names=export_paths_all_points,
             points=visualizer.points_from_priors(results.priors),
+            boxes=visualizer.boxes_from_priors(results.priors),
         )
         gt_masks = visualizer.arrays_to_masks(masks)
         # resize masks to target image size

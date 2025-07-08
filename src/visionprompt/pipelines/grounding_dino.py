@@ -23,8 +23,8 @@ class GroundingDinoSAM(Pipeline):
         self,
         sam_predictor: SamPredictor,
         apply_mask_refinement: bool,
-        box_threshold: float = 0.3,
-        text_threshold: float = 0.3,
+        box_threshold: float = 0.15,
+        text_threshold: float = 0.15,
         device: str = "cuda",
     ) -> None:
         """Initialize the pipeline.

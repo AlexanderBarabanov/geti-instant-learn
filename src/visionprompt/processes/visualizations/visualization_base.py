@@ -6,7 +6,7 @@ import numpy as np
 import torch
 
 from visionprompt.processes import Process
-from visionprompt.types import Masks, Points, Priors
+from visionprompt.types import Boxes, Masks, Points, Priors
 
 
 class Visualization(Process):
@@ -50,6 +50,18 @@ class Visualization(Process):
             The list of points
         """
         return [m.points for m in priors]
+
+    @staticmethod
+    def boxes_from_priors(priors: list[Priors]) -> list[Boxes]:
+        """Extracts points from priors.
+
+        Args:
+            priors: The list of priors to extract boxes from
+
+        Returns:
+            The list of boxes
+        """
+        return [m.boxes for m in priors]
 
     @staticmethod
     def arrays_to_masks(arrays: list[np.ndarray], class_id: int = 0) -> list[Masks]:
