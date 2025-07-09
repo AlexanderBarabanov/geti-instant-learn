@@ -54,6 +54,7 @@ class GroundingDinoSAM(Pipeline):
             precision=precision,
             compile_models=compile_models,
             verbose=verbose,
+            template=GroundingDinoBoxGenerator.Template.specific_object,
         )
 
         self.segmenter: Segmenter = SamDecoder(

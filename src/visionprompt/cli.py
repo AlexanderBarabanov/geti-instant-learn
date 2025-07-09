@@ -32,10 +32,15 @@ class VisionPromptCLI:
         """Add arguments for the run subcommand."""
         # load datasets
         parser.add_subclass_arguments(Pipeline, "pipeline", default="Matcher")
-        parser.add_argument("--reference_image_dir", type=str, default=None, help="Directory with reference images.")
-        parser.add_argument("--target_image_dir", type=str, required=True, help="Directory with target images.")
+        parser.add_argument(
+            "--reference_image_dir", "--ref", type=str, default=None, help="Directory with reference images."
+        )
+        parser.add_argument(
+            "--target_image_dir", "--target", type=str, required=True, help="Directory with target images."
+        )
         parser.add_argument(
             "--reference_prompt_dir",
+            "--ref_prompt",
             type=str,
             default=None,
             help="Directory with reference prompts (masks or points).",
@@ -51,7 +56,7 @@ class VisionPromptCLI:
             help="Text prompt for grounding dino. If provided, pipeline is set to GroundingDinoSAM.",
         )
         parser.add_argument("--output_location", type=str, default=None, help="Directory to save output.")
-        parser.add_argument("--chunk_size", type=int, default=10, help="Chunk size for processing target images.")
+        parser.add_argument("--chunk_size", type=int, default=5, help="Chunk size for processing target images.")
 
     @staticmethod
     def add_benchmark_arguments(parser: ArgumentParser) -> None:

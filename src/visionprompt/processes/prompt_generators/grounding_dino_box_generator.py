@@ -24,11 +24,18 @@ class GroundingDinoBoxGenerator(PromptGenerator):
         BASE = "base"
         TINY = "tiny"
 
+    class Template:
+        """Template for object prompts."""
+
+        specific_object = "a {prior}"
+        all_objects = "an object"
+
     def __init__(
         self,
         box_threshold: float,
         text_threshold: float,
         size: Size | str,
+        template: str,
         device: str = "cuda",
         precision: str = "bf16",
         compile_models: bool = False,
@@ -40,6 +47,7 @@ class GroundingDinoBoxGenerator(PromptGenerator):
             box_threshold: The box threshold.
             text_threshold: The text threshold.
             size: The size of the model.
+            template: The template to use for the prompt
             device: The device to use.
             precision: The precision to use for the model.
             compile_models: Whether to compile the models.
@@ -66,11 +74,12 @@ class GroundingDinoBoxGenerator(PromptGenerator):
         )
         self.box_threshold = box_threshold
         self.text_threshold = text_threshold
+        self.template = template
 
     def __call__(
         self,
-        target_images: list[Image] | None = None,
-        text_priors: list[Text] | None = None,
+        target_images: list[Image],
+        text_priors: list[Text],
     ) -> list[Priors]:
         """This generates bounding box prompt candidates (or priors) based on the text priors.
 
@@ -91,8 +100,8 @@ class GroundingDinoBoxGenerator(PromptGenerator):
         # convert to strings seperated by a '.'
         text_labels = []
         for text_prior in text_priors:
-            text = ".".join([text_prior.get(cid) for cid in text_prior.class_ids()])
-            text_labels.append([text])
+            text = [self.template.format(prior=text_prior.get(cid)) for cid in text_prior.class_ids()]
+            text_labels.append(text)
 
         # Run the dino model
         inputs = self.processor(images=pil_images, text=text_labels, return_tensors="pt").to(self.device)

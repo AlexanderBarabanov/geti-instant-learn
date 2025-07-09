@@ -85,10 +85,10 @@ def run_pipeline(
         else pathlib.Path(target_image_directory).parent.parent / "output"
     )
 
-    reference_images, reference_priors = parse_reference_data(
+    reference_images, reference_priors, num_classes = parse_reference_data(
         reference_image_directory, reference_prompt_directory, reference_points_str, reference_text_prompt
     )
-    target_images: list[Image] = parse_image_files(target_image_directory)
+    target_images, _ = parse_image_files(target_image_directory)
 
     pipeline.learn(reference_images, reference_priors)
     if reference_image_directory:
@@ -97,6 +97,7 @@ def run_pipeline(
             masks=[p.masks for p in reference_priors],
             names=[image.image_path.name for image in reference_images],
             points=[p.points for p in reference_priors],
+            num_classes=num_classes,
         )
 
     progress = Progress(
@@ -118,6 +119,7 @@ def run_pipeline(
                 names=[image.image_path.name for image in chunk],
                 points=results.used_points,
                 boxes=[p.boxes for p in results.priors],
+                num_classes=num_classes,
             )
             progress.update(task, advance=len(chunk))
     logger.info(f"Ouput saved in {output_location}")
@@ -220,7 +222,7 @@ def parse_reference_data(
     reference_prompt_root: str | None = None,
     reference_points_str: str | None = None,
     reference_text_prompt: str | None = None,
-) -> tuple[list[Image], list[Priors]]:
+) -> tuple[list[Image], list[Priors], int]:
     """Parse the reference data.
 
     Args:
@@ -230,11 +232,12 @@ def parse_reference_data(
         reference_text_prompt: The string containing the text prompt.
 
     Returns:
-        A tuple of lists of images and prompts.
+        A tuple of lists of images and prompts, and the number of classes.
     """
+    num_classes = 1
     reference_images: list[Image] = []
     if reference_image_root:
-        reference_images = parse_image_files(reference_image_root)
+        reference_images, num_classes = parse_image_files(reference_image_root)
 
     reference_prompts: list[Priors] = []
     if reference_prompt_root is not None:
@@ -255,8 +258,9 @@ def parse_reference_data(
         for class_id, text in enumerate(split_text):
             text_prior.add(text, class_id=class_id)
         reference_prompts = [Priors(text=text_prior)]
+        num_classes = len(split_text)
 
-    return reference_images, reference_prompts
+    return reference_images, reference_prompts, num_classes
 
 
 def parse_image_files(root_dir: str) -> list[Image]:
@@ -267,6 +271,7 @@ def parse_image_files(root_dir: str) -> list[Image]:
 
     Returns:
         A list of images.
+        Number of classes.
     """
     root_dir = pathlib.Path(root_dir)
     class_dirs = [d for d in root_dir.iterdir() if d.is_dir()]
@@ -282,7 +287,7 @@ def parse_image_files(root_dir: str) -> list[Image]:
         for ext in IMAGE_EXTENSIONS:
             image_files.extend(root_dir.glob(ext))
 
-    return [Image(image_path=f) for f in image_files]
+    return [Image(image_path=f) for f in image_files], len(class_dirs)
 
 
 if __name__ == "__main__":

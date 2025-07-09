@@ -393,7 +393,7 @@ def predict_on_dataset(  # noqa: C901
 
                 # Learn using the priors
                 text_prior = Text()
-                text_prior.add(f"a {category_name} or similar object", class_id=0)
+                text_prior.add(category_name, class_id=0)
                 reference_priors = [Priors(masks=priors_masks2[i], text=text_prior) for i in range(len(priors_masks2))]
                 try:
                     pipeline.learn(

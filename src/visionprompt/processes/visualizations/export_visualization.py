@@ -2,6 +2,7 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+import colorsys
 from pathlib import Path
 
 import cv2
@@ -40,7 +41,7 @@ class ExportMaskVisualization(Visualization):
         self.output_folder = output_folder
 
     @staticmethod
-    def create_overlay(
+    def create_overlay(  # noqa: C901
         image: np.ndarray,
         masks: np.ndarray,
         points: list[np.ndarray] | None = None,
@@ -50,6 +51,7 @@ class ExportMaskVisualization(Visualization):
         box_scores: list[float] | None = None,
         box_types: list[int] | None = None,
         polygons: list[Points] | None = None,
+        num_classes: int | None = None,
     ) -> np.ndarray:
         """Save a visualization of the segmentation mask overlaid on the image.
 
@@ -63,6 +65,7 @@ class ExportMaskVisualization(Visualization):
             box_scores: Optional confidence scores for the boxes
             box_types: The type of box (class or label)
             polygons: Optional polygons to visualize
+            num_classes: The number of classes for creating box colors per class
         """
         image_vis = image.copy()
 
@@ -106,7 +109,12 @@ class ExportMaskVisualization(Visualization):
                 for i, box in enumerate(boxes):
                     # Draw star marker
                     x1, y1, x2, y2 = [int(box[0]), int(box[1]), int(box[2]), int(box[3])]
-                    cv2.rectangle(image_vis, (x1, y1), (x2, y2), color=(255, 64, 255), thickness=2)
+                    if num_classes is None or num_classes == 1:
+                        rgb = (255, 64, 255)
+                    else:
+                        rgb = colorsys.hsv_to_rgb((box_types[i] / float(num_classes)), 1.0, 1.0)
+                        rgb = [int(x * 255) for x in rgb]
+                    cv2.rectangle(image_vis, (x1, y1), (x2, y2), color=rgb, thickness=2)
 
                     # Add confidence score text
                     confidence = float(box_scores[i])
@@ -147,6 +155,7 @@ class ExportMaskVisualization(Visualization):
         points: list[Points] | None = None,
         boxes: list[Boxes] | None = None,
         annotations: list[Annotations] | None = None,
+        num_classes: int = 1,
     ) -> None:
         """This method exports the visualization images.
 
@@ -156,7 +165,9 @@ class ExportMaskVisualization(Visualization):
             names: List of filenames
             points: List of points to visualize
             boxes: List of boxes to visualize
+            boxes: List of boxes to visualize
             annotations: List of annotations to visualize
+            num_classes: The total number of classes
         """
         # Generate overlay
         if names is None:
@@ -175,9 +186,6 @@ class ExportMaskVisualization(Visualization):
             output_filename = Path(self.output_folder) / name
             Path.mkdir(Path(output_filename, parents=True).parent, exist_ok=True, parents=True)
 
-            if len(masks_per_class.class_ids()) > 1:
-                msg = "Multiple class masks not supported yet."
-                raise RuntimeError(msg)
             image_vis = image_np
 
             for class_id in masks_per_class.class_ids():
@@ -206,7 +214,7 @@ class ExportMaskVisualization(Visualization):
                 polygons = self._get_polygons(annotations[i]) if annotations is not None else None
 
                 image_vis = self.create_overlay(
-                    image=image_np,
+                    image=image_vis,
                     masks=mask_np,
                     points=point_yxs,
                     point_scores=point_scores,
@@ -215,6 +223,7 @@ class ExportMaskVisualization(Visualization):
                     box_scores=box_scores,
                     box_types=box_types,
                     polygons=polygons,
+                    num_classes=num_classes,
                 )
 
             # Save visualization
