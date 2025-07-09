@@ -70,6 +70,7 @@ class Matcher(Pipeline):
         precision: str = "bf16",
         compile_models: bool = False,
         verbose: bool = False,
+        device: str = "cuda",
         image_size: int | tuple[int, int] | None = None,
     ) -> None:
         """Initialize the Matcher pipeline.
@@ -84,16 +85,22 @@ class Matcher(Pipeline):
             precision: The precision to use for the model.
             compile_models: Whether to compile the models.
             verbose: Whether to print verbose output of the model optimization process.
+            device: The device to use for the model.
             image_size: The size of the image to use, if None, the image will not be resized.
         """
         super().__init__(image_size=image_size)
         self.sam_predictor = load_sam_model(
-            sam_name, precision=precision, compile_models=compile_models, verbose=verbose
+            sam_name,
+            device,
+            precision=precision,
+            compile_models=compile_models,
+            verbose=verbose,
         )
         self.encoder: Encoder = DinoEncoder(
             precision=precision,
             compile_models=compile_models,
             verbose=verbose,
+            device=device,
         )
         self.feature_selector: FeatureSelector = AllFeaturesSelector()
         self.prompt_generator: PromptGenerator = BidirectionalPromptGenerator(

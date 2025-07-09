@@ -23,6 +23,7 @@ logger = getLogger("Vision Prompt")
 
 def optimize_model(
     model: AutoModel,
+    device: str,
     precision: torch.dtype,
     compile_models: bool,
     verbose: bool = True,
@@ -32,6 +33,7 @@ def optimize_model(
 
     Args:
         model: The model to optimize.
+        device: The device to use for the model.
         precision: The precision to use for the model.
         compile_models: Whether to compile the model.
         verbose: Whether to show the inference time.
@@ -44,12 +46,12 @@ def optimize_model(
     def get_dummy_input() -> torch.Tensor:
         """Gets or creates a dummy input tensor for the model."""
         if hasattr(model, "dummy_inputs") and "pixel_values" in model.dummy_inputs:
-            return model.dummy_inputs["pixel_values"].to(precision).cuda()
+            return model.dummy_inputs["pixel_values"].to(precision).to(device)
 
         # Fallback if dummy_inputs is not available or doesn't have pixel_values
         image_size = model.config.image_size
         num_channels = getattr(model.config, "num_channels", 3)
-        return torch.randn(1, num_channels, image_size, image_size, device="cuda", dtype=precision)
+        return torch.randn(1, num_channels, image_size, image_size, device=device, dtype=precision)
 
     def show_inference_time(model_to_time: AutoModel) -> None:
         """This method shows the inference time of the model."""
@@ -58,7 +60,10 @@ def optimize_model(
         start = time.time()
         _ = model_to_time(pixel_values=dummy_input)
         end = time.time()
-        model_size = torch.cuda.memory_allocated() / 1e6
+        if device.startswith("cuda"):
+            model_size = torch.cuda.memory_allocated() / 1e6
+        else:
+            model_size = torch.cpu.memory_allocated() / 1e6
         logger.debug(
             f"Inference time: {end - start:.2f} seconds, FPS: {1 / (end - start):.2f}, "
             f"Memory allocated: {model_size:.2f} MB",
@@ -88,6 +93,7 @@ def optimize_model(
 
 def optimize_sam_model(
     sam_predictor: SamPredictor | SamHQPredictor | SamFastPredictor | EfficientViTSamPredictor,
+    device: str,
     precision: torch.dtype,
     compile_models: bool,
     verbose: bool,
@@ -99,6 +105,7 @@ def optimize_sam_model(
 
     Args:
         sam_predictor: The SAM predictor to optimize.
+        device: The device to use for the model.
         precision: The precision to use for the model.
         compile_models: Whether to compile the model.
         verbose: Whether to show detailed optimization logs.
@@ -122,7 +129,10 @@ def optimize_sam_model(
         start = time.time()
         sam_predictor.set_image(np.ones(shape=(1024, 1024, 3), dtype=np.uint8))
         end = time.time()
-        model_size = torch.cuda.memory_allocated() / 1e6
+        if device.startswith("cuda"):
+            model_size = torch.cuda.memory_allocated() / 1e6
+        else:
+            model_size = torch.cpu.memory_allocated() / 1e6
         logger.debug(
             f"Inference time: {end - start:.2f} seconds, FPS: {1 / (end - start):.2f}, "
             f"Memory allocated: {model_size:.2f} MB"

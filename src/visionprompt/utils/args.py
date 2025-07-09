@@ -168,6 +168,12 @@ def populate_benchmark_parser(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Whether to show the inference time of the optimized models",
     )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cuda",
+        help="The device to use for the models",
+    )
 
 
 def get_arguments(arg_list: list[str] | None = None) -> argparse.Namespace:

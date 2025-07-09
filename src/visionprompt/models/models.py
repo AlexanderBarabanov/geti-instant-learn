@@ -27,6 +27,7 @@ logger = getLogger("Vision Prompt")
 
 def load_sam_model(
     sam_name: SAMModelName,
+    device: str = "cuda",
     precision: str = "bf16",
     compile_models: bool = False,
     verbose: bool = False,
@@ -35,6 +36,7 @@ def load_sam_model(
 
     Args:
         sam_name: The name of the SAM model.
+        device: The device to use for the model.
         precision: The precision of the model.
         compile_models: Whether to compile the model.
         verbose: Whether to print verbose output.
@@ -56,13 +58,13 @@ def load_sam_model(
     logger.info(f"Loading segmentation model: {sam_name} from {checkpoint_path}")
 
     if sam_name in {SAMModelName.SAM, SAMModelName.MOBILE_SAM}:
-        model: Sam = sam_model_registry[registry_name](checkpoint=str(checkpoint_path)).cuda().eval()
+        model: Sam = sam_model_registry[registry_name](checkpoint=str(checkpoint_path)).to(device).eval()
         predictor = SamPredictor(model)
     elif sam_name in {SAMModelName.SAM_HQ, SAMModelName.SAM_HQ_TINY}:
-        model: SamHQ = sam_hq_model_registry[registry_name](checkpoint=str(checkpoint_path)).cuda().eval()
+        model: SamHQ = sam_hq_model_registry[registry_name](checkpoint=str(checkpoint_path)).to(device).eval()
         predictor = SamHQPredictor(model)
     elif sam_name == SAMModelName.SAM_FAST:
-        model = sam_model_fast_registry[registry_name](checkpoint=str(checkpoint_path)).cuda().eval()
+        model = sam_model_fast_registry[registry_name](checkpoint=str(checkpoint_path)).to(device).eval()
         predictor = SamFastPredictor(model)
     elif sam_name == SAMModelName.EFFICIENT_VIT_SAM:
         model = (
@@ -70,7 +72,7 @@ def load_sam_model(
                 name=registry_name,
                 weight_url=str(checkpoint_path),
             )
-            .cuda()
+            .to(device)
             .eval()
         )
         predictor = EfficientViTSamPredictor(model)
@@ -80,6 +82,7 @@ def load_sam_model(
 
     return optimize_sam_model(
         sam_predictor=predictor,
+        device=device,
         precision=precision_to_torch_dtype(precision),
         compile_models=compile_models,
         verbose=verbose,

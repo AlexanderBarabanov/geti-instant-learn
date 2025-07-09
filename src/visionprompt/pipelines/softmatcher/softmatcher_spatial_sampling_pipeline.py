@@ -53,6 +53,7 @@ class SoftMatcherSpatialSampling(Matcher):
         precision: str = "bf16",
         compile_models: bool = False,
         verbose: bool = False,
+        device: str = "cuda",
         image_size: int | tuple[int, int] | None = None,
     ) -> None:
         """Initialize the SoftMatcherSpatialSampling pipeline.
@@ -67,6 +68,7 @@ class SoftMatcherSpatialSampling(Matcher):
             precision: The precision to use for the model.
             compile_models: Whether to compile the models.
             verbose: Whether to print verbose output of the model optimization process.
+            device: The device to use for the model.
             image_size: The size of the image to use, if None, the image will not be resized.
         """
         super().__init__(
@@ -79,6 +81,7 @@ class SoftMatcherSpatialSampling(Matcher):
             precision=precision,
             compile_models=compile_models,
             verbose=verbose,
+            device=device,
             image_size=image_size,
         )
         self.prompt_generator: PromptGenerator = SoftmatcherPromptGenerator(

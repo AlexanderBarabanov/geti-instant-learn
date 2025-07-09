@@ -37,7 +37,10 @@ class Pipeline(ABC):
         True
     """
 
-    def __init__(self, image_size: int | tuple[int, int] | None = None) -> None:
+    def __init__(
+        self,
+        image_size: int | tuple[int, int] | None = None,
+    ) -> None:
         """Initialization method that caches all parameters.
 
         Args:

@@ -59,6 +59,7 @@ class GroundingDinoBoxGenerator(PromptGenerator):
         )
         self.model = optimize_model(
             model=self.model,
+            device=self.device,
             precision=precision_to_torch_dtype(precision),
             compile_models=compile_models,
             verbose=verbose,

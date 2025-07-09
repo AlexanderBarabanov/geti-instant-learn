@@ -44,7 +44,7 @@ class GroundingDinoSAM(Pipeline):
         """
         super().__init__(image_size=image_size)
         self.sam_predictor = load_sam_model(
-            sam_name, precision=precision, compile_models=compile_models, verbose=verbose
+            sam_name, device, precision=precision, compile_models=compile_models, verbose=verbose
         )
         self.prompt_generator: GroundingDinoBoxGenerator = GroundingDinoBoxGenerator(
             device=device,

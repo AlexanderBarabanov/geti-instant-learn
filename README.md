@@ -89,7 +89,7 @@ class PerSam(Pipeline):
     ) -> None:
         super().__init__(image_size=image_size)
         self.sam_predictor = load_sam_model(
-            sam_name, precision=precision, compile_models=compile_models, verbose=verbose
+            sam_name, device, precision=precision, compile_models=compile_models, verbose=verbose
         )
         self.encoder: Encoder = SamEncoder(sam_predictor=sam_predictor)
         self.feature_selector: FeatureSelector = AverageFeatures()

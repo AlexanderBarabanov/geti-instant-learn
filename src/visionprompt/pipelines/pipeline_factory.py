@@ -62,6 +62,7 @@ def load_pipeline(sam_name: SAMModelName, pipeline_name: PipelineName, args: Nam
                 compile_models=args.compile_models,
                 verbose=args.verbose,
                 image_size=args.image_size,
+                device=args.device,
             )
         case PipelineName.PER_DINO:
             return PerDino(
@@ -77,6 +78,7 @@ def load_pipeline(sam_name: SAMModelName, pipeline_name: PipelineName, args: Nam
                 compile_models=args.compile_models,
                 verbose=args.verbose,
                 image_size=args.image_size,
+                device=args.device,
             )
         case PipelineName.MATCHER:
             return Matcher(
@@ -90,6 +92,7 @@ def load_pipeline(sam_name: SAMModelName, pipeline_name: PipelineName, args: Nam
                 compile_models=args.compile_models,
                 verbose=args.verbose,
                 image_size=args.image_size,
+                device=args.device,
             )
         case PipelineName.PER_SAM_MAPI:
             return PerSamMAPI()
@@ -105,6 +108,7 @@ def load_pipeline(sam_name: SAMModelName, pipeline_name: PipelineName, args: Nam
                 compile_models=args.compile_models,
                 verbose=args.verbose,
                 image_size=args.image_size,
+                device=args.device,
             )
         case PipelineName.SOFT_MATCHER_RFF:
             return SoftMatcherRFF(
@@ -118,6 +122,7 @@ def load_pipeline(sam_name: SAMModelName, pipeline_name: PipelineName, args: Nam
                 compile_models=args.compile_models,
                 verbose=args.verbose,
                 image_size=args.image_size,
+                device=args.device,
             )
         case PipelineName.SOFT_MATCHER_BIDIRECTIONAL:
             return SoftMatcherBiDirectional(
@@ -131,6 +136,7 @@ def load_pipeline(sam_name: SAMModelName, pipeline_name: PipelineName, args: Nam
                 compile_models=args.compile_models,
                 verbose=args.verbose,
                 image_size=args.image_size,
+                device=args.device,
             )
         case PipelineName.SOFT_MATCHER_RFF_BIDIRECTIONAL:
             return SoftMatcherRFFBiDirectional(
@@ -144,6 +150,7 @@ def load_pipeline(sam_name: SAMModelName, pipeline_name: PipelineName, args: Nam
                 compile_models=args.compile_models,
                 verbose=args.verbose,
                 image_size=args.image_size,
+                device=args.device,
             )
         case PipelineName.SOFT_MATCHER_SAMPLING:
             return SoftMatcherSampling(
@@ -157,6 +164,7 @@ def load_pipeline(sam_name: SAMModelName, pipeline_name: PipelineName, args: Nam
                 compile_models=args.compile_models,
                 verbose=args.verbose,
                 image_size=args.image_size,
+                device=args.device,
             )
         case PipelineName.SOFT_MATCHER_RFF_SAMPLING:
             return SoftMatcherRFFSampling(
@@ -170,6 +178,7 @@ def load_pipeline(sam_name: SAMModelName, pipeline_name: PipelineName, args: Nam
                 compile_models=args.compile_models,
                 verbose=args.verbose,
                 image_size=args.image_size,
+                device=args.device,
             )
         case PipelineName.SOFT_MATCHER_BIDIRECTIONAL_SAMPLING:
             return SoftMatcherBiDirectionalSampling(
@@ -183,6 +192,7 @@ def load_pipeline(sam_name: SAMModelName, pipeline_name: PipelineName, args: Nam
                 compile_models=args.compile_models,
                 verbose=args.verbose,
                 image_size=args.image_size,
+                device=args.device,
             )
         case PipelineName.SOFT_MATCHER_RFF_BIDIRECTIONAL_SAMPLING:
             return SoftMatcherRFFBiDirectionalSampling(
@@ -196,16 +206,17 @@ def load_pipeline(sam_name: SAMModelName, pipeline_name: PipelineName, args: Nam
                 compile_models=args.compile_models,
                 verbose=args.verbose,
                 image_size=args.image_size,
+                device=args.device,
             )
         case PipelineName.GROUNDING_DINO_SAM:
             return GroundingDinoSAM(
                 sam_name=sam_name,
                 apply_mask_refinement=args.apply_mask_refinement,
-                device="cuda:0",
                 precision=args.precision,
                 compile_models=args.compile_models,
                 verbose=args.verbose,
                 image_size=args.image_size,
+                device=args.device,
             )
         case _:
             msg = f"Algorithm {pipeline_name.value} not implemented yet"

@@ -47,9 +47,10 @@ class DinoEncoder(Encoder):
         compile_models: bool,
         verbose: bool,
         model_id: str = "facebook/dinov2-large",
+        device: str = "cuda",
     ) -> None:
         super().__init__()
-        model = AutoModel.from_pretrained(model_id).cuda().eval()
+        model = AutoModel.from_pretrained(model_id).to(device).eval()
 
         self.encoder_input_size = model.config.image_size
         self.patch_size = model.config.patch_size
@@ -60,6 +61,7 @@ class DinoEncoder(Encoder):
             precision=precision_to_torch_dtype(precision),
             compile_models=compile_models,
             verbose=verbose,
+            device=device,
         ).eval()
 
         self.processor = AutoImageProcessor.from_pretrained(
@@ -123,7 +125,7 @@ class DinoEncoder(Encoder):
         for class_id, masks in masks_per_class.data.items():
             for mask in masks:
                 # preprocess mask, add batch dim, convert to float and resize
-                pooled_mask = self.encoder_mask_transform(mask.data).cuda()
+                pooled_mask = self.encoder_mask_transform(mask.data).to(self.model.device)
                 resized_masks.add(mask=pooled_mask, class_id=class_id)
                 # extract local features
                 indices = pooled_mask.flatten().bool()
