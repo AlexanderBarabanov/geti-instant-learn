@@ -1,4 +1,4 @@
-"""SoftMatcherBiDirectionalSpatialSampling pipeline."""
+"""SoftMatcher pipeline."""
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
@@ -12,18 +12,30 @@ if TYPE_CHECKING:
     from visionprompt.processes.prompt_generators.prompt_generator_base import PromptGenerator
 
 
-class SoftMatcherBiDirectionalSpatialSampling(Matcher):
-    """This is the SoftMatcherBiDirectionalSpatialSampling pipeline.
+class SoftMatcher(Matcher):
+    """This is the SoftMatcher pipeline.
 
-    This pipeline is the same as the SoftMatcherBiDirectional pipeline, but it uses spatial sampling.
+    Instead of using a linear sum assignment, this pipeline uses a soft matching algorithm to generate prompts
+    for the segmenter.
+
+    This pipeline is based on the paper:
+    "Probabilistic Feature Matching for Fast Scalable Visual Prompting"
+    https://www.ijcai.org/proceedings/2024/1000.pdf
+
+    Main novelties:
+    - Replaces the bidirectional prompt generator with a soft matching algorithm, for very fast computation
+    - Can use Random Fourier Features to approximate the similarity map to increase prompt generation speed
+
+    We have added several sampling techniques to increase the performance of the pipeline.
 
     Examples:
-        >>> from visionprompt.pipelines.softmatcher import SoftMatcherBiDirectionalSpatialSampling
+        >>> from visionprompt.pipelines.softmatcher import SoftMatcher
         >>> from visionprompt.types import Image, Priors, Results
         >>> import torch
         >>> import numpy as np
         >>>
-        >>> soft_matcher = SoftMatcherBiDirectionalSpatialSampling()
+        >>> soft_matcher = SoftMatcher()
+        >>>
         >>> # Create mock inputs
         >>> ref_image = np.zeros((1024, 1024, 3), dtype=np.uint8)
         >>> target_image = np.zeros((1024, 1024, 3), dtype=np.uint8)
@@ -50,13 +62,18 @@ class SoftMatcherBiDirectionalSpatialSampling(Matcher):
         apply_mask_refinement: bool = True,
         skip_points_in_existing_masks: bool = True,
         mask_similarity_threshold: float | None = 0.42,
+        use_sampling: bool = False,
+        use_spatial_sampling: bool = False,
+        approximate_matching: bool = False,
+        softmatching_score_threshold: float = 0.4,
+        softmatching_bidirectional: bool = False,
         precision: str = "bf16",
         compile_models: bool = False,
         verbose: bool = False,
         device: str = "cuda",
         image_size: int | tuple[int, int] | None = None,
     ) -> None:
-        """Initialize the SoftMatcherBiDirectionalSpatialSampling pipeline.
+        """Initialize the SoftMatcher pipeline.
 
         Args:
             sam_name: The name of the SAM model to use.
@@ -65,6 +82,11 @@ class SoftMatcherBiDirectionalSpatialSampling(Matcher):
             apply_mask_refinement: Whether to apply mask refinement.
             skip_points_in_existing_masks: Whether to skip points in existing masks.
             mask_similarity_threshold: The similarity threshold for the mask.
+            use_sampling: Whether to use sampling.
+            use_spatial_sampling: Whether to use spatial sampling.
+            approximate_matching: Whether to use approximate matching.
+            softmatching_score_threshold: The score threshold for the soft matching.
+            softmatching_bidirectional: Whether to use bidirectional soft matching.
             precision: The precision to use for the model.
             compile_models: Whether to compile the models.
             verbose: Whether to print verbose output of the model optimization process.
@@ -81,8 +103,8 @@ class SoftMatcherBiDirectionalSpatialSampling(Matcher):
             precision=precision,
             compile_models=compile_models,
             verbose=verbose,
-            image_size=image_size,
             device=device,
+            image_size=image_size,
         )
         self.prompt_generator: PromptGenerator = SoftmatcherPromptGenerator(
             encoder_input_size=self.encoder.encoder_input_size,
@@ -90,7 +112,9 @@ class SoftMatcherBiDirectionalSpatialSampling(Matcher):
             encoder_feature_size=self.encoder.feature_size,
             num_background_points=num_background_points,
             num_foreground_points=num_foreground_points,
-            use_spatial_sampling=True,
-            approximate_matching=False,
-            softmatching_bidirectional=True,
+            use_sampling=use_sampling,
+            use_spatial_sampling=use_spatial_sampling,
+            approximate_matching=approximate_matching,
+            softmatching_score_threshold=softmatching_score_threshold,
+            softmatching_bidirectional=softmatching_bidirectional,
         )

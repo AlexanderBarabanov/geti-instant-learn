@@ -9,20 +9,7 @@ from .persam_mapi_pipeline import PerSamMAPI
 from .persam_pipeline import PerSam
 from .pipeline_base import Pipeline
 from .pipeline_factory import load_pipeline
-from .softmatcher import (
-    SoftMatcher,
-    SoftMatcherBiDirectional,
-    SoftMatcherBiDirectionalSampling,
-    SoftMatcherBiDirectionalSpatialSampling,
-    SoftMatcherRFF,
-    SoftMatcherRFFBiDirectional,
-    SoftMatcherRFFBiDirectionalSampling,
-    SoftMatcherRFFBiDirectionalSpatialSampling,
-    SoftMatcherRFFSampling,
-    SoftMatcherRFFSpatialSampling,
-    SoftMatcherSampling,
-    SoftMatcherSpatialSampling,
-)
+from .softmatcher_pipeline import SoftMatcher
 
 __all__ = [
     "Matcher",
@@ -31,17 +18,6 @@ __all__ = [
     "PerSamMAPI",
     "Pipeline",
     "SoftMatcher",
-    "SoftMatcherBiDirectional",
-    "SoftMatcherBiDirectionalSampling",
-    "SoftMatcherBiDirectionalSpatialSampling",
-    "SoftMatcherRFF",
-    "SoftMatcherRFFBiDirectional",
-    "SoftMatcherRFFBiDirectionalSampling",
-    "SoftMatcherRFFBiDirectionalSpatialSampling",
-    "SoftMatcherRFFSampling",
-    "SoftMatcherRFFSpatialSampling",
-    "SoftMatcherSampling",
-    "SoftMatcherSpatialSampling",
     "GroundingDinoSAM",
     "load_pipeline",
 ]

@@ -25,13 +25,6 @@ class PipelineName(Enum):
     PER_DINO = "PerDino"
     PER_SAM_MAPI = "PerSAMMAPI"
     SOFT_MATCHER = "SoftMatcher"
-    SOFT_MATCHER_RFF = "SoftMatcherRFF"
-    SOFT_MATCHER_BIDIRECTIONAL = "SoftMatcherBiDirectional"
-    SOFT_MATCHER_RFF_BIDIRECTIONAL = "SoftMatcherRFFBiDirectional"
-    SOFT_MATCHER_SAMPLING = "SoftMatcherSampling"
-    SOFT_MATCHER_RFF_SAMPLING = "SoftMatcherRFFSampling"
-    SOFT_MATCHER_BIDIRECTIONAL_SAMPLING = "SoftMatcherBiDirectionalSampling"
-    SOFT_MATCHER_RFF_BIDIRECTIONAL_SAMPLING = "SoftMatcherRFFBiDirectionalSampling"
 
 
 class DatasetName(Enum):

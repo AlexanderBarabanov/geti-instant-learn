@@ -132,6 +132,32 @@ def populate_benchmark_parser(parser: argparse.ArgumentParser) -> None:
         help="Number of background points to sample",
     )
     parser.add_argument(
+        "--use_sampling",
+        action="store_true",
+        help="Use sampling",
+    )
+    parser.add_argument(
+        "--use_spatial_sampling",
+        action="store_true",
+        help="Use spatial sampling",
+    )
+    parser.add_argument(
+        "--approximate_matching",
+        action="store_true",
+        help="Use approximate matching",
+    )
+    parser.add_argument(
+        "--softmatching_score_threshold",
+        type=float,
+        default=0.4,
+        help="The score threshold for the soft matching",
+    )
+    parser.add_argument(
+        "--softmatching_bidirectional",
+        action="store_true",
+        help="Use bidirectional soft matching",
+    )
+    parser.add_argument(
         "--num_priors",
         type=int,
         default=1,

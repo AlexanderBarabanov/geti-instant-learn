@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger("Vision Prompt")
 
 
-def load_pipeline(sam_name: SAMModelName, pipeline_name: PipelineName, args: Namespace) -> Pipeline:  # noqa: C901, PLR0911
+def load_pipeline(sam_name: SAMModelName, pipeline_name: PipelineName, args: Namespace) -> Pipeline:
     """Instantiate and return the requested pipeline.
 
     Args:
@@ -29,21 +29,7 @@ def load_pipeline(sam_name: SAMModelName, pipeline_name: PipelineName, args: Nam
         The instantiated pipeline.
     """
     # Lazy import to avoid circular dependencies during module import time.
-    from visionprompt.pipelines import (
-        GroundingDinoSAM,
-        Matcher,
-        PerDino,
-        PerSam,
-        PerSamMAPI,
-        SoftMatcher,
-        SoftMatcherBiDirectional,
-        SoftMatcherBiDirectionalSampling,
-        SoftMatcherRFF,
-        SoftMatcherRFFBiDirectional,
-        SoftMatcherRFFBiDirectionalSampling,
-        SoftMatcherRFFSampling,
-        SoftMatcherSampling,
-    )
+    from visionprompt.pipelines import GroundingDinoSAM, Matcher, PerDino, PerSam, PerSamMAPI, SoftMatcher
 
     logger.info("Constructing pipeline: %s", pipeline_name.value)
 
@@ -104,104 +90,11 @@ def load_pipeline(sam_name: SAMModelName, pipeline_name: PipelineName, args: Nam
                 apply_mask_refinement=args.apply_mask_refinement,
                 skip_points_in_existing_masks=args.skip_points_in_existing_masks,
                 mask_similarity_threshold=args.mask_similarity_threshold,
-                precision=args.precision,
-                compile_models=args.compile_models,
-                verbose=args.verbose,
-                image_size=args.image_size,
-                device=args.device,
-            )
-        case PipelineName.SOFT_MATCHER_RFF:
-            return SoftMatcherRFF(
-                sam_name=sam_name,
-                num_foreground_points=args.num_foreground_points,
-                num_background_points=args.num_background_points,
-                apply_mask_refinement=args.apply_mask_refinement,
-                skip_points_in_existing_masks=args.skip_points_in_existing_masks,
-                mask_similarity_threshold=args.mask_similarity_threshold,
-                precision=args.precision,
-                compile_models=args.compile_models,
-                verbose=args.verbose,
-                image_size=args.image_size,
-                device=args.device,
-            )
-        case PipelineName.SOFT_MATCHER_BIDIRECTIONAL:
-            return SoftMatcherBiDirectional(
-                sam_name=sam_name,
-                num_foreground_points=args.num_foreground_points,
-                num_background_points=args.num_background_points,
-                apply_mask_refinement=args.apply_mask_refinement,
-                skip_points_in_existing_masks=args.skip_points_in_existing_masks,
-                mask_similarity_threshold=args.mask_similarity_threshold,
-                precision=args.precision,
-                compile_models=args.compile_models,
-                verbose=args.verbose,
-                image_size=args.image_size,
-                device=args.device,
-            )
-        case PipelineName.SOFT_MATCHER_RFF_BIDIRECTIONAL:
-            return SoftMatcherRFFBiDirectional(
-                sam_name=sam_name,
-                num_foreground_points=args.num_foreground_points,
-                num_background_points=args.num_background_points,
-                apply_mask_refinement=args.apply_mask_refinement,
-                skip_points_in_existing_masks=args.skip_points_in_existing_masks,
-                mask_similarity_threshold=args.mask_similarity_threshold,
-                precision=args.precision,
-                compile_models=args.compile_models,
-                verbose=args.verbose,
-                image_size=args.image_size,
-                device=args.device,
-            )
-        case PipelineName.SOFT_MATCHER_SAMPLING:
-            return SoftMatcherSampling(
-                sam_name=sam_name,
-                num_foreground_points=args.num_foreground_points,
-                num_background_points=args.num_background_points,
-                apply_mask_refinement=args.apply_mask_refinement,
-                skip_points_in_existing_masks=args.skip_points_in_existing_masks,
-                mask_similarity_threshold=args.mask_similarity_threshold,
-                precision=args.precision,
-                compile_models=args.compile_models,
-                verbose=args.verbose,
-                image_size=args.image_size,
-                device=args.device,
-            )
-        case PipelineName.SOFT_MATCHER_RFF_SAMPLING:
-            return SoftMatcherRFFSampling(
-                sam_name=sam_name,
-                num_foreground_points=args.num_foreground_points,
-                num_background_points=args.num_background_points,
-                apply_mask_refinement=args.apply_mask_refinement,
-                skip_points_in_existing_masks=args.skip_points_in_existing_masks,
-                mask_similarity_threshold=args.mask_similarity_threshold,
-                precision=args.precision,
-                compile_models=args.compile_models,
-                verbose=args.verbose,
-                image_size=args.image_size,
-                device=args.device,
-            )
-        case PipelineName.SOFT_MATCHER_BIDIRECTIONAL_SAMPLING:
-            return SoftMatcherBiDirectionalSampling(
-                sam_name=sam_name,
-                num_foreground_points=args.num_foreground_points,
-                num_background_points=args.num_background_points,
-                apply_mask_refinement=args.apply_mask_refinement,
-                skip_points_in_existing_masks=args.skip_points_in_existing_masks,
-                mask_similarity_threshold=args.mask_similarity_threshold,
-                precision=args.precision,
-                compile_models=args.compile_models,
-                verbose=args.verbose,
-                image_size=args.image_size,
-                device=args.device,
-            )
-        case PipelineName.SOFT_MATCHER_RFF_BIDIRECTIONAL_SAMPLING:
-            return SoftMatcherRFFBiDirectionalSampling(
-                sam_name=sam_name,
-                num_foreground_points=args.num_foreground_points,
-                num_background_points=args.num_background_points,
-                apply_mask_refinement=args.apply_mask_refinement,
-                skip_points_in_existing_masks=args.skip_points_in_existing_masks,
-                mask_similarity_threshold=args.mask_similarity_threshold,
+                use_sampling=args.use_sampling,
+                use_spatial_sampling=args.use_spatial_sampling,
+                approximate_matching=args.approximate_matching,
+                softmatching_score_threshold=args.softmatching_score_threshold,
+                softmatching_bidirectional=args.softmatching_bidirectional,
                 precision=args.precision,
                 compile_models=args.compile_models,
                 verbose=args.verbose,
