@@ -4,9 +4,7 @@
 
 import torch
 
-from visionprompt.processes.feature_selectors.feature_selector_base import (
-    FeatureSelector,
-)
+from visionprompt.processes.feature_selectors.feature_selector_base import FeatureSelector
 from visionprompt.types import Features
 
 
@@ -46,7 +44,7 @@ class AllFeaturesSelector(FeatureSelector):
     def __init__(self) -> None:
         super().__init__()
 
-    def __call__(self, features_per_image: list[Features]) -> list[Features]:
+    def __call__(self, features_per_image: list[Features]) -> Features:
         """This method merges all features over all prior images without averaging.
 
         Each class will maintain all its feature vectors from all images.
@@ -55,7 +53,7 @@ class AllFeaturesSelector(FeatureSelector):
             features_per_image: A list of features for each reference image.
 
         Returns:
-            A list of Features object containing all features per class.
+            A Features object containing all features per class.
         """
         result_features = Features()
 
@@ -69,4 +67,4 @@ class AllFeaturesSelector(FeatureSelector):
             features_per_image,
         )
 
-        return [result_features]
+        return result_features

@@ -67,7 +67,6 @@ class PerSamMAPI(Pipeline):
             reference_images,
             reference_priors,
         )
-        return Results()
 
     @track_duration
     def infer(self, target_images: list[Image]) -> Results:

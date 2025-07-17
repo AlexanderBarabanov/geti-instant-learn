@@ -52,6 +52,77 @@ uv sync --extra dev
 uv sync --extra full
 ```
 
+## Usage
+
+The project is structured around a command-line interface (CLI) with three subcommands: `run`, `benchmark`, and `ui`.
+
+You can get help for any command by using the `-h` or `--help` flag, for example, `visionprompt benchmark --help`.
+
+### Run a Pipeline
+
+The `run` subcommand allows you to execute a pipeline on your own set of images.
+
+**Example:**
+```bash
+# Run using predefined masks with default pipeline (Matcher)
+visionprompt run --reference_images path/to/reference/images --target_images path/to/target/images --reference_prompts path/to/reference/masks
+
+# Run using points
+visionprompt run --reference_images path/to/reference/images --target_images path/to/target/images --points "[0:[640,640], -1:[200,200]]"
+
+# Run using text prompt
+visionprompt run --target_images path/to/target/images --reference_text_prompt "can"
+
+# Run any other subclass of Pipeline (e.g. SoftMatcher) using MobileSAM
+visionprompt run --pipeline SoftMatcher --pipeline.sam MOBILE_SAM ...
+```
+You can configure the pipeline's parameters using dot notation (e.g., `--pipeline.mask_similarity_threshold`, `--pipeline.device`).
+
+### Benchmark on Datasets
+
+The `benchmark` subcommand is used to evaluate pipeline performance on various datasets. It can be used to test multiple pipelines, datasets, and hyperparameters all in one experiment.
+
+**Basic Usage:**
+
+```bash
+# Evaluate the default pipeline (MatcherModular) on LVIS dataset with 1-shot
+visionprompt benchmark
+
+# Specify dataset and pipeline
+visionprompt benchmark --dataset_name PerSeg --pipeline MatcherModular
+
+# Change number of reference shots
+visionprompt benchmark --n_shot 3
+
+# Select a different backbone
+visionprompt benchmark --sam MobileSAM
+
+# Filter evaluation to a specific class
+visionprompt benchmark --class_name cat
+
+# Combine arguments
+visionprompt benchmark --dataset_name PerSeg --pipeline MatcherModular --n_shot 3 --sam MobileSAM --class_name can
+
+# Run all pipelines on all datasets
+visionprompt benchmark --pipeline all --dataset_name all
+```
+
+See [`src/visionprompt/utils/args.py`](src/visionprompt/utils/args.py) or run `visionprompt benchmark --help` for all available command-line options. Results (metrics and visualizations) are typically saved to `~/outputs/`.
+
+### Launch the Web UI
+
+An interactive web UI is available for qualitative analysis.
+
+```bash
+visionprompt ui
+```
+
+The UI allows you to select different pipelines, datasets, and images to inspect outputs like similarity maps, masks, and points. By default, it runs on `http://0.0.0.0:5050`. You can change this with `--host` and `--port` arguments.
+
+![Vision Prompt UI](docs/figs/VisionPromptUI.png)
+
+
+
 ## Modular Pipeline Example
 
 The power of this repository lies in its modularity. You can easily modify pipelines by changing which components are instantiated within their class definition.
@@ -74,7 +145,7 @@ class PerSam(Pipeline):
 
     def __init__(
         self,
-        sam_name: str = "SAM",
+        sam: str = "SAM",
         num_foreground_points: int,
         num_background_points: int,
         apply_mask_refinement: bool,
@@ -89,7 +160,7 @@ class PerSam(Pipeline):
     ) -> None:
         super().__init__(image_size=image_size)
         self.sam_predictor = load_sam_model(
-            sam_name, device, precision=precision, compile_models=compile_models, verbose=verbose
+            sam, device, precision=precision, compile_models=compile_models, verbose=verbose
         )
         self.encoder: Encoder = SamEncoder(sam_predictor=sam_predictor)
         self.feature_selector: FeatureSelector = AverageFeatures()
@@ -291,75 +362,6 @@ classDiagram
     ClassOverlapMaskFilter --|> Process
 ```
 
-
-## Usage
-
-The project is structured around a command-line interface (CLI) with three subcommands: `run`, `benchmark`, and `ui`.
-
-You can get help for any command by using the `-h` or `--help` flag, for example, `visionprompt benchmark --help`.
-
-### Run a Pipeline
-
-The `run` subcommand allows you to execute a pipeline on your own set of images.
-
-**Example:**
-```bash
-# Run using predefined masks with default pipeline (Matcher)
-visionprompt run --reference_image_dir path/to/reference/images --target_image_dir path/to/target/images --reference_prompt_dir path/to/reference/masks
-
-# Run using points
-visionprompt run --reference_image_dir path/to/reference/images --target_image_dir path/to/target/images --points "[0:[640,640], -1:[200,200]]"
-
-# Run using text prompt
-visionprompt run --target_image_dir path/to/target/images --reference_text_prompt "can"
-
-# Run any other subclass of Pipeline (e.g. SoftMatcher) using MobileSAM
-visionprompt run --pipeline SoftMatcher --pipeline.sam_name MOBILE_SAM ...
-```
-You can configure the pipeline's parameters using dot notation (e.g., `--pipeline.num_grid_cells`, `--pipeline.sam_name`).
-
-### Benchmark on Datasets
-
-The `benchmark` subcommand is used to evaluate pipeline performance on various datasets. It can be used to test multiple pipelines, datasets, and hyperparameters all in one experiment.
-
-**Basic Usage:**
-
-```bash
-# Evaluate the default pipeline (MatcherModular) on LVIS dataset with 1-shot
-visionprompt benchmark
-
-# Specify dataset and pipeline
-visionprompt benchmark --dataset_name PerSeg --pipeline MatcherModular
-
-# Change number of reference shots
-visionprompt benchmark --n_shot 3
-
-# Select a different backbone
-visionprompt benchmark --sam_name MobileSAM
-
-# Filter evaluation to a specific class
-visionprompt benchmark --class_name cat
-
-# Combine arguments
-visionprompt benchmark --dataset_name PerSeg --pipeline MatcherModular --n_shot 3 --sam_name MobileSAM --class_name can
-
-# Run all pipelines on all datasets
-visionprompt benchmark --pipeline all --dataset_name all
-```
-
-See [`src/visionprompt/utils/args.py`](src/visionprompt/utils/args.py) or run `visionprompt benchmark --help` for all available command-line options. Results (metrics and visualizations) are typically saved to `~/outputs/`.
-
-### Launch the Web UI
-
-An interactive web UI is available for qualitative analysis.
-
-```bash
-visionprompt ui
-```
-
-The UI allows you to select different pipelines, datasets, and images to inspect outputs like similarity maps, masks, and points. By default, it runs on `http://0.0.0.0:5050`. You can change this with `--host` and `--port` arguments.
-
-![Vision Prompt UI](docs/figs/VisionPromptUI.png)
 
 ## Acknowledgements
 

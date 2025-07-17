@@ -48,6 +48,10 @@ class Image(Data):
         """Get the image data."""
         return self._data
 
+    @data.setter
+    def data(self, value: np.ndarray) -> None:
+        self._data = value
+
     @property
     def tensor(self) -> torch.Tensor:
         """Get the image data as a torch tensor."""

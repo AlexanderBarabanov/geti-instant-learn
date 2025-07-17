@@ -33,13 +33,13 @@ class VisionPromptCLI:
         # load datasets
         parser.add_subclass_arguments(Pipeline, "pipeline", default="Matcher")
         parser.add_argument(
-            "--reference_image_dir", "--ref", type=str, default=None, help="Directory with reference images."
+            "--reference_images", "--ref", type=str, default=None, help="Directory with reference images."
         )
         parser.add_argument(
-            "--target_image_dir", "--target", type=str, required=True, help="Directory with target images."
+            "--target_images", "--target", type=str, required=True, help="Directory with target images."
         )
         parser.add_argument(
-            "--reference_prompt_dir",
+            "--reference_prompts",
             "--ref_prompt",
             type=str,
             default=None,
@@ -56,6 +56,9 @@ class VisionPromptCLI:
             help="Text prompt for grounding dino. If provided, pipeline is set to GroundingDinoSAM.",
         )
         parser.add_argument("--output_location", type=str, default=None, help="Directory to save output.")
+        parser.add_argument(
+            "--output_masks_only", action="store_true", default=False, help="Whether to save masks only."
+        )
         parser.add_argument("--batch_size", type=int, default=5, help="Batch size for processing target images.")
 
     @staticmethod
@@ -122,19 +125,20 @@ class VisionPromptCLI:
         subcommand = config.subcommand
         match subcommand:
             case "run":
-                if not config.run.reference_image_dir and not config.run.reference_text_prompt:
-                    msg = "Either reference_image_dir or reference_text_prompt must be provided."
+                if not config.run.reference_images and not config.run.reference_text_prompt:
+                    msg = "Either reference_images or reference_text_prompt must be provided."
                     raise ValueError(msg)
 
                 pipeline = config.run.pipeline
                 run_pipeline(
                     pipeline=pipeline,
-                    target_image_dir=config.run.target_image_dir,
-                    reference_image_dir=config.run.reference_image_dir,
-                    reference_prompt_dir=config.run.reference_prompt_dir,
+                    target_images=config.run.target_images,
+                    reference_images=config.run.reference_images,
+                    reference_prompts=config.run.reference_prompts,
                     reference_points_str=config.run.points,
                     reference_text_prompt=config.run.reference_text_prompt,
                     output_location=config.run.output_location,
+                    output_masks_only=config.run.output_masks_only,
                     batch_size=config.run.batch_size,
                 )
             case "benchmark":

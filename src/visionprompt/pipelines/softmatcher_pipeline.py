@@ -56,7 +56,7 @@ class SoftMatcher(Matcher):
 
     def __init__(
         self,
-        sam_name: SAMModelName = SAMModelName.SAM,
+        sam: SAMModelName = SAMModelName.SAM,
         num_foreground_points: int = 40,
         num_background_points: int = 2,
         apply_mask_refinement: bool = True,
@@ -76,7 +76,7 @@ class SoftMatcher(Matcher):
         """Initialize the SoftMatcher pipeline.
 
         Args:
-            sam_name: The name of the SAM model to use.
+            sam: The name of the SAM model to use.
             num_foreground_points: The number of foreground points to use.
             num_background_points: The number of background points to use.
             apply_mask_refinement: Whether to apply mask refinement.
@@ -94,7 +94,7 @@ class SoftMatcher(Matcher):
             image_size: The size of the image to use, if None, the image will not be resized.
         """
         super().__init__(
-            sam_name=sam_name,
+            sam=sam,
             num_foreground_points=num_foreground_points,
             num_background_points=num_background_points,
             apply_mask_refinement=apply_mask_refinement,

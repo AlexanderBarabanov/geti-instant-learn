@@ -610,7 +610,7 @@ def perform_benchmark_experiment(args: argparse.Namespace | None = None) -> None
         )
 
         dataset = load_dataset(dataset_enum.value, whitelist=args.class_name, batch_size=args.batch_size)
-        pipeline = load_pipeline(sam_name=backbone_enum, pipeline_name=pipeline_enum, args=args)
+        pipeline = load_pipeline(sam=backbone_enum, pipeline_name=pipeline_enum, args=args)
 
         # Individual experiment artifacts are saved in a path derived from the base path.
         unique_output_path = _get_output_path_for_experiment(

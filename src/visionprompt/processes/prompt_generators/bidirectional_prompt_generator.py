@@ -72,10 +72,10 @@ class BidirectionalPromptGenerator(FeaturePromptGenerator):
 
     def __call__(
         self,
-        reference_features: list[Features] | None = None,
-        target_features: list[Features] | None = None,
-        reference_masks: list[Masks] | None = None,
-        target_images: list[Image] | None = None,
+        reference_features: Features,
+        target_features: list[Features],
+        reference_masks: list[Masks],
+        target_images: list[Image],
     ) -> tuple[list[Priors], list[Similarities]]:
         """This generates prompt candidates (or priors) based on the similarities.
 
@@ -85,7 +85,7 @@ class BidirectionalPromptGenerator(FeaturePromptGenerator):
         This Prompt Generator computes the similarity map internally.
 
         Args:
-            reference_features: List[Features] List of reference features, one per reference image instance
+            reference_features: Features object containing reference features
             target_features: List[Features] List of target features, one per target image instance
             reference_masks: List[Masks] List of reference masks, one per reference image instance
             target_images: ListImage] The target images
@@ -94,24 +94,14 @@ class BidirectionalPromptGenerator(FeaturePromptGenerator):
             List[Priors] List of priors, one per target image instance
         """
         priors_per_image: list[Priors] = []
-
-        if reference_features is None:
-            reference_features = [Features()]
-        reference_features = reference_features[0]
         flattened_global_features = reference_features.global_features.reshape(
             -1,
             reference_features.global_features.shape[-1],
-        )
-
-        if reference_masks is None:
-            reference_masks = [Masks()]
+        )  # this basically makes a vertical stack + flatten
         reference_masks = self._merge_masks(reference_masks)
+
         similarities_per_images = []
 
-        if target_features is None:
-            target_features = [Features()]
-        if target_images is None:
-            target_images = [Image()]
         for target_image_features, target_image in zip(target_features, target_images, strict=False):
             priors = Priors()
             similarities = Similarities()
@@ -442,10 +432,10 @@ class BidirectionalPromptGenerator(FeaturePromptGenerator):
 
     @staticmethod
     def _merge_masks(reference_masks: list[Masks]) -> Masks:
-        """Merge the reference masks from multiple instances into a single Masks object.
+        """Concatenate the per-image masks in the *height* direction.
 
-        This is done by concatenating masks for the same class ID.
-        Masks are merged so we can do linear sum assignment in one go over multiple reference images (multi-shot).
+        This is done so that, after .flatten(), patch-indices line up with the way reference
+        features are stacked.
 
         Args:
             reference_masks: List[Masks] - List of reference masks, one per reference image instance
@@ -453,11 +443,33 @@ class BidirectionalPromptGenerator(FeaturePromptGenerator):
         Returns:
             Masks - Merged masks
         """
-        merged_masks = Masks()
-        for masks_instance in reference_masks:
-            for class_id, mask_tensor in masks_instance.data.items():
-                merged_masks.add(mask_tensor, class_id)
-        return merged_masks
+        if not reference_masks:
+            return Masks()
+
+        device = next(iter(reference_masks[0].data.values())).device
+        n_images = len(reference_masks)
+        h, w = next(iter(reference_masks[0].data.values())).shape[-2:]
+
+        # All class-ids that appear anywhere
+        class_ids: set[int] = set()
+        for m in reference_masks:
+            class_ids.update(m.data.keys())
+
+        merged = Masks()
+        for cid in class_ids:
+            # Tall canvas: (1, h * n_images, w)
+            tall = torch.zeros((1, h * n_images, w), dtype=torch.bool, device=device)
+
+            for img_idx, m in enumerate(reference_masks):
+                if cid not in m.data:
+                    continue
+                block = m.data[cid].any(dim=0, keepdim=True)  # (1, h, w)
+                start = img_idx * h
+                tall[:, start : start + h, :] = block  # paste with OR
+
+            merged.add(tall, cid)
+
+        return merged
 
     def _resize_similarity_map(
         self,

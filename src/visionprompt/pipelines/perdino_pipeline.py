@@ -56,7 +56,7 @@ class PerDino(Pipeline):
 
     def __init__(
         self,
-        sam_name: SAMModelName = SAMModelName.SAM,
+        sam: SAMModelName = SAMModelName.SAM,
         num_foreground_points: int = 40,
         num_background_points: int = 2,
         apply_mask_refinement: bool = True,
@@ -73,7 +73,7 @@ class PerDino(Pipeline):
         """Initialize the PerDino pipeline.
 
         Args:
-            sam_name: The name of the SAM model to use.
+            sam: The name of the SAM model to use.
             num_foreground_points: The number of foreground points to use.
             num_background_points: The number of background points to use.
             apply_mask_refinement: Whether to apply mask refinement.
@@ -89,7 +89,7 @@ class PerDino(Pipeline):
         """
         super().__init__(image_size=image_size)
         self.sam_predictor = load_sam_model(
-            sam_name,
+            sam,
             device,
             precision=precision,
             compile_models=compile_models,
@@ -135,7 +135,6 @@ class PerDino(Pipeline):
             reference_priors,
         )
         self.reference_features = self.feature_selector(reference_features)
-        return Results()
 
     @track_duration
     def infer(self, target_images: list[Image]) -> Results:

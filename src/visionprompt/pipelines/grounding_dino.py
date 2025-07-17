@@ -19,7 +19,7 @@ class GroundingDinoSAM(Pipeline):
 
     def __init__(
         self,
-        sam_name: SAMModelName,
+        sam: SAMModelName,
         apply_mask_refinement: bool,
         precision: str = "bf16",
         compile_models: bool = False,
@@ -32,7 +32,7 @@ class GroundingDinoSAM(Pipeline):
         """Initialize the pipeline.
 
         Args:
-            sam_name: The SAM model name.
+            sam: The SAM model name.
             apply_mask_refinement: Whether to apply mask refinement.
             precision: The precision to use for the model.
             compile_models: Whether to compile the models.
@@ -44,7 +44,7 @@ class GroundingDinoSAM(Pipeline):
         """
         super().__init__(image_size=image_size)
         self.sam_predictor = load_sam_model(
-            sam_name, device, precision=precision, compile_models=compile_models, verbose=verbose
+            sam, device, precision=precision, compile_models=compile_models, verbose=verbose
         )
         self.prompt_generator: GroundingDinoBoxGenerator = GroundingDinoBoxGenerator(
             device=device,
@@ -78,8 +78,6 @@ class GroundingDinoSAM(Pipeline):
             raise ValueError(msg)
 
         self.text_priors = reference_priors[0].text
-
-        return Results()
 
     @track_duration
     def infer(self, target_images: list[Image]) -> Results:

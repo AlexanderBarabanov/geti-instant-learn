@@ -17,11 +17,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger("Vision Prompt")
 
 
-def load_pipeline(sam_name: SAMModelName, pipeline_name: PipelineName, args: Namespace) -> Pipeline:
+def load_pipeline(sam: SAMModelName, pipeline_name: PipelineName, args: Namespace) -> Pipeline:
     """Instantiate and return the requested pipeline.
 
     Args:
-        sam_name: The name of the SAM model.
+        sam: The name of the SAM model.
         pipeline_name: The name of the pipeline.
         args: The arguments to the pipeline.
 
@@ -36,7 +36,7 @@ def load_pipeline(sam_name: SAMModelName, pipeline_name: PipelineName, args: Nam
     match pipeline_name:
         case PipelineName.PER_SAM:
             return PerSam(
-                sam_name=sam_name,
+                sam=sam,
                 num_foreground_points=args.num_foreground_points,
                 num_background_points=args.num_background_points,
                 apply_mask_refinement=args.apply_mask_refinement,
@@ -52,7 +52,7 @@ def load_pipeline(sam_name: SAMModelName, pipeline_name: PipelineName, args: Nam
             )
         case PipelineName.PER_DINO:
             return PerDino(
-                sam_name=sam_name,
+                sam=sam,
                 num_foreground_points=args.num_foreground_points,
                 num_background_points=args.num_background_points,
                 apply_mask_refinement=args.apply_mask_refinement,
@@ -68,7 +68,7 @@ def load_pipeline(sam_name: SAMModelName, pipeline_name: PipelineName, args: Nam
             )
         case PipelineName.MATCHER:
             return Matcher(
-                sam_name=sam_name,
+                sam=sam,
                 num_foreground_points=args.num_foreground_points,
                 num_background_points=args.num_background_points,
                 apply_mask_refinement=args.apply_mask_refinement,
@@ -84,7 +84,7 @@ def load_pipeline(sam_name: SAMModelName, pipeline_name: PipelineName, args: Nam
             return PerSamMAPI()
         case PipelineName.SOFT_MATCHER:
             return SoftMatcher(
-                sam_name=sam_name,
+                sam=sam,
                 num_foreground_points=args.num_foreground_points,
                 num_background_points=args.num_background_points,
                 apply_mask_refinement=args.apply_mask_refinement,
@@ -103,7 +103,7 @@ def load_pipeline(sam_name: SAMModelName, pipeline_name: PipelineName, args: Nam
             )
         case PipelineName.GROUNDING_DINO_SAM:
             return GroundingDinoSAM(
-                sam_name=sam_name,
+                sam=sam,
                 apply_mask_refinement=args.apply_mask_refinement,
                 precision=args.precision,
                 compile_models=args.compile_models,

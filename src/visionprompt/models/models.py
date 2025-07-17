@@ -26,7 +26,7 @@ logger = getLogger("Vision Prompt")
 
 
 def load_sam_model(
-    sam_name: SAMModelName,
+    sam: SAMModelName,
     device: str = "cuda",
     precision: str = "bf16",
     compile_models: bool = False,
@@ -35,7 +35,7 @@ def load_sam_model(
     """Load and optimize a SAM model.
 
     Args:
-        sam_name: The name of the SAM model.
+        sam: The name of the SAM model.
         device: The device to use for the model.
         precision: The precision of the model.
         compile_models: Whether to compile the model.
@@ -44,29 +44,29 @@ def load_sam_model(
     Returns:
         The loaded model.
     """
-    if sam_name not in MODEL_MAP:
-        msg = f"Invalid model type: {sam_name}"
+    if sam not in MODEL_MAP:
+        msg = f"Invalid model type: {sam}"
         raise ValueError(msg)
 
-    model_info = MODEL_MAP[sam_name]
-    check_model_weights(sam_name)
+    model_info = MODEL_MAP[sam]
+    check_model_weights(sam)
 
     registry_name = model_info["registry_name"]
     local_filename = model_info["local_filename"]
     checkpoint_path = DATA_PATH.joinpath(local_filename)
 
-    logger.info(f"Loading segmentation model: {sam_name} from {checkpoint_path}")
+    logger.info(f"Loading segmentation model: {sam} from {checkpoint_path}")
 
-    if sam_name in {SAMModelName.SAM, SAMModelName.MOBILE_SAM}:
+    if sam in {SAMModelName.SAM, SAMModelName.MOBILE_SAM}:
         model: Sam = sam_model_registry[registry_name](checkpoint=str(checkpoint_path)).to(device).eval()
         predictor = SamPredictor(model)
-    elif sam_name in {SAMModelName.SAM_HQ, SAMModelName.SAM_HQ_TINY}:
+    elif sam in {SAMModelName.SAM_HQ, SAMModelName.SAM_HQ_TINY}:
         model: SamHQ = sam_hq_model_registry[registry_name](checkpoint=str(checkpoint_path)).to(device).eval()
         predictor = SamHQPredictor(model)
-    elif sam_name == SAMModelName.SAM_FAST:
+    elif sam == SAMModelName.SAM_FAST:
         model = sam_model_fast_registry[registry_name](checkpoint=str(checkpoint_path)).to(device).eval()
         predictor = SamFastPredictor(model)
-    elif sam_name == SAMModelName.EFFICIENT_VIT_SAM:
+    elif sam == SAMModelName.EFFICIENT_VIT_SAM:
         model = (
             create_efficientvit_sam_model(
                 name=registry_name,
@@ -77,7 +77,7 @@ def load_sam_model(
         )
         predictor = EfficientViTSamPredictor(model)
     else:
-        msg = f"Model {sam_name} not implemented yet"
+        msg = f"Model {sam} not implemented yet"
         raise NotImplementedError(msg)
 
     return optimize_sam_model(

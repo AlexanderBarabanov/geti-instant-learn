@@ -31,12 +31,13 @@ setup_logger()
 
 def run_pipeline(
     pipeline: Pipeline,
-    target_image_dir: str,
-    reference_image_dir: str | None = None,
-    reference_prompt_dir: str | None = None,
+    target_images: str,
+    reference_images: str | None = None,
+    reference_prompts: str | None = None,
     reference_points_str: str | None = None,
     reference_text_prompt: str | None = None,
     output_location: str | None = None,
+    output_masks_only: bool = False,
     batch_size: int = 5,
 ) -> None:
     """Loads reference data (images and prompts) and target images and runs the pipeline.
@@ -56,50 +57,51 @@ def run_pipeline(
             "[-1:[x1,y1], 0:[x1, y1], 0:[x2, y2],...], [-1:[x1,y1], 0:[x1, y1], 0:[x2, y2],...], ..."
 
     Example:
-        reference_image_dir: "~/data/reference"
-        reference_prompt_dir: "~/data/reference/prompts"
+        reference_images: "~/data/reference"
+        reference_prompts: "~/data/reference/prompts"
             containing class directories with prompt files for a mask e.g. "class_1/<reference_image_filename>.png"
             or point files e.g. "class_1/<reference_image_filename>.txt"
 
     Example:
-        reference_image_dir: "~/data/reference"
+        reference_images: "~/data/reference"
         reference_points_str: "[-1:[50, 50], 0:[200, 320], 0:[100, 100], ...], [-1:[100, 100], 1:[100, 100], ...], ..."
 
     Args:
         pipeline: The pipeline to run.
-        target_image_dir: The directory containing all target images.
-        reference_image_dir: The directory containing all reference images.
-        reference_prompt_dir: The directory containing all reference prompt such as mask files or point files.
+        target_images: The directory containing all target images.
+        reference_images: The directory containing all reference images.
+        reference_prompts: The directory containing all reference prompt such as mask files or point files.
         reference_points_str: The string containing all reference points.
         reference_text_prompt: The string containing the text prompt.
         output_location: Custom location for the output data. If not provided, the output will be saved in the
             root of the target image directory.
+        output_masks_only: If True, only the masks will be saved. Otherwise, we show the masks on top of the images
+            with points, boxes and scores.
         batch_size: The number of images to process in each batch.
     """
-    reference_image_directory = Path(reference_image_dir).expanduser() if reference_image_dir else None
-    reference_prompt_directory = Path(reference_prompt_dir).expanduser() if reference_prompt_dir else None
-    target_image_directory = Path(target_image_dir).expanduser()
+    reference_images = Path(reference_images).expanduser() if reference_images else None
+    reference_prompts = Path(reference_prompts).expanduser() if reference_prompts else None
+    target_images = Path(target_images).expanduser()
     output_location = (
-        Path(output_location).expanduser()
-        if output_location
-        else pathlib.Path(target_image_directory).parent.parent / "output"
+        Path(output_location).expanduser() if output_location else pathlib.Path(target_images).parent.parent / "output"
     )
 
-    reference_images, reference_priors, num_classes = parse_reference_data(
-        reference_image_directory, reference_prompt_directory, reference_points_str, reference_text_prompt
+    reference_images, reference_priors, class_strings = parse_reference_data(
+        reference_images, reference_prompts, reference_points_str, reference_text_prompt
     )
-    target_images, _ = parse_image_files(target_image_directory)
+    target_images, _ = parse_image_files(target_images)
 
     pipeline.learn(reference_images, reference_priors)
-    if reference_image_directory:
-        ExportMaskVisualization(str(output_location / "reference"))(
-            images=reference_images,
-            masks=[p.masks for p in reference_priors],
-            names=[image.image_path.name for image in reference_images],
-            points=[p.points for p in reference_priors],
-            num_classes=num_classes,
-        )
-
+    if reference_images:
+        for image, prior in zip(reference_images, reference_priors, strict=False):
+            ExportMaskVisualization(str(output_location / "reference" / image.image_path.parent.name))(
+                images=[image],
+                masks=[prior.masks] if prior.masks else None,
+                names=[image.image_path.name],
+                points=[prior.points] if prior.points else None,
+                class_names=class_strings,
+                show_legend=True,
+            )
     progress = Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -113,26 +115,36 @@ def run_pipeline(
         for i in range(0, len(target_images), batch_size):
             chunk = target_images[i : i + batch_size]
             results = pipeline.infer(chunk)
-            ExportMaskVisualization(str(output_location / "target"))(
-                images=chunk,
-                masks=results.masks,
-                names=[image.image_path.name for image in chunk],
-                points=results.used_points,
-                boxes=[p.boxes for p in results.priors],
-                num_classes=num_classes,
-            )
+            if output_masks_only:
+                for target_image in chunk:
+                    target_image.data = np.zeros(target_image.data.shape, dtype=np.uint8)
+                ExportMaskVisualization(str(output_location / "target"))(
+                    images=chunk,
+                    masks=results.masks,
+                    names=[image.image_path.name for image in chunk],
+                )
+            else:
+                ExportMaskVisualization(str(output_location / "target"))(
+                    images=chunk,
+                    masks=results.masks,
+                    names=[image.image_path.name for image in chunk],
+                    points=results.used_points,
+                    boxes=[p.boxes for p in results.priors],
+                    class_names=class_strings,
+                    show_legend=True,
+                )
             progress.update(task, advance=len(chunk))
     logger.info(f"Ouput saved in {output_location}")
 
 
-def parse_reference_prompt_from_directory(reference_prompt_directory: Path) -> dict[str, Priors]:
+def parse_reference_prompt_from_directory(reference_prompts: Path) -> dict[str, Priors]:
     """Parse the reference prompt from a directory.
 
     This function can parse a directory with class sub-directories, or a single directory with masks.
     The function returns a dictionary of image filenames to Priors.
 
     Args:
-        reference_prompt_directory: The root directory containing all
+        reference_prompts: The root directory containing all
             reference prompt such as mask files or point files.
 
     Returns:
@@ -142,16 +154,16 @@ def parse_reference_prompt_from_directory(reference_prompt_directory: Path) -> d
     image_suffixes = {f".{ext.strip('*.')}" for ext in IMAGE_EXTENSIONS}
     prompt_globs = [*IMAGE_EXTENSIONS, "*.txt", "*.json"]
 
-    dirs_to_scan = [d for d in reference_prompt_directory.iterdir() if d.is_dir()]
+    dirs_to_scan = [d for d in reference_prompts.iterdir() if d.is_dir()]
     if not dirs_to_scan:
         # No subdirectories found, so scan the root directory.
-        dirs_to_scan = [reference_prompt_directory]
+        dirs_to_scan = [reference_prompts]
 
     for class_id, directory in enumerate(dirs_to_scan):
         prompt_files = [p for ext in prompt_globs for p in directory.glob(ext)]
 
         for prompt_file in prompt_files:
-            image_filename = prompt_file.stem
+            image_filename = str(class_id) + "_" + prompt_file.stem
             if image_filename not in priors_map:
                 priors_map[image_filename] = Priors()
 
@@ -232,21 +244,23 @@ def parse_reference_data(
         reference_text_prompt: The string containing the text prompt.
 
     Returns:
-        A tuple of lists of images and prompts, and the number of classes.
+        A tuple of lists of images and prompts, and the class strings.
     """
-    num_classes = 1
+    class_strings = [""]
     reference_images: list[Image] = []
     if reference_image_root:
-        reference_images, num_classes = parse_image_files(reference_image_root)
+        reference_images, class_strings = parse_image_files(reference_image_root)
 
     reference_prompts: list[Priors] = []
     if reference_prompt_root is not None:
         if not reference_image_root:
-            msg = "reference_image_dir must be provided with reference_prompt_dir"
+            msg = "reference_images must be provided with reference_prompts"
             raise ValueError(msg)
         prior_map = parse_reference_prompt_from_directory(reference_prompt_root)
         # sort the prompts by the reference image filenames
-        reference_prompts = [prior_map[image.image_path.stem] for image in reference_images]
+        reference_prompts = [
+            prior_map[str(class_id) + "_" + image.image_path.stem] for class_id, image in enumerate(reference_images)
+        ]
 
     if reference_points_str is not None:
         reference_prompts.extend(parse_reference_str_prompt(reference_points_str))
@@ -258,12 +272,12 @@ def parse_reference_data(
         for class_id, text in enumerate(split_text):
             text_prior.add(text, class_id=class_id)
         reference_prompts = [Priors(text=text_prior)]
-        num_classes = len(split_text)
+        class_strings = split_text
 
-    return reference_images, reference_prompts, num_classes
+    return reference_images, reference_prompts, class_strings
 
 
-def parse_image_files(root_dir: str) -> list[Image]:
+def parse_image_files(root_dir: str) -> tuple[list[Image], list[str]]:
     """Parse the image files from a directory.
 
     Args:
@@ -271,7 +285,7 @@ def parse_image_files(root_dir: str) -> list[Image]:
 
     Returns:
         A list of images.
-        Number of classes.
+        A list of class strings.
     """
     root_dir = pathlib.Path(root_dir)
     class_dirs = [d for d in root_dir.iterdir() if d.is_dir()]
@@ -282,33 +296,37 @@ def parse_image_files(root_dir: str) -> list[Image]:
         for class_dir in class_dirs:
             for ext in IMAGE_EXTENSIONS:
                 image_files.extend(class_dir.glob(ext))
+        class_names = [class_dir.name for class_dir in class_dirs]
     else:
         # Root directory contains images
         for ext in IMAGE_EXTENSIONS:
             image_files.extend(root_dir.glob(ext))
+        class_names = [""]
 
-    return [Image(image_path=f) for f in image_files], len(class_dirs)
+    return [Image(image_path=f) for f in image_files], class_names
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--reference_image_dir", type=str)
-    parser.add_argument("--target_image_dir", type=str)
-    parser.add_argument("--reference_prompt_dir", type=str)
+    parser.add_argument("--reference_images", type=str)
+    parser.add_argument("--target_images", type=str)
+    parser.add_argument("--reference_prompts", type=str)
     parser.add_argument("--points", type=str)
     parser.add_argument("--reference_text_prompt", type=str)
     parser.add_argument("--output_location", type=str)
+    parser.add_argument("--output_masks_only", action="store_true", default=False)
     parser.add_argument("--batch_size", type=int, default=5)
     args = parser.parse_args()
 
     run_pipeline(
-        pipeline=Matcher(sam_name="MobileSAM"),
-        target_image_dir=args.target_image_dir,
-        reference_image_dir=args.reference_image_dir,
-        reference_prompt_dir=args.reference_prompt_dir,
+        pipeline=Matcher(sam="MobileSAM"),
+        target_images=args.target_images,
+        reference_images=args.reference_images,
+        reference_prompts=args.reference_prompts,
         reference_points_str=args.points,
         reference_text_prompt=args.reference_text_prompt,
         output_location=args.output_location,
+        output_masks_only=args.output_masks_only,
         batch_size=args.batch_size,
     )

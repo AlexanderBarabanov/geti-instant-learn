@@ -50,15 +50,13 @@ class Pipeline(ABC):
         self.resize_masks = ResizeMasks(size=image_size)
 
     @abstractmethod
-    def learn(self, reference_images: list[Image], reference_priors: list[Priors]) -> Results:
+    def learn(self, reference_images: list[Image], reference_priors: list[Priors]) -> None:
         """This method learns the context.
 
         Args:
             reference_images: A list of images ot learn from.
             reference_priors: A list of priors associated with the image.
 
-        Returns:
-            None
         """
 
     @abstractmethod

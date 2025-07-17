@@ -23,7 +23,7 @@ def populate_benchmark_parser(parser: argparse.ArgumentParser) -> None:
     """Populate the argument parser with benchmark arguments."""
     parser.add_argument("--log_level", type=str, default="INFO", help="Log level")
     parser.add_argument(
-        "--sam_name",
+        "--sam",
         type=str,
         default="MobileSAM",
         choices=["all"] + [model.value for model in SAMModelName],
@@ -269,7 +269,7 @@ def parse_experiment_args(args: argparse.Namespace) -> tuple[list[DatasetName], 
     """
     valid_datasets = _parse_enum_list(args.dataset_name, DatasetName, "dataset")
     valid_pipelines = _parse_enum_list(args.pipeline, PipelineName, "pipeline")
-    valid_backbones = _parse_enum_list(args.sam_name, SAMModelName, "SAM model")
+    valid_backbones = _parse_enum_list(args.sam, SAMModelName, "SAM model")
 
     if not valid_datasets:
         msg = f"No valid datasets found from '{args.dataset_name}'. Available: {[d.value for d in DatasetName]}"
@@ -278,7 +278,7 @@ def parse_experiment_args(args: argparse.Namespace) -> tuple[list[DatasetName], 
         msg = f"No valid pipelines found from '{args.pipeline}'. Available: {[p.value for p in PipelineName]}"
         raise ValueError(msg)
     if not valid_backbones:
-        msg = f"No valid SAM models found from '{args.sam_name}'. Available: {[m.value for m in SAMModelName]}"
+        msg = f"No valid SAM models found from '{args.sam}'. Available: {[m.value for m in SAMModelName]}"
         raise ValueError(msg)
 
     return valid_datasets, valid_pipelines, valid_backbones

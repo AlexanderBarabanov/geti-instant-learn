@@ -95,10 +95,10 @@ class SoftmatcherPromptGenerator(BidirectionalPromptGenerator):
 
     def __call__(
         self,
-        reference_features: list[Features] | None = None,
-        target_features_list: list[Features] | None = None,
-        reference_masks: list[Masks] | None = None,
-        target_images: list[Image] | None = None,
+        reference_features: Features,
+        target_features_list: list[Features],
+        reference_masks: list[Masks],
+        target_images: list[Image],
     ) -> tuple[list[Priors], list[Similarities]]:
         """This class generates prompts for the segmenter.
 
@@ -108,7 +108,7 @@ class SoftmatcherPromptGenerator(BidirectionalPromptGenerator):
         This Prompt Generator computes the similarity map internally.
 
         Args:
-            reference_features: List[Features] List of reference features, one per reference image instance
+            reference_features: Features object containing reference features
             target_features_list: List[Features] List of target features, one per target image instance
             reference_masks: List[Masks] List of reference masks, one per reference image instance
             target_images: List[Image] List of target images
@@ -119,21 +119,12 @@ class SoftmatcherPromptGenerator(BidirectionalPromptGenerator):
         """
         priors_per_image: list[Priors] = []
         similarities_per_image: list[Similarities] = []
-        if reference_features is None:
-            reference_features = [Features()]
-        reference_features = reference_features[0]
         flattened_global_features = reference_features.global_features.reshape(
             -1,
             reference_features.global_features.shape[-1],
         )
-        if reference_masks is None:
-            reference_masks = [Masks()]
-        reference_masks = self._merge_masks(reference_masks)
 
-        if target_features_list is None:
-            target_features_list = [Features()]
-        if target_images is None:
-            target_images = [Image()]
+        reference_masks = self._merge_masks(reference_masks)
         for i, target_features in enumerate(target_features_list):
             priors = Priors()
             similarities = Similarities()

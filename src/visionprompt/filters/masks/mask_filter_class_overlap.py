@@ -38,34 +38,37 @@ class ClassOverlapMaskFilter(MaskFilter):
             ):
                 if other_label <= label:
                     continue
+                foreground_point_scores = image_used_points.only_foreground()[label][0][:, 2]
+                other_foreground_point_scores = image_used_points.only_foreground()[other_label][0][:, 2]
 
                 overlapped_label = []
                 overlapped_other_label = []
                 for (im, mask), (jm, other_mask) in product(enumerate(masks), enumerate(other_masks)):
                     mask_iou, intersection = self._calculate_mask_iou(mask, other_mask)
                     if mask_iou > threshold_iou:
-                        if image_used_points.data[label][im][2] > image_used_points.data[other_label][jm][2]:
+                        if foreground_point_scores[im] > other_foreground_point_scores[jm]:
                             overlapped_other_label.append(jm)
                         else:
                             overlapped_label.append(im)
                     elif mask_iou > 0:
                         # refine the slightly overlapping region
                         overlapped_coords = torch.where(intersection)
-                        if image_used_points.data[label][im][2] > image_used_points.data[other_label][jm][2]:
+                        if foreground_point_scores[im] > other_foreground_point_scores[jm]:
                             other_mask[overlapped_coords] = 0.0
                         else:
                             mask[overlapped_coords] = 0.0
 
-                for im in sorted(set(overlapped_label), reverse=True):
-                    # Create new tensor excluding the mask at index im
-                    new_masks = torch.cat([masks[:im], masks[im + 1 :]], dim=0)
-                    image_masks.data[label] = new_masks
-                    used_points_per_image.data[label].pop(im)
+                # Remove masks / points flagged as overlapped in a single operation
+                if overlapped_label:
+                    keep = torch.ones(masks.size(0), dtype=torch.bool, device=masks.device)
+                    keep[list(set(overlapped_label))] = False  # masks to drop
+                    image_masks.data[label] = masks[keep]
+                    image_used_points.data[label][0] = image_used_points.data[label][0][keep]
 
-                for jm in sorted(set(overlapped_other_label), reverse=True):
-                    # Create new tensor excluding the mask at index jm
-                    new_other_masks = torch.cat([other_masks[:jm], other_masks[jm + 1 :]], dim=0)
-                    image_masks.data[other_label] = new_other_masks
-                    used_points_per_image.data[other_label].pop(jm)
+                if overlapped_other_label:
+                    keep_other = torch.ones(other_masks.size(0), dtype=torch.bool, device=other_masks.device)
+                    keep_other[list(set(overlapped_other_label))] = False
+                    image_masks.data[other_label] = other_masks[keep_other]
+                    image_used_points.data[other_label][0] = image_used_points.data[other_label][0][keep_other]
 
         return masks_per_image
