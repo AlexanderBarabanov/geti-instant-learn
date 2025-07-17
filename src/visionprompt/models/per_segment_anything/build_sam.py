@@ -8,7 +8,8 @@ from functools import partial
 
 import torch
 
-from .modeling import ImageEncoderViT, MaskDecoder, PromptEncoder, Sam, TinyViT, TwoWayTransformer
+from .modeling import (ImageEncoderViT, MaskDecoder, PromptEncoder, Sam,
+                       TinyViT, TwoWayTransformer)
 
 
 def build_sam_vit_h(checkpoint=None):
@@ -88,7 +89,7 @@ def build_sam_vit_t(checkpoint=None):
     mobile_sam.eval()
     if checkpoint is not None:
         with open(checkpoint, "rb") as f:
-            state_dict = torch.load(f)
+            state_dict = torch.load(f, weights_only=True)
         mobile_sam.load_state_dict(state_dict)
     return mobile_sam
 
@@ -152,6 +153,6 @@ def _build_sam(
     sam.eval()
     if checkpoint is not None:
         with open(checkpoint, "rb") as f:
-            state_dict = torch.load(f)
+            state_dict = torch.load(f, weights_only=True)
         sam.load_state_dict(state_dict)
     return sam

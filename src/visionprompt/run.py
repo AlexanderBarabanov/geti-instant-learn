@@ -37,7 +37,7 @@ def run_pipeline(
     reference_points_str: str | None = None,
     reference_text_prompt: str | None = None,
     output_location: str | None = None,
-    chunk_size: int = 10,
+    batch_size: int = 5,
 ) -> None:
     """Loads reference data (images and prompts) and target images and runs the pipeline.
 
@@ -74,7 +74,7 @@ def run_pipeline(
         reference_text_prompt: The string containing the text prompt.
         output_location: Custom location for the output data. If not provided, the output will be saved in the
             root of the target image directory.
-        chunk_size: The number of images to process in each chunk.
+        batch_size: The number of images to process in each batch.
     """
     reference_image_directory = Path(reference_image_dir).expanduser() if reference_image_dir else None
     reference_prompt_directory = Path(reference_prompt_dir).expanduser() if reference_prompt_dir else None
@@ -110,8 +110,8 @@ def run_pipeline(
     )
     with progress:
         task = progress.add_task("[cyan]Inference", total=len(target_images))
-        for i in range(0, len(target_images), chunk_size):
-            chunk = target_images[i : i + chunk_size]
+        for i in range(0, len(target_images), batch_size):
+            chunk = target_images[i : i + batch_size]
             results = pipeline.infer(chunk)
             ExportMaskVisualization(str(output_location / "target"))(
                 images=chunk,
@@ -299,6 +299,7 @@ if __name__ == "__main__":
     parser.add_argument("--points", type=str)
     parser.add_argument("--reference_text_prompt", type=str)
     parser.add_argument("--output_location", type=str)
+    parser.add_argument("--batch_size", type=int, default=5)
     args = parser.parse_args()
 
     run_pipeline(
@@ -309,4 +310,5 @@ if __name__ == "__main__":
         reference_points_str=args.points,
         reference_text_prompt=args.reference_text_prompt,
         output_location=args.output_location,
+        batch_size=args.batch_size,
     )

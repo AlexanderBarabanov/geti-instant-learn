@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import colorsys
+import hashlib
 import logging
 import random
 import sys
@@ -53,8 +54,14 @@ def precision_to_torch_dtype(precision: str) -> torch.dtype:
     return {"fp32": torch.float32, "fp16": torch.float16, "bf16": torch.bfloat16}[precision.lower()]
 
 
-def download_file(url: str, target_path: Path) -> None:
-    """Download a file from a URL to a target path."""
+def download_file(url: str, target_path: Path, sha_sum: str | None = None) -> None:
+    """Download a file from a URL to a target path.
+
+    Args:
+        url: URL to download the file from
+        target_path: Path to save the file to
+        sha_sum: SHA-256 checksum of the file
+    """
     target_dir = target_path.parent
     target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -77,7 +84,7 @@ def download_file(url: str, target_path: Path) -> None:
         with requests.get(url, stream=True, timeout=10) as r:
             r.raise_for_status()
             total_size = int(r.headers.get("content-length", 0))
-            print(f"Downloading {target_path.name} ({total_size / (1024 * 1024):.2f} MB) from {url}...")
+            logger.info(f"Downloading {target_path.name} ({total_size / (1024 * 1024):.2f} MB) from {url}...")
 
             with progress:
                 task_id = progress.add_task("download", total=total_size, filename=target_path.name)
@@ -90,16 +97,53 @@ def download_file(url: str, target_path: Path) -> None:
             if not disable_progress and total_size > 0:
                 progress.update(task_id, completed=total_size)
 
-        print(f"Downloaded model weights successfully to {target_path}")
-    except Exception as e:
-        # Catch other potential errors (e.g., file writing issues)
-        print(f"\nAn unexpected error occurred during download: {e}")
+        if sha_sum:
+            check_file_hash(target_path, sha_sum)
+
+        logger.info(f"Downloaded model weights successfully to {target_path}")
+    except Exception:
+        logger.exception("An unexpected error occurred during download.")
         if target_path.exists():
             try:
                 target_path.unlink()
-            except OSError as unlink_e:
-                print(f"Error removing file {target_path} after error: {unlink_e}")
+            except OSError:
+                logger.exception(f"Error removing file {target_path} after error")
         raise
+
+
+def check_file_hash(file_path: Path, expected_hash: str) -> bool:
+    """Check if the file hash matches the expected hash.
+
+    Args:
+        file_path: Path to the file to check the hash of
+        expected_hash: Expected SHA-256 hash of the file
+
+    Returns:
+        True if the file hash matches the expected hash, False otherwise
+    """
+    file_hash = hashlib.sha256(file_path.read_bytes()).hexdigest()
+    if file_hash != expected_hash:
+        msg = f"File {file_path} has incorrect hash. Expected {expected_hash}, got {file_hash}"
+        raise ValueError(msg)
+
+
+def compute_file_hash(file_path: Path) -> str:
+    """Compute the SHA-256 hash of a file.
+
+    Args:
+        file_path: Path to the file to compute the hash of
+
+    Returns:
+        SHA-256 hash of the file
+    """
+    if not file_path.exists():
+        msg = f"Filepath {file_path} does not exist."
+        raise ValueError(msg)
+    hash_obj = hashlib.sha256()
+    with file_path.open("rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):  # Read in 64 KB chunks
+            hash_obj.update(chunk)
+    return hash_obj.hexdigest()
 
 
 def get_colors(n: int) -> np.ndarray:

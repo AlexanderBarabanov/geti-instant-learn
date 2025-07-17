@@ -1,7 +1,7 @@
 """This is the main file for the web UI.
 
 It is a Flask application that allows you to run several Visual Prompting pipelines and see the results.
-The web UI is served at http://localhost:5050
+The web UI is served at http://127.0.0.1:5050
 
 The web UI can be started by running:
 python -m web_ui.app
@@ -29,7 +29,7 @@ from web_ui.helpers import (
     stream_inference,
 )
 
-CHUNK_SIZE = 5
+BATCH_SIZE = 5
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -162,7 +162,7 @@ def run_processing() -> Response:
                     target_indices=target_indices,
                     class_name_filter=class_name_filter,
                     prepared_reference_data=prepared_reference_data,
-                    chunk_size=CHUNK_SIZE,
+                    batch_size=BATCH_SIZE,
                 )
             ),
             mimetype="application/json",
@@ -180,4 +180,4 @@ def run_processing() -> Response:
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", debug=True, port=5050)  # noqa: S104,S201
+    app.run(host="127.0.0.1", port=5050)

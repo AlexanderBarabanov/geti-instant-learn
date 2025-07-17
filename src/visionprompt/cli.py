@@ -56,7 +56,7 @@ class VisionPromptCLI:
             help="Text prompt for grounding dino. If provided, pipeline is set to GroundingDinoSAM.",
         )
         parser.add_argument("--output_location", type=str, default=None, help="Directory to save output.")
-        parser.add_argument("--chunk_size", type=int, default=5, help="Chunk size for processing target images.")
+        parser.add_argument("--batch_size", type=int, default=5, help="Batch size for processing target images.")
 
     @staticmethod
     def add_benchmark_arguments(parser: ArgumentParser) -> None:
@@ -135,7 +135,7 @@ class VisionPromptCLI:
                     reference_points_str=config.run.points,
                     reference_text_prompt=config.run.reference_text_prompt,
                     output_location=config.run.output_location,
-                    chunk_size=config.run.chunk_size,
+                    batch_size=config.run.batch_size,
                 )
             case "benchmark":
                 perform_benchmark_experiment(config.benchmark)

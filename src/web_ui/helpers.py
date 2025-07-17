@@ -430,7 +430,7 @@ def stream_inference(
     target_indices: list[int],
     class_name_filter: str,
     prepared_reference_data: list[dict[str, str]],
-    chunk_size: int = 10,
+    batch_size: int = 5,
 ) -> Generator[str, None, None]:
     """Generator function to process targets in chunks and yield results as JSON strings."""
     total_targets = len(target_indices)
@@ -441,8 +441,8 @@ def stream_inference(
     }
     yield json.dumps(initial_message) + "\n"
 
-    for chunk_start_idx in range(0, total_targets, chunk_size):
-        chunk_end_idx = min(chunk_start_idx + chunk_size, total_targets)
+    for chunk_start_idx in range(0, total_targets, batch_size):
+        chunk_end_idx = min(chunk_start_idx + batch_size, total_targets)
         current_chunk_indices = target_indices[chunk_start_idx:chunk_end_idx]
 
         try:

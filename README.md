@@ -366,7 +366,6 @@ The UI allows you to select different pipelines, datasets, and images to inspect
 This project builds upon and utilizes code from several excellent open-source repositories. We thank the authors for their contributions:
 
 - [PerSAM](https://github.com/ZrrSkywalker/Personalize-SAM)
-- [P2SAM](https://github.com/Zch0414/P2SAM)
 - [Matcher](https://github.com/aim-uofa/Matcher)
 - [DinoV2](https://github.com/facebookresearch/dinov2)
 - [SAM](https://github.com/facebookresearch/segment-anything)

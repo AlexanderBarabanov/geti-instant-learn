@@ -90,7 +90,11 @@ def load_sam_model(
 
 
 def check_model_weights(model_name: SAMModelName) -> None:
-    """Check if model weights exist locally, download if necessary."""
+    """Check if model weights exist locally, download if necessary.
+
+    Args:
+        model_name: The name of the model.
+    """
     if model_name not in MODEL_MAP:
         msg = f"Model '{model_name.value}' not found in MODEL_MAP for weight checking."
         raise ValueError(msg)
@@ -98,6 +102,7 @@ def check_model_weights(model_name: SAMModelName) -> None:
     model_info = MODEL_MAP[model_name]
     local_filename = model_info["local_filename"]
     download_url = model_info["download_url"]
+    sha_sum = model_info["sha_sum"]
 
     if not local_filename or not download_url:
         msg = f"Missing 'local_filename' or 'download_url' for {model_name.value} in MODEL_MAP."
@@ -107,4 +112,4 @@ def check_model_weights(model_name: SAMModelName) -> None:
 
     if not target_path.exists():
         logger.info(f"Model weights for {model_name.value} not found at {target_path}, downloading...")
-        download_file(download_url, target_path)
+        download_file(download_url, target_path, sha_sum)
