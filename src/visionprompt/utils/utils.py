@@ -168,7 +168,7 @@ def prepare_target_guided_prompting(
 
     Produces attention similarity and target embedding for the decoder.
     This technique is used in Per-Segment-Anything.
-    It canimprove the performance of the decoder by providing additional information.
+    It can improve the performance of the decoder by providing additional information.
     Note that not all backbones support this technique.
 
     Args:

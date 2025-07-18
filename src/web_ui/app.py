@@ -47,7 +47,7 @@ current_pipeline_name = initial_default_args.pipeline
 @app.route("/")
 def index() -> str:
     """Serves the main HTML page."""
-    ui_pipelines = [p.value for p in PipelineName]
+    ui_pipelines = [p.value for p in PipelineName if p != PipelineName.GROUNDING_DINO_SAM]
     ui_datasets = [d.value for d in DatasetName]
     return render_template(
         "index.html",
@@ -55,7 +55,7 @@ def index() -> str:
         pipelines=ui_pipelines,
         datasets=ui_datasets,
         compile_models=initial_default_args.compile_models,
-        default_sam_name=initial_default_args.sam_name,
+        default_sam_name=initial_default_args.sam,
         precision=initial_default_args.precision,
     )
 

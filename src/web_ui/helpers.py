@@ -187,10 +187,10 @@ def parse_request_and_check_reload(
         requested_values["pipeline"] = new_pipeline_name
 
     # SAM Model
-    if (new_sam_name := request_data.get("sam_name", new_args.sam_name)) != new_args.sam_name:
+    if (new_sam_name := request_data.get("sam", new_args.sam)) != new_args.sam:
         reload_needed = True
-        requested_values["sam_name"] = new_sam_name
-        new_args.sam_name = new_sam_name
+        requested_values["sam"] = new_sam_name
+        new_args.sam = new_sam_name
 
     # Precision
     new_precision_str = request_data.get("precision", new_args.precision)
@@ -243,20 +243,22 @@ def reload_pipeline_if_needed(
     if pipeline_instance is None:
         reload_needed = True
         logger.info("Pipeline not loaded yet, triggering initial load.")
-        if "sam_name" not in requested_values:
-            requested_values["sam_name"] = current_args.sam_name
+        if "sam" not in requested_values:
+            requested_values["sam"] = current_args.sam
         if "pipeline" not in requested_values:
             requested_values["pipeline"] = current_args.pipeline
 
     if reload_needed:
         logger.info(f"Reloading pipeline due to changes in: {list(requested_values.keys())}")
         try:
+            # Use the current pipeline name if no pipeline change was requested
+            target_pipeline_name = requested_values.get("pipeline", pipeline_name)
             pipeline_instance = load_pipeline(
-                sam_name=SAMModelName(current_args.sam_name),
-                pipeline_name=PipelineName(requested_values.get("pipeline", current_args.pipeline)),
+                sam=SAMModelName(current_args.sam),
+                pipeline_name=PipelineName(target_pipeline_name),
                 args=current_args,
             )
-            pipeline_name = requested_values.get("pipeline", current_args.pipeline)
+            pipeline_name = target_pipeline_name
             logger.info("Pipeline reloaded successfully.")
         except Exception as e:
             msg = f"Error reloading pipeline: {e}"

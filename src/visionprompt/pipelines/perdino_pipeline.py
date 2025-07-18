@@ -56,7 +56,7 @@ class PerDino(Pipeline):
 
     def __init__(
         self,
-        sam: SAMModelName = SAMModelName.SAM,
+        sam: SAMModelName = SAMModelName.SAM_HQ_TINY,
         num_foreground_points: int = 40,
         num_background_points: int = 2,
         apply_mask_refinement: bool = True,

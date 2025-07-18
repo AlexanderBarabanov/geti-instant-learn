@@ -25,7 +25,7 @@ def populate_benchmark_parser(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--sam",
         type=str,
-        default="MobileSAM",
+        default="SAM-HQ-tiny",
         choices=["all"] + [model.value for model in SAMModelName],
         help=HELP_SAM_NAME,
     )

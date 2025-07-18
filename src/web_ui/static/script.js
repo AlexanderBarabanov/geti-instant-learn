@@ -44,7 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const compileModelsCheckbox = document.getElementById("compileModelsCheckbox");
   const precisionSelect = document.getElementById("precisionSelect");
 
-  async function fetchAndPopulateClasses (selectedDataset) {
+  async function fetchAndPopulateClasses(selectedDataset) {
     classNameSelect.innerHTML =
       '<option value="" disabled selected>Loading...</option>';
     numTargetImagesControl.classList.remove("hidden");
@@ -147,7 +147,7 @@ document.addEventListener("DOMContentLoaded", () => {
     console.error("Mask similarity threshold slider or value span not found!");
   }
 
-  async function updateTargetImageSlider (selectedDataset, selectedClassName) {
+  async function updateTargetImageSlider(selectedDataset, selectedClassName) {
     numTargetImagesControl.classList.remove("hidden");
     numTargetImagesValueSpan.textContent = "Loading...";
     maxTargetImagesValueSpan.textContent = "";
@@ -265,7 +265,7 @@ document.addEventListener("DOMContentLoaded", () => {
           n_shot: nShot,
           num_target_images: numTargetImages,
           num_background_points: numBackgroundPoints,
-          sam_name: samName,
+          sam: samName,
           similarity_threshold: similarityThreshold,
           mask_similarity_threshold: maskSimilarityThreshold,
           skip_points_in_existing_masks: skipPoints,
@@ -391,7 +391,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  function displayReferenceData (referenceData) {
+  function displayReferenceData(referenceData) {
     if (!referenceContainer) return;
     referenceContainer.innerHTML = ''; // Clear previous content
 
@@ -437,7 +437,7 @@ document.addEventListener("DOMContentLoaded", () => {
     referenceContainer.appendChild(gridContainer);
   }
 
-  function displayResults (targetResults) {
+  function displayResults(targetResults) {
     targetResults.forEach((result, indexOffset) => {
       // Calculate a unique index based on how many results are already displayed
       const existingResultsCount = resultsContainer.children.length;
@@ -930,7 +930,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  function preloadMaskImages (canvasId) {
+  function preloadMaskImages(canvasId) {
     const data = canvasDataStore[canvasId];
     if (!data || !data.masks) return;
 
@@ -951,7 +951,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  function preloadGroundTruthMaskImage (canvasId) {
+  function preloadGroundTruthMaskImage(canvasId) {
     const data = canvasDataStore[canvasId];
     if (!data || !data.ground_truth_mask_uri) return;
 
@@ -971,7 +971,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function redrawCanvas (canvasId) {
+  function redrawCanvas(canvasId) {
     const data = canvasDataStore[canvasId];
     if (!data || !data.image) return;
 
@@ -1138,7 +1138,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function handleCanvasClick (event) {
+  function handleCanvasClick(event) {
     const canvas = event.target;
     const canvasId = canvas.id;
     const data = canvasDataStore[canvasId];

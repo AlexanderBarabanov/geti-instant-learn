@@ -59,7 +59,7 @@ class SamDecoder(Segmenter):
         Args:
             sam_predictor: SamPredictor the SAM predictor
             apply_mask_refinement: bool whether to apply mask refinement
-            target_guided_attention: bool whether to use target guided attention, TODO: not implemented yet
+            target_guided_attention: bool whether to use target guided attention
             mask_similarity_threshold: float the threshold for the average similarity of a mask
             skip_points_in_existing_masks: bool whether to skip points that fall within already generated masks
               for the same class
@@ -247,11 +247,11 @@ class SamDecoder(Segmenter):
                         dtype=np.float32,
                     )
 
-                    masks, mask_scores, low_res_logits, *_ = self.predictor.predict(
+                    masks, mask_scores, low_res_logits, *_ = self._predict(
                         point_coords=point_coords,
                         point_labels=point_labels,
                         multimask_output=False,
-                        # TODO(Daankrol): target guided attention and target-semantic prompting  # noqa: TD003
+                        sim_map=similarities.data[class_id] if similarities is not None else None,
                     )
 
                     if not self.apply_mask_refinement:
@@ -280,6 +280,52 @@ class SamDecoder(Segmenter):
                 all_used_points.add(torch.tensor(np.array(points_used)), class_id)
 
         return all_masks, all_used_points
+
+    def _predict(
+        self,
+        point_coords: np.ndarray,
+        point_labels: np.ndarray,
+        multimask_output: bool = False,
+        sim_map: torch.Tensor | None = None,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Predict masks from a list of points with an optional similarity map.
+
+        Args:
+            point_coords: The coordinates of the points to predict masks from.
+            point_labels: The labels of the points to predict masks from.
+            multimask_output: Whether to output multiple masks.
+            sim_map: The similarity map to use for the prediction.
+
+        Returns:
+            A tuple of masks, scores, and logits.
+        """
+        # Not all predictors support target-guided-attention.
+        supports_attention = "attn_sim" in self.predictor.predict.__code__.co_varnames
+
+        if not supports_attention or not self.target_guided_attention:
+            return self.predictor.predict(
+                point_coords=point_coords,
+                point_labels=point_labels,
+                multimask_output=multimask_output,
+            )
+
+        sigmoid_sim_map = None
+        if sim_map is not None:
+            sim_map = sim_map.sum(dim=0, keepdim=True)
+            sim_map = sim_map.unsqueeze(0)
+            sim_map = F.interpolate(
+                sim_map,
+                size=(64, 64),
+                mode="nearest",
+            ).squeeze(0)
+            sigmoid_sim_map = F.sigmoid(sim_map).flatten().unsqueeze(0)
+
+        return self.predictor.predict(
+            point_coords=point_coords,
+            point_labels=point_labels,
+            multimask_output=multimask_output,
+            attn_sim=sigmoid_sim_map,
+        )
 
     def _filter_mask(
         self,
@@ -355,6 +401,10 @@ class SamDecoder(Segmenter):
 
         # Cascaded Post-refinement-2
         y, x = np.nonzero(masks[best_idx])
+        # it can happen that the mask is empty, in that case we return the original mask
+        if len(x) == 0 or len(y) == 0:
+            return masks[best_idx], masks, scores[best_idx]
+
         x_min = x.min()
         x_max = x.max()
         y_min = y.min()

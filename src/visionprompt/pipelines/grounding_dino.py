@@ -19,8 +19,8 @@ class GroundingDinoSAM(Pipeline):
 
     def __init__(
         self,
-        sam: SAMModelName,
-        apply_mask_refinement: bool,
+        sam: SAMModelName = SAMModelName.SAM_HQ_TINY,
+        apply_mask_refinement: bool = True,
         precision: str = "bf16",
         compile_models: bool = False,
         verbose: bool = False,
