@@ -160,7 +160,7 @@ class ExportMaskVisualization(Visualization):
                 legend_bg,
                 (color_x, color_y),
                 (color_x + color_box_size, color_y + color_box_size),
-                color,
+                tuple(int(c) for c in color),
                 -1,
             )
             cv2.rectangle(

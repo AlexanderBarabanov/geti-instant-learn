@@ -3,7 +3,8 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-from visionprompt.filters.masks import ClassOverlapMaskFilter, MaskFilter
+from visionprompt.filters.masks import BoxAwareMaskFilter, ClassOverlapMaskFilter, MaskFilter
+from visionprompt.filters.priors import MultiInstancePriorFilter
 from visionprompt.models.models import load_sam_model
 from visionprompt.pipelines.pipeline_base import Pipeline
 from visionprompt.processes.mask_processors import MaskProcessor, MasksToPolygons
@@ -24,8 +25,9 @@ class GroundingDinoSAM(Pipeline):
         precision: str = "bf16",
         compile_models: bool = False,
         verbose: bool = False,
-        box_threshold: float = 0.15,
-        text_threshold: float = 0.15,
+        backbone_size: GroundingDinoBoxGenerator.Size = GroundingDinoBoxGenerator.Size.TINY,
+        box_threshold: float = 0.4,
+        text_threshold: float = 0.3,
         device: str = "cuda",
         image_size: int | tuple[int, int] | None = None,
     ) -> None:
@@ -37,6 +39,7 @@ class GroundingDinoSAM(Pipeline):
             precision: The precision to use for the model.
             compile_models: Whether to compile the models.
             verbose: Whether to print verbose output of the model optimization process.
+            backbone_size: The size of the backbone.
             box_threshold: The box threshold.
             text_threshold: The text threshold.
             device: The device to use.
@@ -50,18 +53,19 @@ class GroundingDinoSAM(Pipeline):
             device=device,
             box_threshold=box_threshold,
             text_threshold=text_threshold,
-            size="tiny",
+            size=backbone_size,
             precision=precision,
             compile_models=compile_models,
             verbose=verbose,
             template=GroundingDinoBoxGenerator.Template.specific_object,
         )
-
         self.segmenter: Segmenter = SamDecoder(
             sam_predictor=self.sam_predictor,
             apply_mask_refinement=apply_mask_refinement,
             skip_points_in_existing_masks=False,  # not relevant for boxes
         )
+        self.box_aware_mask_filter: MaskFilter = BoxAwareMaskFilter()
+        self.multi_instance_prior_filter: MultiInstancePriorFilter = MultiInstancePriorFilter()
         self.mask_processor: MaskProcessor = MasksToPolygons()
         self.class_overlap_mask_filter: MaskFilter = ClassOverlapMaskFilter()
         self.text_priors: Text | None = None
@@ -85,13 +89,14 @@ class GroundingDinoSAM(Pipeline):
         # Start running the pipeline
         target_images = self.resize_images(target_images)
         priors = self.prompt_generator(target_images, [self.text_priors] * len(target_images))
-        masks, used_points = self.segmenter(target_images, priors)
+        priors = self.multi_instance_prior_filter(priors)
+        masks, _, used_boxes = self.segmenter(target_images, priors)
         annotations = self.mask_processor(masks)
 
         # write output
         results = Results()
         results.priors = priors
-        results.used_points = used_points
+        results.used_boxes = used_boxes
         results.masks = masks
         results.annotations = annotations
         return results

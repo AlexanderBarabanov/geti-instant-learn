@@ -27,7 +27,7 @@ class GroundingDinoBoxGenerator(PromptGenerator):
     class Template:
         """Template for object prompts."""
 
-        specific_object = "a {prior}"
+        specific_object = "{prior}"
         all_objects = "an object"
 
     def __init__(
@@ -101,12 +101,12 @@ class GroundingDinoBoxGenerator(PromptGenerator):
         text_labels = []
         for text_prior in text_priors:
             text = [self.template.format(prior=text_prior.get(cid)) for cid in text_prior.class_ids()]
-            text_labels.append(text)
+            text_labels.append(". ".join(text) + ".")
 
         # Run the dino model
         inputs = self.processor(images=pil_images, text=text_labels, return_tensors="pt").to(self.device)
         inputs["pixel_values"] = inputs["pixel_values"].to(self.model.dtype)
-        with torch.autocast(device_type=self.device, dtype=self.model.dtype):
+        with torch.no_grad(), torch.autocast(device_type=self.device, dtype=self.model.dtype):
             outputs = self.model(**inputs)
         results = self.processor.post_process_grounded_object_detection(
             outputs,

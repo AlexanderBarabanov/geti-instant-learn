@@ -79,7 +79,7 @@ class SamDecoder(Segmenter):
         images: list[Image],
         priors: list[Priors] | None = None,
         similarities: list[Similarities] | None = None,
-    ) -> tuple[list[Masks], list[Points] | list[Boxes]]:
+    ) -> tuple[list[Masks], list[Points], list[Boxes]]:
         """Create masks from priors using SAM.
 
         Args:
@@ -89,12 +89,14 @@ class SamDecoder(Segmenter):
 
         Returns:
             A tuple of a list of masks, one for each class in each target image,
-            and a list of points, one for each class in each target image.
+            a list of points, one for each class in each target image,
+            and a list of boxes, one for each class in each target image.
         """
         if similarities is None:
             similarities = []
         masks_per_image: list[Masks] = []
         points_per_image: list[Points] = []
+        boxes_per_image: list[Boxes] = []
 
         for i, (image, priors_per_image, similarities_per_image) in enumerate(
             iterable=zip_longest(images, priors, similarities, fillvalue=None),
@@ -110,19 +112,20 @@ class SamDecoder(Segmenter):
                 )
                 points_per_image.append(points_used)
             elif not priors_per_image.boxes.is_empty:
-                masks = self._predict_by_individual_box(
+                masks, boxes_used = self._predict_by_individual_box(
                     image,
                     priors_per_image.boxes,
                     similarities_per_image,
                     image_id=self.image_counter + i,
                 )
+                boxes_per_image.append(boxes_used)
             else:
                 masks = Masks()
             masks_per_image.append(masks)
 
         self.image_counter += len(images)
 
-        return masks_per_image, points_per_image
+        return masks_per_image, points_per_image, boxes_per_image
 
     def _predict_by_individual_box(
         self,
@@ -130,7 +133,7 @@ class SamDecoder(Segmenter):
         boxes: Boxes,
         similarities: list[Similarities] | None = None,
         image_id: int = 0,
-    ) -> Masks:
+    ) -> tuple[Masks, Boxes]:
         """Predict masks from a list boxes.
 
         Args:
@@ -143,6 +146,7 @@ class SamDecoder(Segmenter):
             A tuple of generated masks and actual points used.
         """
         all_masks = Masks()
+        all_used_boxes = Boxes()
         self.predictor.set_image(image.data)
         for class_id, boxes_per_map in boxes.data.items():
             # iterate over each point list of each similarity map
@@ -151,6 +155,7 @@ class SamDecoder(Segmenter):
                     # no boxes for this class
                     continue
 
+                used_boxes_for_this_tensor = []
                 # predict masks
                 for box in all_boxes:
                     x1, y1, x2, y2, _, _ = box
@@ -172,8 +177,12 @@ class SamDecoder(Segmenter):
                         continue
 
                     all_masks.add(final_mask, class_id)
+                    used_boxes_for_this_tensor.append(box)
 
-        return all_masks
+                if used_boxes_for_this_tensor:
+                    all_used_boxes.add(torch.stack(used_boxes_for_this_tensor), class_id)
+
+        return all_masks, all_used_boxes
 
     def _predict_by_individual_point(  # noqa: C901
         self,

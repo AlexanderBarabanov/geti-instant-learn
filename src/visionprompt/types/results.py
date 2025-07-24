@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from visionprompt.types.annotations import Annotations
+from visionprompt.types.boxes import Boxes
 from visionprompt.types.masks import Masks
 from visionprompt.types.points import Points
 from visionprompt.types.priors import Priors
@@ -16,6 +17,7 @@ class Results:
         self._priors: list[Priors] | None = None
         self._annotations: list[Annotations] | None = None
         self._used_points: list[Points] | None = None
+        self._used_boxes: list[Boxes] | None = None
         self._similarities: list[Similarities] | None = None
         self._duration: float | None = None
 
@@ -48,6 +50,16 @@ class Results:
     def used_points(self, used_points: list[Points]) -> None:
         """Sets the used points."""
         self._used_points = used_points
+
+    @property
+    def used_boxes(self) -> list[Boxes]:
+        """Returns used boxes produced by the latest run of pipeline."""
+        return self._used_boxes if self._used_boxes is not None else []
+
+    @used_boxes.setter
+    def used_boxes(self, used_boxes: list[Boxes]) -> None:
+        """Sets the used boxes."""
+        self._used_boxes = used_boxes
 
     @property
     def annotations(self) -> list[Annotations]:

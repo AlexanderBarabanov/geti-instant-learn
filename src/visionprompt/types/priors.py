@@ -38,6 +38,11 @@ class Priors(Data):
         """Get the boxes."""
         return self._boxes
 
+    @boxes.setter
+    def boxes(self, boxes: Boxes) -> None:
+        """Set the boxes."""
+        self._boxes = boxes
+
     @points.setter
     def points(self, points: Points) -> None:
         """Set the points."""

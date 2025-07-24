@@ -92,6 +92,7 @@ def run_pipeline(
     target_images, _ = parse_image_files(target_images)
 
     pipeline.learn(reference_images, reference_priors)
+
     if reference_images:
         for image, prior in zip(reference_images, reference_priors, strict=False):
             ExportMaskVisualization(str(output_location / "reference" / image.image_path.parent.name))(
@@ -129,7 +130,7 @@ def run_pipeline(
                     masks=results.masks,
                     names=[image.image_path.name for image in chunk],
                     points=results.used_points,
-                    boxes=[p.boxes for p in results.priors],
+                    boxes=results.used_boxes,
                     class_names=class_strings,
                     show_legend=True,
                 )
@@ -267,8 +268,8 @@ def parse_reference_data(
 
     if reference_text_prompt is not None:
         text_prior = Text()
-        # split text based on commas and add to text_prior
-        split_text = reference_text_prompt.split(",")
+        # split text based on dots and commas and add to text_prior
+        split_text = [t.strip() for t in re.split(r"[.,]", reference_text_prompt) if t.strip()]
         for class_id, text in enumerate(split_text):
             text_prior.add(text, class_id=class_id)
         reference_prompts = [Priors(text=text_prior)]
