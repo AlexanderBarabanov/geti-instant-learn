@@ -1,0 +1,31 @@
+# Copyright (C) 2022-2025 Intel Corporation
+# LIMITED EDGE SOFTWARE DISTRIBUTION LICENSE
+
+import logging
+
+from fastapi import Response, status
+
+from routers import pipelines_router
+
+logger = logging.getLogger(__name__)
+
+
+@pipelines_router.post(
+    path="",
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        status.HTTP_201_CREATED: {
+            "description": "Successfully created a new pipeline.",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "description": "Unexpected error occurred while creating a new pipeline.",
+        },
+    },
+)
+def create_pipeline() -> Response:
+    """
+    Create a new pipeline configuration.
+    """
+    logger.debug("Received POST pipelines request.")
+
+    return Response(status_code=status.HTTP_201_CREATED)
