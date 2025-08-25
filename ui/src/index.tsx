@@ -1,6 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './app.tsx';
+import { Providers } from './providers.tsx';
+import './index.css';
 
 const rootEl = document.getElementById('root');
 
@@ -9,7 +11,9 @@ if (rootEl) {
 
   root.render(
     <React.StrictMode>
-      <App />
+      <Providers>
+        <App />
+      </Providers>
     </React.StrictMode>,
   );
 }

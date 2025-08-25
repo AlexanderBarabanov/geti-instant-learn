@@ -1,11 +1,13 @@
-import { Button } from '@geti/ui';
+import { Button, View } from '@geti/ui';
+import { Header } from './components/header.component';
 
 export const App = () => {
   return (
-    <div>
+    <View>
+      <Header />
       <h1>Rsbuild with React</h1>
       <p>Start building amazing things with Rsbuild.</p>
       <Button>Test</Button>
-    </div>
+    </View>
   );
 };
