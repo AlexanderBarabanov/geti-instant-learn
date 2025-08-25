@@ -23,3 +23,4 @@ node_modules/
 flash_4_configs.p
 dist/
 build/
+*.build

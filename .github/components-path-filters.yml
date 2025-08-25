@@ -1,0 +1,11 @@
+# Platform services
+lib:
+  - lib/**
+  - .github/workflows/**
+backend:
+  - backend/**
+  - lib/**
+  - .github/workflows/**
+ui:
+  - ui/**
+  - .github/workflows/**
