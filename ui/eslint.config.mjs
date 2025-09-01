@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2025 Intel Corporation
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import js from '@eslint/js';
 import { globalIgnores } from 'eslint/config';
 import reactHooks from 'eslint-plugin-react-hooks';

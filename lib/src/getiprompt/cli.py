@@ -1,8 +1,8 @@
-"""This module contains the VisionPrompt CLI."""
-
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
-# ruff: noqa: E402
+
+"""This module contains the VisionPrompt CLI."""
+
 import inspect
 import warnings
 
