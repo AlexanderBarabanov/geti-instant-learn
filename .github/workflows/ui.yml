@@ -83,20 +83,9 @@ jobs:
           path: "ui/dist.tar.gz"
 
   lint:
-    name: Eslint checks
-    runs-on: innersource.prod.amr.dind
-    permissions:
-      contents: read # to checkout code
-    needs: generate-openapi-spec
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          persist-credentials: false
-
-      - name: placeholder
-        run: |
-          echo "A placeholder for ci steps, version: ${{ inputs.build_version }}"
+    uses: ./.github/workflows/lint.yml
+    with:
+      build_version: ${{ inputs.build_version }}
 
   unit-tests:
     name: Unit tests
