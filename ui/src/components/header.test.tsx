@@ -1,3 +1,8 @@
+/**
+ * Copyright (C) 2025 Intel Corporation
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { render } from '@geti-prompt/test-utils';
 import { Header } from './header.component';
 import { screen } from '@testing-library/react';

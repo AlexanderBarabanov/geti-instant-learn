@@ -1,5 +1,7 @@
-// Copyright (C) 2022-2025 Intel Corporation
-// LIMITED EDGE SOFTWARE DISTRIBUTION LICENSE
+/**
+ * Copyright (C) 2025 Intel Corporation
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { FlatCompat } from '@eslint/eslintrc';
 import js from '@eslint/js';
 import sharedEslintConfig from '@geti/config/lint';
+import headers from 'eslint-plugin-headers';
 
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
@@ -23,6 +26,9 @@ export default [
   },
   ...sharedEslintConfig,
   {
+    plugins: {
+      headers,
+    },
     rules: {
       'no-restricted-imports': [
         'error',
@@ -43,7 +49,17 @@ export default [
           ],
         },
       ],
-      'header/header': 'off',
+      'headers/header-format': [
+        'error',
+        {
+          source: 'string',
+          content:
+            'Copyright (C) {year} Intel Corporation\nSPDX-License-Identifier: Apache-2.0',
+          variables: {
+            year: '2025',
+          },
+        },
+      ],
     },
   },
   ...compat.extends('plugin:playwright/playwright-test').map((config) => ({
