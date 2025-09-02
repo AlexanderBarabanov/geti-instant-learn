@@ -5,6 +5,7 @@ import argparse
 from enum import Enum
 from typing import TypeVar
 
+from getiprompt.processes.prompt_generators import GroundingModel
 from getiprompt.utils.constants import DatasetName, PipelineName, SAMModelName
 
 # Generate help strings with choices
@@ -199,6 +200,25 @@ def populate_benchmark_parser(parser: argparse.ArgumentParser) -> None:
         type=str,
         default="cuda",
         help="The device to use for the models",
+    )
+    parser.add_argument(
+        "--grounding_model",
+        type=str,
+        default=GroundingModel.LLMDET_TINY.value,
+        choices=[g.value for g in GroundingModel],
+        help="The grounding model to use",
+    )
+    parser.add_argument(
+        "--box_threshold",
+        type=float,
+        default=0.4,
+        help="The box threshold for the grounding model",
+    )
+    parser.add_argument(
+        "--text_threshold",
+        type=float,
+        default=0.3,
+        help="The text threshold for the grounding model",
     )
 
 

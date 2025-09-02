@@ -19,7 +19,7 @@ from transformers import AutoModel
 from getiprompt.models.per_segment_anything import SamPredictor
 from getiprompt.models.per_segment_anything.modeling.tiny_vit_sam import Attention, TinyViT
 
-logger = getLogger("Vision Prompt")
+logger = getLogger("Geti Prompt")
 
 
 def optimize_model(

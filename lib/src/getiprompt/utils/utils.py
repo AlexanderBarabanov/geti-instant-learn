@@ -22,7 +22,7 @@ from sklearn.manifold import TSNE
 from torch.nn import functional as F
 from torchvision import transforms
 
-logger = getLogger("Vision Prompt")
+logger = getLogger("Geti Prompt")
 
 
 def setup_logger(dir_path: Path | None = None, log_level: str = "INFO") -> None:

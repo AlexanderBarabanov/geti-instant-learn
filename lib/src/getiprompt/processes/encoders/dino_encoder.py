@@ -15,7 +15,7 @@ from getiprompt.processes.encoders.encoder_base import Encoder
 from getiprompt.types import Features, Image, Masks, Priors
 from getiprompt.utils import MaybeToTensor, precision_to_torch_dtype
 
-logger = getLogger("Vision Prompt")
+logger = getLogger("Geti Prompt")
 
 
 class DinoEncoder(Encoder):

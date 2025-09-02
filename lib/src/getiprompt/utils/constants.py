@@ -19,7 +19,7 @@ class SAMModelName(Enum):
 class PipelineName(Enum):
     """Enum for pipeline types."""
 
-    GROUNDING_DINO_SAM = "GroundingDinoSAM"
+    GROUNDED_SAM = "GroundedSAM"
     MATCHER = "Matcher"
     PER_SAM = "PerSAM"
     PER_DINO = "PerDino"

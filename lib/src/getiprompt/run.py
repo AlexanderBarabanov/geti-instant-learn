@@ -1,5 +1,6 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
+# ruff: noqa: E402
 
 """This module contains functionality for running the pipeline on custom data."""
 
@@ -25,7 +26,7 @@ from getiprompt.types import Image, Priors, Text
 from getiprompt.utils.constants import IMAGE_EXTENSIONS
 from getiprompt.utils.utils import setup_logger
 
-logger = getLogger("Vision Prompt")
+logger = getLogger("Geti Prompt")
 setup_logger()
 
 

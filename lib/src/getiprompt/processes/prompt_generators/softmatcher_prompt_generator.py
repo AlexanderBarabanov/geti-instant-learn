@@ -12,7 +12,7 @@ from getiprompt.processes.prompt_generators.bidirectional_prompt_generator impor
 from getiprompt.types import Features, Masks, Priors, Similarities
 from getiprompt.types.image import Image
 
-logger = getLogger("Vision Prompt")
+logger = getLogger("Geti Prompt")
 
 
 class SoftmatcherPromptGenerator(BidirectionalPromptGenerator):

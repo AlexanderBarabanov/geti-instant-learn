@@ -11,7 +11,7 @@ authors = [
   { name="Daan Krol", email="daan.krol@intel.com" },
   { name="Klaas Dijkstra", email="klaas.dijkstra@intel.com" },
 ]
-description = "Vision Prompt - A modular framework for visual prompting"
+description = "Geti Prompt - A modular framework for visual prompting"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
@@ -227,6 +227,7 @@ exclude = [
     "node_modules",
     "venv",
     "per_segment_anything",
+    "src/getiprompt/models/grounding_dino.py",
 ]
 
 # Same as Black.

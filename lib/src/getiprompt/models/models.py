@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
     from getiprompt.models.per_segment_anything.modeling.sam import Sam
 
-logger = getLogger("Vision Prompt")
+logger = getLogger("Geti Prompt")
 
 
 def load_sam_model(
