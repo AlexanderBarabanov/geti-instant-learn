@@ -6,5 +6,5 @@
 import { RootLayout } from './root-layout.component';
 
 export const App = () => {
-  return <RootLayout />;
+    return <RootLayout />;
 };
