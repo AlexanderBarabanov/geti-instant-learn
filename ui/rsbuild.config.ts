@@ -9,19 +9,19 @@ import { pluginSass } from '@rsbuild/plugin-sass';
 import { pluginSvgr } from '@rsbuild/plugin-svgr';
 
 export default defineConfig({
-  plugins: [
-    pluginReact(),
+    plugins: [
+        pluginReact(),
 
-    pluginSass(),
+        pluginSass(),
 
-    pluginSvgr({
-      svgrOptions: {
-        exportType: 'named',
-      },
-    }),
-  ],
+        pluginSvgr({
+            svgrOptions: {
+                exportType: 'named',
+            },
+        }),
+    ],
 
-  html: {
-    title: 'Geti Prompt',
-  },
+    html: {
+        title: 'Geti Prompt',
+    },
 });
