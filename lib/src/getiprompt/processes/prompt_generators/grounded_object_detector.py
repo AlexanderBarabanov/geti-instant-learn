@@ -47,7 +47,7 @@ class GroundedObjectDetector(PromptGenerator):
         device: str = "cuda",
         precision: str = "bf16",
         compile_models: bool = False,
-        verbose: bool = False,
+        benchmark_inference_speed: bool = False,
     ) -> None:
         """Initialize the GroundedObjectDetector.
 
@@ -59,13 +59,13 @@ class GroundedObjectDetector(PromptGenerator):
             device: The device to use.
             precision: The precision to use for the model.
             compile_models: Whether to compile the models.
-            verbose: Whether to print verbose output of the model optimization process.
+            benchmark_inference_speed: Whether to benchmark the inference speed.
         """
         super().__init__()
         self.model_id = grounding_model.value
         self.device = device
         self.model, self.processor = self._load_grounding_model_and_processor(
-            self.model_id, precision, device, compile_models, verbose
+            self.model_id, precision, device, compile_models, benchmark_inference_speed
         )
         self.box_threshold = box_threshold
         self.text_threshold = text_threshold
@@ -101,7 +101,7 @@ class GroundedObjectDetector(PromptGenerator):
         # Run the grounding model
         inputs = self.processor(images=pil_images, text=text_labels, return_tensors="pt").to(self.device)
         inputs["pixel_values"] = inputs["pixel_values"].to(self.model.dtype)
-        with torch.no_grad(), torch.autocast(device_type=self.device, dtype=self.model.dtype):
+        with torch.inference_mode(), torch.autocast(device_type=self.device, dtype=self.model.dtype):
             outputs = self.model(**inputs)
         results = self.processor.post_process_grounded_object_detection(
             outputs,
@@ -135,7 +135,7 @@ class GroundedObjectDetector(PromptGenerator):
 
     @staticmethod
     def _load_grounding_model_and_processor(
-        model_id: str, precision: str, device: str, compile_models: bool, verbose: bool
+        model_id: str, precision: str, device: str, compile_models: bool, benchmark_inference_speed: bool
     ) -> tuple[AutoModelForZeroShotObjectDetection, AutoProcessor]:
         """Load the grounding model and processor.
 
@@ -144,7 +144,7 @@ class GroundedObjectDetector(PromptGenerator):
             precision: The precision to use for the model.
             device: The device to use for the model.
             compile_models: Whether to compile the models.
-            verbose: Whether to print verbose output of the model optimization process.
+            benchmark_inference_speed: Whether to benchmark the inference speed.
         """
         processor = AutoProcessor.from_pretrained(model_id)
         if model_id.startswith("fushh7/llmdet_swin"):
@@ -163,6 +163,6 @@ class GroundedObjectDetector(PromptGenerator):
             device=device,
             precision=precision_to_torch_dtype(precision),
             compile_models=compile_models,
-            verbose=verbose,
+            benchmark_inference_speed=benchmark_inference_speed,
         )
         return model, processor

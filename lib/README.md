@@ -154,12 +154,16 @@ class PerSam(Pipeline):
         mask_similarity_threshold: float,
         precision: torch.dtype = torch.bfloat16,
         compile_models: bool = False,
-        verbose: bool = False,
+        benchmark_inference_speed: bool = False,
         image_size: int | tuple[int, int] | None = None,
     ) -> None:
         super().__init__(image_size=image_size)
         self.sam_predictor = load_sam_model(
-            sam, device, precision=precision, compile_models=compile_models, verbose=verbose
+            sam,
+            device,
+            precision=precision,
+            compile_models=compile_models,
+            benchmark_inference_speed=benchmark_inference_speed,
         )
         self.encoder: Encoder = SamEncoder(sam_predictor=sam_predictor)
         self.feature_selector: FeatureSelector = AverageFeatures()

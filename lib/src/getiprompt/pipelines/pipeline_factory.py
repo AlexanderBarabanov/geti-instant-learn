@@ -48,7 +48,7 @@ def load_pipeline(sam: SAMModelName, pipeline_name: PipelineName, args: Namespac
                 mask_similarity_threshold=args.mask_similarity_threshold,
                 precision=args.precision,
                 compile_models=args.compile_models,
-                verbose=args.verbose,
+                benchmark_inference_speed=args.benchmark_inference_speed,
                 image_size=args.image_size,
                 device=args.device,
             )
@@ -64,7 +64,7 @@ def load_pipeline(sam: SAMModelName, pipeline_name: PipelineName, args: Namespac
                 mask_similarity_threshold=args.mask_similarity_threshold,
                 precision=args.precision,
                 compile_models=args.compile_models,
-                verbose=args.verbose,
+                benchmark_inference_speed=args.benchmark_inference_speed,
                 image_size=args.image_size,
                 device=args.device,
             )
@@ -78,7 +78,7 @@ def load_pipeline(sam: SAMModelName, pipeline_name: PipelineName, args: Namespac
                 mask_similarity_threshold=args.mask_similarity_threshold,
                 precision=args.precision,
                 compile_models=args.compile_models,
-                verbose=args.verbose,
+                benchmark_inference_speed=args.benchmark_inference_speed,
                 image_size=args.image_size,
                 device=args.device,
             )
@@ -99,7 +99,7 @@ def load_pipeline(sam: SAMModelName, pipeline_name: PipelineName, args: Namespac
                 softmatching_bidirectional=args.softmatching_bidirectional,
                 precision=args.precision,
                 compile_models=args.compile_models,
-                verbose=args.verbose,
+                benchmark_inference_speed=args.benchmark_inference_speed,
                 image_size=args.image_size,
                 device=args.device,
             )
@@ -112,7 +112,7 @@ def load_pipeline(sam: SAMModelName, pipeline_name: PipelineName, args: Namespac
                 apply_mask_refinement=args.apply_mask_refinement,
                 precision=args.precision,
                 compile_models=args.compile_models,
-                verbose=args.verbose,
+                benchmark_inference_speed=args.benchmark_inference_speed,
                 image_size=args.image_size,
                 device=args.device,
             )

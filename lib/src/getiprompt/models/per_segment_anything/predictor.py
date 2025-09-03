@@ -189,8 +189,8 @@ class SamPredictor:
         )
 
         masks = masks[0].detach().cpu().numpy()
-        iou_predictions = iou_predictions[0].detach().cpu().numpy()
-        low_res_masks = low_res_masks[0].detach().cpu().numpy()
+        iou_predictions = iou_predictions[0].float().detach().cpu().numpy()
+        low_res_masks = low_res_masks[0].float().detach().cpu().numpy()
         high_res_masks = high_res_masks[0]
 
         return masks, iou_predictions, low_res_masks, high_res_masks

@@ -7,7 +7,6 @@
 import sys
 import warnings
 
-warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 
@@ -17,6 +16,9 @@ from getiprompt.benchmark import perform_benchmark_experiment
 from getiprompt.pipelines.pipeline_base import Pipeline
 from getiprompt.run import run_pipeline
 from getiprompt.utils.args import populate_benchmark_parser
+from getiprompt.utils.utils import setup_logger
+
+setup_logger()
 
 
 class GetiPromptCLI:
@@ -32,8 +34,11 @@ class GetiPromptCLI:
         """Add arguments for the run subcommand."""
         # load datasets
         pipeline_default = "Matcher"
+
+        # Use Grounding model when text is provided as input.
         if "--reference_text_prompt" in sys.argv or "--text" in sys.argv:
             pipeline_default = "GroundedSAM"
+
         parser.add_subclass_arguments(Pipeline, "pipeline", default=pipeline_default)
         parser.add_argument(
             "--reference_images", "--ref", type=str, default=None, help="Directory with reference images."
@@ -80,7 +85,8 @@ class GetiPromptCLI:
     def execute(self) -> None:
         """Execute the CLI."""
         cfg = self.parser.parse_args()
-
+        log_level = cfg[cfg.subcommand].log_level if "log_level" in cfg[cfg.subcommand] else "INFO"
+        setup_logger(log_level=log_level)
         instantiated_config = self.parser.instantiate_classes(cfg)
 
         self._execute_subcommands(instantiated_config)
@@ -108,6 +114,13 @@ class GetiPromptCLI:
     def _add_common_args(parser: ArgumentParser) -> None:
         """Adds common arguments for all subcommands."""
         parser.add_argument("--config", action=ActionConfigFile)
+        parser.add_argument(
+            "--log_level",
+            type=str,
+            default="INFO",
+            choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+            help="Set the logging level.",
+        )
 
     @staticmethod
     def _execute_subcommands(config: Namespace) -> None:

@@ -22,7 +22,6 @@ HELP_DATASET_NAME = f"Dataset name or comma-separated list. Use 'all' to run all
 
 def populate_benchmark_parser(parser: argparse.ArgumentParser) -> None:
     """Populate the argument parser with benchmark arguments."""
-    parser.add_argument("--log_level", type=str, default="INFO", help="Log level")
     parser.add_argument(
         "--sam",
         type=str,
@@ -191,7 +190,7 @@ def populate_benchmark_parser(parser: argparse.ArgumentParser) -> None:
         help="Whether to compile the models",
     )
     parser.add_argument(
-        "--verbose",
+        "--benchmark_inference_speed",
         action="store_true",
         help="Whether to show the inference time of the optimized models",
     )

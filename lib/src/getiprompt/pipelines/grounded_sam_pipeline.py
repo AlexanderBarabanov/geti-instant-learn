@@ -25,7 +25,7 @@ class GroundedSAM(Pipeline):
         apply_mask_refinement: bool = True,
         precision: str = "bf16",
         compile_models: bool = False,
-        verbose: bool = False,
+        benchmark_inference_speed: bool = False,
         box_threshold: float = 0.4,
         text_threshold: float = 0.3,
         device: str = "cuda",
@@ -39,7 +39,7 @@ class GroundedSAM(Pipeline):
             apply_mask_refinement: Whether to apply mask refinement.
             precision: The precision to use for the model.
             compile_models: Whether to compile the models.
-            verbose: Whether to print verbose output of the model optimization process.
+            benchmark_inference_speed: Whether to benchmark the inference speed.
             box_threshold: The box threshold.
             text_threshold: The text threshold.
             device: The device to use.
@@ -47,7 +47,11 @@ class GroundedSAM(Pipeline):
         """
         super().__init__(image_size=image_size)
         self.sam_predictor = load_sam_model(
-            sam, device, precision=precision, compile_models=compile_models, verbose=verbose
+            sam,
+            device,
+            precision=precision,
+            compile_models=compile_models,
+            benchmark_inference_speed=benchmark_inference_speed,
         )
         self.prompt_generator: GroundedObjectDetector = GroundedObjectDetector(
             device=device,
@@ -57,7 +61,7 @@ class GroundedSAM(Pipeline):
             grounding_model=grounding_model,
             precision=precision,
             compile_models=compile_models,
-            verbose=verbose,
+            benchmark_inference_speed=benchmark_inference_speed,
         )
         self.segmenter: Segmenter = SamDecoder(
             sam_predictor=self.sam_predictor,
