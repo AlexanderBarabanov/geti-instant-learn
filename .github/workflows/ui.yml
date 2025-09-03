@@ -11,7 +11,7 @@ on:
 jobs:
   generate-openapi-spec:
     name: Generate OpenAPI Spec
-    runs-on: innersource.prod.amr.dind
+    runs-on: ubuntu-latest
     permissions:
       contents: read # to checkout code
     steps:
