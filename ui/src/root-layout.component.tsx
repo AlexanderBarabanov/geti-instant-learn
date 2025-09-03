@@ -6,18 +6,14 @@
 import { Grid, minmax, View } from '@geti/ui';
 
 import { Header } from './components/header.component';
+import { Sidebar } from './components/sidebar.component';
 
 export const RootLayout = () => {
     return (
         <Grid
-            areas={[
-                'header header header',
-                'toolbar prompt-sidebar sidebar',
-                'main prompt-sidebar sidebar',
-                'main-button prompt-sidebar sidebar',
-            ]}
-            rows={['size-800', 'size-700', '1fr', 'size-600']}
-            columns={[minmax('60%', '1fr'), 'auto', 'size-600']}
+            areas={['header header header', 'toolbar prompt-sidebar sidebar', 'main prompt-sidebar sidebar']}
+            rows={['size-800', 'size-700', '1fr']}
+            columns={[minmax('60%', '1fr'), 'auto']}
             height={'100vh'}
         >
             <Header />
@@ -26,20 +22,10 @@ export const RootLayout = () => {
                 Toolbar
             </View>
 
-            <View gridArea={'prompt-sidebar'} borderColor={'chartreuse-400'} borderWidth={'thin'}>
-                Prompt settings
-            </View>
-
-            <View gridArea={'sidebar'} borderColor={'celery-400'} borderWidth={'thin'}>
-                Side
-            </View>
+            <Sidebar />
 
             <View gridArea={'main'} borderColor={'red-400'} borderWidth={'thin'}>
                 Main
-            </View>
-
-            <View gridArea={'main-button'} borderColor={'green-400'} borderWidth={'thin'}>
-                Button
             </View>
         </Grid>
     );
