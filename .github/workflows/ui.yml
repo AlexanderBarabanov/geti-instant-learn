@@ -46,7 +46,7 @@ jobs:
 
   build:
     name: Build UI
-    runs-on: innersource.prod.amr.dind
+    runs-on: ubuntu-latest
     permissions:
       contents: read # to checkout code
     steps:
@@ -84,7 +84,7 @@ jobs:
 
   unit-tests:
     name: Unit tests
-    runs-on: innersource.prod.amr.dind
+    runs-on: ubuntu-latest
     permissions:
       contents: read # to checkout code
     needs: generate-openapi-spec
@@ -106,7 +106,7 @@ jobs:
     permissions:
       contents: read # to checkout code
     timeout-minutes: 60
-    runs-on: innersource.prod.amr.dind
+    runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.55.0-noble
     steps:
