@@ -32,13 +32,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo -E curl -fsSL 'https://proget.makedeb.org/debian-feeds/prebuilt-mpr.pub' | gpg --dearmor | sudo tee /usr/share/keyrings/prebuilt-mpr-archive-keyring.gpg 1> /dev/null && \
-          echo "deb [arch=all,$(dpkg --print-architecture) signed-by=/usr/share/keyrings/prebuilt-mpr-archive-keyring.gpg] https://proget.makedeb.org prebuilt-mpr $(lsb_release -cs)" | sudo tee /etc/apt/sources.list.d/prebuilt-mpr.list && \
-          sudo -E apt update && \
-          sudo -E apt install -y \
-            just \
-            libgl1-mesa-glx \
-            libglib2.0-0
+          sudo apt-get update
+          sudo apt-get install -y just libgl1 libglib2.0-0
 
       - name: Get OpenAPI spec
         run: |
