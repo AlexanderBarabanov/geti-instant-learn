@@ -109,6 +109,7 @@ jobs:
         run: npm run test:unit:coverage
 
       - name: Generate coverage report
+        if: github.event.pull_request.head.repo.full_name == github.repository
         working-directory: "ui"
         run: |
           echo "## 📊 Test coverage report" > coverage.md
@@ -137,7 +138,7 @@ jobs:
           fi
 
       - name: Comment PR with coverage report
-        if: github.event_name == 'pull_request'
+        if: github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           script: |
