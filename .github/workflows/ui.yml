@@ -85,9 +85,6 @@ jobs:
   unit-tests:
     name: Unit tests
     runs-on: ubuntu-latest
-    permissions:
-      contents: read # to checkout code
-      pull-requests: write
 
     steps:
       - name: Checkout code
