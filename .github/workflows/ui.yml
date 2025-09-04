@@ -137,12 +137,18 @@ jobs:
           fi
 
       - name: Comment PR with coverage report
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         if: github.event_name == 'pull_request'
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           script: |
             const fs = require('fs');
-            const coverageComment = fs.readFileSync('./ui/coverage.md', 'utf8');
+            
+            let coverageComment = '';
+            try {
+              coverageComment = fs.readFileSync('ui/coverage.md', 'utf8');
+            } catch (error) {
+              coverageComment = '## 📊 Test Coverage Report\n\nCoverage report generation failed.';
+            }
 
             const comments = await github.rest.issues.listComments({
               owner: context.repo.owner,
