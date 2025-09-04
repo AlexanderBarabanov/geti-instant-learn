@@ -108,8 +108,6 @@ jobs:
       - name: Generate coverage report
         working-directory: "ui"
         run: |
-          echo "📊 Test coverage report" >> coverage.md
-
           if [ -f coverage/coverage-summary.json ]; then
             node <<'EOF' >> coverage.md
               const fs = require('fs');
@@ -120,6 +118,7 @@ jobs:
                 const branches = `${coverage.total.branches.pct.toFixed(1)}%`;
                 const statements = `${coverage.total.statements.pct.toFixed(1)}%`;
 
+                console.log(`## 📊 Test coverage report`);
                 console.log(`| Metric | Coverage |`);
                 console.log(`| --- | --- |`);
                 console.log(`| Lines | ${lines} |`);
@@ -131,6 +130,7 @@ jobs:
               }
             EOF
           else
+            echo "## 📊 Test coverage report" > coverage.md
             echo "No coverage summary found" >> coverage.md
           fi
 
