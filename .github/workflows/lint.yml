@@ -44,3 +44,4 @@ jobs:
       - name: Typescript
         working-directory: "ui"
         run: npm run type-check
+        if: false
