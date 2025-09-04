@@ -1,0 +1,32 @@
+/**
+ * Copyright (C) 2025 Intel Corporation
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { Grid, minmax, View } from '@geti/ui';
+
+import { Header } from './components/header.component';
+import { Sidebar } from './components/sidebar.component';
+
+export const RootLayout = () => {
+    return (
+        <Grid
+            areas={['header header header', 'toolbar prompt-sidebar sidebar', 'main prompt-sidebar sidebar']}
+            rows={['size-800', 'size-700', '1fr']}
+            columns={[minmax('60%', '1fr'), 'auto']}
+            height={'100vh'}
+        >
+            <Header />
+
+            <View gridArea={'toolbar'} borderColor={'blue-400'} borderWidth={'thin'}>
+                Toolbar
+            </View>
+
+            <Sidebar />
+
+            <View gridArea={'main'} borderColor={'red-400'} borderWidth={'thin'}>
+                Main
+            </View>
+        </Grid>
+    );
+};
