@@ -1,4 +1,4 @@
-name: main.yml
+name: main
 on:
   workflow_dispatch:
   pull_request:
