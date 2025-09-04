@@ -87,7 +87,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read # to checkout code
-      #pull-requests: write
+      pull-requests: write
 
     steps:
       - name: Checkout code
