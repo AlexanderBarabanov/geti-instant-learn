@@ -108,29 +108,28 @@ jobs:
       - name: Generate coverage report
         working-directory: "ui"
         run: |
+          echo "## 📊 Test coverage report" > coverage.md
           if [ -f coverage/coverage-summary.json ]; then
-            node <<'EOF' >> coverage.md
+            node -e "
               const fs = require('fs');
               try {
-                const coverage = JSON.parse(fs.readFileSync('./coverage/coverage-summary.json', 'utf8'));
-                const lines = `${coverage.total.lines.pct.toFixed(1)}%`;
-                const functions = `${coverage.total.functions.pct.toFixed(1)}%`;
-                const branches = `${coverage.total.branches.pct.toFixed(1)}%`;
-                const statements = `${coverage.total.statements.pct.toFixed(1)}%`;
-
-                console.log(`## 📊 Test coverage report`);
-                console.log(`| Metric | Coverage |`);
-                console.log(`| --- | --- |`);
-                console.log(`| Lines | ${lines} |`);
-                console.log(`| Functions | ${functions} |`);
-                console.log(`| Branches | ${branches} |`);
-                console.log(`| Statements | ${statements} |`);
+                  const coverage = JSON.parse(fs.readFileSync('./coverage/coverage-summary.json', 'utf8'));
+                  const lines = \`\${coverage.total.lines.pct.toFixed(1)}%\`;
+                  const functions = \`\${coverage.total.functions.pct.toFixed(1)}%\`;
+                  const branches = \`\${coverage.total.branches.pct.toFixed(1)}%\`;
+                  const statements = \`\${coverage.total.statements.pct.toFixed(1)}%\`;
+                  
+                  console.log(\`| Metric | Coverage |\`);
+                  console.log(\`| --- | --- |\`);
+                  console.log(\`| Lines | \${lines} |\`);
+                  console.log(\`| Functions | \${functions} |\`);
+                  console.log(\`| Branches | \${branches} |\`);
+                  console.log(\`| Statements | \${statements} |\`);
               } catch {
                 console.error('Failed to parse coverage summary');
               }
-          EOF
+            " >> coverage.md"
           else
-            echo "## 📊 Test coverage report" > coverage.md
             echo "No coverage summary found" >> coverage.md
           fi
 
