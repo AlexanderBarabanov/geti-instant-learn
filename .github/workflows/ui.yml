@@ -78,9 +78,40 @@ jobs:
           path: "ui/dist.tar.gz"
 
   lint:
-    uses: ./.github/workflows/lint.yml
-    with:
-      build_version: ${{ inputs.build_version }}
+    name: Lint checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        id: setup-node
+        with:
+          node-version-file: ui/.nvmrc
+
+      - name: Install dependencies
+        working-directory: "ui"
+        run: npm ci
+
+      - name: Prettier
+        working-directory: "ui"
+        run: npm run format:check
+
+      - name: Lint
+        working-directory: "ui"
+        run: npm run lint
+
+      - name: Cyclic imports
+        working-directory: "ui"
+        run: npm run cyclic-deps-check
+
+      - name: Typescript
+        working-directory: "ui"
+        run: npm run type-check
 
   unit-tests:
     name: Unit tests
