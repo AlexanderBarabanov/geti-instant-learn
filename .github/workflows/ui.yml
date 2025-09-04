@@ -128,7 +128,7 @@ jobs:
               } catch {
                 console.error('Failed to parse coverage summary');
               }
-            " >> coverage.md"
+            " >> coverage.md
           else
             echo "No coverage summary found" >> coverage.md
           fi
