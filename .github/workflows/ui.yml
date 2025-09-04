@@ -112,7 +112,7 @@ jobs:
         working-directory: "ui"
         run: |
           echo "## 📊 Test coverage report" > coverage.md
-          if [ -f coverage/coverage-summary.json ]; then
+          if [ -f ./coverage/coverage-summary.json ]; then
             node -e "
               const fs = require('fs');
               try {
