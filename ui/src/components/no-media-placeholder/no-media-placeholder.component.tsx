@@ -14,7 +14,7 @@ interface NoMediaPlaceholderProps {
 
 export const NoMediaPlaceholder = ({ title }: NoMediaPlaceholderProps) => {
     return (
-        <View backgroundColor={'gray-400'} height={'100%'}>
+        <View backgroundColor={'gray-200'} height={'100%'} UNSAFE_className={styles.container}>
             <Flex height={'100%'} width={'100%'} justifyContent={'center'} alignItems={'center'}>
                 <Flex direction={'column'} gap={'size-100'} alignItems={'center'}>
                     <NoMedia />
