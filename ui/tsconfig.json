@@ -5,7 +5,8 @@
         "types": ["vitest/globals", "@testing-library/jest-dom"],
         "baseUrl": ".",
         "paths": {
-            "@geti-prompt/test-utils": ["./test-utils"]
+            "@geti-prompt/test-utils": ["./test-utils"],
+            "@geti-prompt/icons": ["./src/assets/icons"],
         }
     }
 }

@@ -6,6 +6,7 @@
 import { Grid, minmax, View } from '@geti/ui';
 
 import { Header } from './components/header.component';
+import { MainContent } from './components/main-content.component';
 import { Sidebar } from './components/sidebar.component';
 
 export const RootLayout = () => {
@@ -22,11 +23,9 @@ export const RootLayout = () => {
                 Toolbar
             </View>
 
-            <Sidebar />
+            <MainContent />
 
-            <View gridArea={'main'} borderColor={'red-400'} borderWidth={'thin'}>
-                Main
-            </View>
+            <Sidebar />
         </Grid>
     );
 };
