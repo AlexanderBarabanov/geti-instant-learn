@@ -6,6 +6,9 @@ from uuid import UUID
 
 from fastapi import Response, status
 
+from db.repository.common import ResourceNotFoundError
+from db.repository.pipeline import PipelineRepository
+from dependencies import SessionDep
 from routers import pipelines_router
 
 logger = logging.getLogger(__name__)
@@ -15,7 +18,7 @@ logger = logging.getLogger(__name__)
     path="/{pipeline_id}",
     status_code=status.HTTP_200_OK,
     responses={
-        status.HTTP_200_OK: {
+        status.HTTP_204_NO_CONTENT: {
             "description": "Successfully deleted the pipeline.",
         },
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
@@ -23,10 +26,16 @@ logger = logging.getLogger(__name__)
         },
     },
 )
-def delete_pipeline(pipeline_id: UUID) -> Response:
+def delete_pipeline(pipeline_id: UUID, db_session: SessionDep) -> Response:
     """
     Delete the specified pipeline.
     """
     logger.debug(f"Received DELETE pipeline {pipeline_id} request.")
+    repo = PipelineRepository(db_session)
+    try:
+        repo.delete_pipeline(pipeline_id)
+    except ResourceNotFoundError:
+        logger.warning(f"Pipeline with id {pipeline_id} not found during delete operation.")
 
-    return Response(status_code=status.HTTP_200_OK, content="Pipeline deleted successfully.")
+    logger.info(f"Successfully deleted pipeline with id {pipeline_id}.")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

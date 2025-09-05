@@ -15,5 +15,5 @@ class Sink(Base):
     __tablename__ = "Sink"
     config: Mapped[dict] = mapped_column(JSON, nullable=False)
     pipeline_id: Mapped[UUID] = mapped_column(ForeignKey("Pipeline.id", ondelete="CASCADE"))
-    pipeline: Mapped["Pipeline"] = relationship(back_populates="source", single_parent=True)
+    pipeline: Mapped["Pipeline"] = relationship(back_populates="sink", single_parent=True)
     __table_args__ = (UniqueConstraint("pipeline_id"),)

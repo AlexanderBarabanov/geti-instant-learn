@@ -13,6 +13,7 @@ from .base import Base
 if TYPE_CHECKING:
     from db.model.annotation import Annotation
     from db.model.label import Label
+    from db.model.pipeline import Pipeline
 
 
 class PromptType(str, Enum):
@@ -29,6 +30,7 @@ class Prompt(Base):
     pipeline_id: Mapped[UUID] = mapped_column(ForeignKey("Pipeline.id", ondelete="CASCADE"), nullable=False)
     text: Mapped[str | None] = mapped_column(nullable=True)
     image_path: Mapped[str | None] = mapped_column(nullable=True)
+    pipeline: Mapped["Pipeline"] = relationship(back_populates="prompts")
     annotations: Mapped[list["Annotation"]] = relationship(
         back_populates="prompt", cascade="all, delete-orphan", passive_deletes=True
     )
