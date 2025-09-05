@@ -6,7 +6,20 @@
 import type { ReactNode } from 'react';
 
 import { ThemeProvider } from '@geti/ui/theme';
+import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const queryClient = new QueryClient({
+    mutationCache: new MutationCache({
+        onSuccess: () => {
+            queryClient.invalidateQueries();
+        },
+    }),
+});
 
 export const Providers = ({ children }: { children: ReactNode }) => {
-    return <ThemeProvider>{children}</ThemeProvider>;
+    return (
+        <QueryClientProvider client={queryClient}>
+            <ThemeProvider>{children}</ThemeProvider>
+        </QueryClientProvider>
+    );
 };
