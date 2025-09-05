@@ -63,6 +63,7 @@ jobs:
     needs: build-parameters
     permissions:
       contents: read
+      pull-requests: write
     if: needs.build-parameters.outputs.components-list && contains(fromJson(needs.build-parameters.outputs.components-list), 'ui')
     uses: ./.github/workflows/ui.yml
     with:
