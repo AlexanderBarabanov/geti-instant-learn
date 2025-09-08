@@ -7,6 +7,7 @@
         "paths": {
             "@geti-prompt/test-utils": ["./test-utils"],
             "@geti-prompt/icons": ["./src/assets/icons"],
+            "@geti-prompt/api": ["./src/api/client"]
         }
     }
 }

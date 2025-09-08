@@ -3,11 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { defineConfig } from '@rsbuild/core';
+import { defineConfig, loadEnv } from '@rsbuild/core';
 import { pluginBabel } from '@rsbuild/plugin-babel';
 import { pluginReact } from '@rsbuild/plugin-react';
 import { pluginSass } from '@rsbuild/plugin-sass';
 import { pluginSvgr } from '@rsbuild/plugin-svgr';
+
+const { publicVars } = loadEnv();
 
 export default defineConfig({
     plugins: [
@@ -29,6 +31,13 @@ export default defineConfig({
             },
         }),
     ],
+
+    source: {
+        define: {
+            ...publicVars,
+            'import.meta.env.PUBLIC_API_URL': publicVars['import.meta.env.PUBLIC_API_URL'] ?? '"http://localhost:9100"',
+        },
+    },
 
     html: {
         title: 'Geti Prompt',

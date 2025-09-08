@@ -21,6 +21,9 @@ const compat = new FlatCompat({
 
 export default [
     {
+        ignores: [...sharedEslintConfig[0].ignores, 'src/api/openapi-spec.d.ts'],
+    },
+    {
         files: ['src/**/*.{js,jsx,ts,tsx}'],
         ignores: ['packages/**/*'],
     },
