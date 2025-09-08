@@ -1,3 +1,8 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+"""DINOv3 zero-shot classification example."""
+
 import torch
 from argparse import ArgumentParser
 from getiprompt.pipelines.dinotxt import DinoTxtZeroShotClassification
@@ -11,19 +16,16 @@ from getiprompt.utils import precision_to_torch_dtype
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--data_root", type=str)
-    parser.add_argument("--backbone_weights", type=str, default="dinov3_vitl16_pretrain_lvd1689m-8aa4cbdd.pth")
-    parser.add_argument("--dinotxt_weights", type=str, default="dinov3_vitl16_dinotxt_vision_head_and_text_encoder-a442d8f5.pth")
     parser.add_argument("--precision", type=str, default="bf16")
     parser.add_argument("--subset", type=str, default="all")
     parser.add_argument("--batch_size", type=int, default=24)
+
     args = parser.parse_args()
     
     # parse arguments
     data_root = Path(args.data_root)
     subset = args.subset
     batch_size = args.batch_size
-    backbone_weights = args.backbone_weights
-    dinotxt_weights = args.dinotxt_weights
     precision = precision_to_torch_dtype(args.precision)
 
 
@@ -47,9 +49,8 @@ if __name__ == "__main__":
 
     # initialize DinoTxt pipeline
     dinotxt = DinoTxtZeroShotClassification(
-        dinotxt_weights=dinotxt_weights,
-        backbone_weights=backbone_weights,
         precision=precision,
+        pretrained=True,
     )
 
     # learn from text prompts

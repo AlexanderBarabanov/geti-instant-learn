@@ -9,7 +9,6 @@ from torch import nn
 from getiprompt.types import Priors, Features
 import torchvision
 
-from pathlib import Path
 from torchvision.transforms.v2.functional import to_dtype, to_image
 
 
@@ -103,8 +102,7 @@ IMAGENET_TEMPLATES = [
 class DinoTextEncoder(nn.Module):
     def __init__(
         self,
-        dinotxt_weights: Path,
-        backbone_weights: Path,
+        pretrained: bool = True,
         image_size: int = 512,
         repo_id = "facebookresearch/dinov3",
         model_id = "dinov3_vitl16_dinotxt_tet1280d20h24l",
@@ -117,8 +115,7 @@ class DinoTextEncoder(nn.Module):
         model, tokenizer = torch.hub.load(
             repo_id, 
             model_id, 
-            dinotxt_weights=dinotxt_weights, 
-            backbone_weights=backbone_weights
+            pretrained=pretrained,
         )
         self.tokenizer = tokenizer
         

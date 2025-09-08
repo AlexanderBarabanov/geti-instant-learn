@@ -1,17 +1,17 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+"""DINOv3 zero-shot classification pipeline."""
+
 import torch
 from getiprompt.pipelines.pipeline_base import Pipeline
 from getiprompt.types import Image, Priors, Results, Masks
-
-from pathlib import Path
-
-
 from getiprompt.models.dinotxt import IMAGENET_TEMPLATES, DinoTextEncoder
 
 class DinoTxtZeroShotClassification(Pipeline):
     def __init__(
         self,
-        dinotxt_weights: Path,
-        backbone_weights: Path,
+        pretrained: bool = True,
         prompt_templates: list[str] = IMAGENET_TEMPLATES,
         topk: tuple[int] = (1, ),
         precision: str = torch.bfloat16,
@@ -24,9 +24,8 @@ class DinoTxtZeroShotClassification(Pipeline):
 
 
         Args:
-            dinotxt_weights: The path to the DINOTxt Encoder weights.
-            backbone_weights: The path to the backbone weights.
-            prompt_template: The prompt template to use for the model.
+            pretrained: Whether to use pretrained weights.
+            prompt_templates: The prompt templates to use for the model.
             precision: The precision to use for the model.
             compile_models: Whether to compile the model.
             verbose: Whether to print verbose output.
@@ -39,8 +38,7 @@ class DinoTxtZeroShotClassification(Pipeline):
             >>> from pathlib import Path
             >>>
             >>> dinotxt = DINOTxt(
-            >>>     dinotxt_weights=Path("dinotxt_weights.pth"),
-            >>>     backbone_weights=Path("backbone_weights.pth"),
+            >>>     pretrained=True,
             >>>     prompt_templates=["a photo of a {}."],  # default is IMAGENET_TEMPLATES
             >>>     precision=torch.bfloat16,
             >>>     compile_models=False,
@@ -54,8 +52,7 @@ class DinoTxtZeroShotClassification(Pipeline):
         self.dino_encoder = DinoTextEncoder(
             repo_id="facebookresearch/dinov3",
             model_id="dinov3_vitl16_dinotxt_tet1280d20h24l",
-            dinotxt_weights=dinotxt_weights,
-            backbone_weights=backbone_weights,
+            pretrained=pretrained,
             device=device,
             image_size=image_size,
             precision=precision,
