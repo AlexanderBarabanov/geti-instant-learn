@@ -1,0 +1,30 @@
+/*
+ * Copyright (C) 2025 Intel Corporation
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+@import './fonts/intel-one-display/intel-one-display.css';
+@import './fonts/intel-one-text/intel-one-text.css';
+@import './fonts/intel-one-mono/intel-one-mono.css';
+
+:root {
+    --spectrum-global-font-family-monospace: 'IntelOne Mono', 'Courier New', monospace;
+    --spectrum-global-font-family-display: 'IntelOne Display', Arial, sans-serif;
+
+    [class*='spectrum'] {
+        font-family: 'IntelOne Text' !important;
+    }
+}
+
+body,
+html,
+#root,
+#theme-provider {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+}
+
+#theme-provider {
+    background-color: var(--spectrum-global-color-gray-100);
+}
