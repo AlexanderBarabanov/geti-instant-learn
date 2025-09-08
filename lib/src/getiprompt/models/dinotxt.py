@@ -6,7 +6,7 @@
 import torch
 from torch import nn
 
-from getiprompt.types import Priors, Features
+from getiprompt.types import Priors
 import torchvision
 
 from torchvision.transforms.v2.functional import to_dtype, to_image
@@ -96,6 +96,7 @@ IMAGENET_TEMPLATES = [
     "a tattoo of the {}.",
     "a photo of {}.",
     "a satellite photo of {}.",
+    "a medical photo of {}.",
 ]
 
 
@@ -118,11 +119,11 @@ class DinoTextEncoder(nn.Module):
             pretrained=pretrained,
         )
         self.tokenizer = tokenizer
-        
         self.device = device
         self.precision = precision
-        model = model.to(dtype=self.precision)
-        self.model = model.cuda()
+        self.model = model.to(dtype=self.precision)
+        if self.device == "cuda":
+            self.model = self.model.cuda()
         self.transforms = torchvision.transforms.Compose([
             torchvision.transforms.v2.Resize(image_size),
             torchvision.transforms.v2.Normalize(mean=mean, std=std),
@@ -134,7 +135,7 @@ class DinoTextEncoder(nn.Module):
         self, 
         reference_prior: Priors,
         prompt_template: list[str] = IMAGENET_TEMPLATES,
-    ) -> Features:
+    ) -> torch.Tensor:
         """Encode the class text prompt to text embedding.
         
         Args:
@@ -149,19 +150,22 @@ class DinoTextEncoder(nn.Module):
             >>> from getiprompt.types import Priors
             >>> encoder = DinoTextEncoder()
             >>> prior = Priors(text={0: "cat", 1: "dog"})
-            >>> encoder.encode_text(prior)
-            Features(shape=(2, 1, 4), embedding_dim=4)
+            >>> text_embedding = encoder.encode_text(prior)
+            >>> text_embedding.shape
+            torch.Size([2, 4])
         """
-        zero_shot_weights = Features()
-        for class_id, label_name in reference_prior.text.items():
+        zero_shot_weights = []
+        for _, label_name in reference_prior.text.items():
             texts = [template.format(label_name) for template in prompt_template] 
-            texts = self.tokenizer.tokenize(texts).cuda()
+            texts = self.tokenizer.tokenize(texts)
+            if self.device == "cuda":
+                texts = texts.cuda()
             class_embeddings = self.model.encode_text(texts)
             class_embeddings /= class_embeddings.norm(dim=-1, keepdim=True)
             class_embedding = class_embeddings.mean(dim=0)
             class_embedding /= class_embedding.norm()
-            zero_shot_weights.add_local_features(class_embedding, class_id=class_id)
-        return zero_shot_weights
+            zero_shot_weights.append(class_embedding)
+        return torch.stack(zero_shot_weights, dim=1)
     
     @torch.no_grad()
     def encode_image(
@@ -172,7 +176,9 @@ class DinoTextEncoder(nn.Module):
 
         images = [self.transforms(to_dtype(to_image(image), dtype=self.precision)) for image in target_images]
         images = torch.stack(images, dim=0)
+        if self.device == "cuda":
+            images = images.cuda()
         with torch.autocast(device_type=self.device, dtype=self.precision):
-            image_features = self.model.encode_image(images.cuda())
+            image_features = self.model.encode_image(images)
             image_features /= image_features.norm(dim=-1, keepdim=True)
         return image_features.to(self.precision)

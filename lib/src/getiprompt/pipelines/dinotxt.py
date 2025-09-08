@@ -13,10 +13,7 @@ class DinoTxtZeroShotClassification(Pipeline):
         self,
         pretrained: bool = True,
         prompt_templates: list[str] = IMAGENET_TEMPLATES,
-        topk: tuple[int] = (1, ),
         precision: str = torch.bfloat16,
-        compile_models: bool = False,
-        verbose: bool = False,
         device: str = "cuda",
         image_size: int | tuple[int, int] | None = 512,
     ) -> None:
@@ -27,8 +24,6 @@ class DinoTxtZeroShotClassification(Pipeline):
             pretrained: Whether to use pretrained weights.
             prompt_templates: The prompt templates to use for the model.
             precision: The precision to use for the model.
-            compile_models: Whether to compile the model.
-            verbose: Whether to print verbose output.
             device: The device to use for the model.
             image_size: The size of the image to use.
 
@@ -41,12 +36,10 @@ class DinoTxtZeroShotClassification(Pipeline):
             >>>     pretrained=True,
             >>>     prompt_templates=["a photo of a {}."],  # default is IMAGENET_TEMPLATES
             >>>     precision=torch.bfloat16,
-            >>>     compile_models=False,
-            >>>     verbose=False,
             >>>     device="cuda",
             >>>     image_size=(512, 512),
             >>> )
-            >>> ref_priors = Priors(t)
+            >>> ref_priors = Priors(text={0: "cat", 1: "dog"})
         """
         super().__init__(image_size=image_size)
         self.dino_encoder = DinoTextEncoder(
@@ -59,7 +52,6 @@ class DinoTxtZeroShotClassification(Pipeline):
         )
         self.prompt_templates = prompt_templates
         self.precision = precision
-        self.topk = topk
 
     def learn(
         self, 
@@ -104,15 +96,9 @@ class DinoTxtZeroShotClassification(Pipeline):
     def infer(self, target_images: list[Image]):
         target_features = self.dino_encoder.encode_image(target_images)
         target_features /= target_features.norm(dim=-1, keepdim=True)
-
-        features = []
-        for class_id, _ in sorted(self.class_maps, key=lambda x: x[0]):
-            # NOTE: Not quite sure why Features has a list of features per class
-            features.append(self.reference_features.local_features[class_id][0])
-        features = torch.stack(features, dim=1)
-
-        logits = 100. * target_features @ features
-        max_scores, max_class_ids = logits.max(dim=1)
+        logits = 100. * target_features @ self.reference_features
+        scores = logits.softmax(dim=1)
+        max_scores, max_class_ids = scores.max(dim=1)
 
         masks = []
         for target_image, max_score, max_class_id in zip(target_images, max_scores, max_class_ids):
