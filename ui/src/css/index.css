@@ -10,10 +10,10 @@
 :root {
     --spectrum-global-font-family-monospace: 'IntelOne Mono', 'Courier New', monospace;
     --spectrum-global-font-family-display: 'IntelOne Display', Arial, sans-serif;
+}
 
-    [class*='spectrum'] {
-        font-family: 'IntelOne Text' !important;
-    }
+[class*='spectrum'] {
+    font-family: 'IntelOne Text';
 }
 
 body,
