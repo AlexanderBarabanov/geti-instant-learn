@@ -45,6 +45,7 @@ dependencies = [
     "markupsafe==3.0.2",
     "jsonargparse",
     "sam-2",
+    "ftfy",
 ]
 
 [tool.uv.sources]

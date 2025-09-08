@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.12' and sys_platform == 'darwin'",
@@ -591,6 +591,101 @@ sdist = { url = "https://files.pythonhosted.org/packages/00/f7/27f15d41f0ed38e8f
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bb/61/78c7b3851add1481b048b5fdc29067397a1784e2910592bc81bb3f608635/fsspec-2025.5.1-py3-none-any.whl", hash = "sha256:24d3a2e663d5fc735ab256263c4075f374a174c3410c0b25e5bd1970bceaa462", size = 199052, upload-time = "2025-05-24T12:03:21.66Z" },
 ]
+
+[[package]]
+name = "ftfy"
+version = "6.3.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "wcwidth" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a5/d3/8650919bc3c7c6e90ee3fa7fd618bf373cbbe55dff043bd67353dbb20cd8/ftfy-6.3.1.tar.gz", hash = "sha256:9b3c3d90f84fb267fe64d375a07b7f8912d817cf86009ae134aa03e1819506ec", size = 308927, upload-time = "2024-10-26T00:50:35.149Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ab/6e/81d47999aebc1b155f81eca4477a616a70f238a2549848c38983f3c22a82/ftfy-6.3.1-py3-none-any.whl", hash = "sha256:7c70eb532015cd2f9adb53f101fb6c7945988d023a085d127d1573dc49dd0083", size = 44821, upload-time = "2024-10-26T00:50:33.425Z" },
+]
+
+[[package]]
+name = "getiprompt"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "efficientvit" },
+    { name = "flask" },
+    { name = "ftfy" },
+    { name = "jsonargparse" },
+    { name = "markupsafe" },
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "opencv-python" },
+    { name = "openvino-model-api" },
+    { name = "pandas" },
+    { name = "pot" },
+    { name = "pycocotools" },
+    { name = "pytorch-labs-segment-anything-fast" },
+    { name = "requests" },
+    { name = "rich" },
+    { name = "sam-2" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
+    { name = "segment-anything-hq" },
+    { name = "torch" },
+    { name = "torchvision" },
+    { name = "umap" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "build" },
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "ruff" },
+    { name = "twine" },
+]
+extras = [
+    { name = "xformers" },
+]
+full = [
+    { name = "build" },
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "ruff" },
+    { name = "twine" },
+    { name = "xformers" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "build", marker = "extra == 'dev'", specifier = ">=1.2.2.post1" },
+    { name = "efficientvit", git = "https://github.com/mit-han-lab/efficientvit.git?rev=71b35be" },
+    { name = "flask", specifier = "==3.1.1" },
+    { name = "ftfy" },
+    { name = "getiprompt", extras = ["dev", "extras"], marker = "extra == 'full'" },
+    { name = "jsonargparse" },
+    { name = "markupsafe", specifier = "==3.0.2", index = "https://pypi.org/simple" },
+    { name = "matplotlib", specifier = "==3.10.3" },
+    { name = "numpy", specifier = "==1.26.4" },
+    { name = "opencv-python", specifier = "==4.11.0.86" },
+    { name = "openvino-model-api", specifier = "==0.3.0.2" },
+    { name = "pandas", specifier = "==2.2.3" },
+    { name = "pot", specifier = "==0.9.5" },
+    { name = "pre-commit", marker = "extra == 'dev'", specifier = "==4.2.0" },
+    { name = "pycocotools", specifier = "==2.0.9" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = "==8.4.0" },
+    { name = "pytorch-labs-segment-anything-fast", git = "https://github.com/pytorch-labs/segment-anything-fast.git?rev=e6aadeb" },
+    { name = "requests", specifier = "==2.32.4" },
+    { name = "rich", specifier = "==14.0.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = "==0.11.12" },
+    { name = "sam-2", git = "https://github.com/facebookresearch/sam2.git?rev=2b90b9f" },
+    { name = "scikit-learn", specifier = "==1.6.1" },
+    { name = "scipy", specifier = "==1.15.3" },
+    { name = "segment-anything-hq", specifier = "==0.3" },
+    { name = "torch", specifier = "==2.7.0+cu126", index = "https://download.pytorch.org/whl/cu126" },
+    { name = "torchvision", specifier = "==0.22.0+cu126", index = "https://download.pytorch.org/whl/cu126" },
+    { name = "twine", marker = "extra == 'dev'", specifier = ">=6.1.0" },
+    { name = "umap", specifier = "==0.1.1" },
+    { name = "xformers", marker = "extra == 'extras'", specifier = "==0.0.30", index = "https://download.pytorch.org/whl/cu126" },
+]
+provides-extras = ["extras", "dev", "full"]
 
 [[package]]
 name = "gitdb"
@@ -1973,16 +2068,16 @@ wheels = [
 
 [[package]]
 name = "protobuf"
-version = "6.31.1"
+version = "5.29.5"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/52/f3/b9655a711b32c19720253f6f06326faf90580834e2e83f840472d752bc8b/protobuf-6.31.1.tar.gz", hash = "sha256:d8cac4c982f0b957a4dc73a80e2ea24fab08e679c0de9deb835f4a12d69aca9a", size = 441797, upload-time = "2025-05-28T19:25:54.947Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/43/29/d09e70352e4e88c9c7a198d5645d7277811448d76c23b00345670f7c8a38/protobuf-5.29.5.tar.gz", hash = "sha256:bc1463bafd4b0929216c35f437a8e28731a2b7fe3d98bb77a600efced5a15c84", size = 425226, upload-time = "2025-05-28T23:51:59.82Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f3/6f/6ab8e4bf962fd5570d3deaa2d5c38f0a363f57b4501047b5ebeb83ab1125/protobuf-6.31.1-cp310-abi3-win32.whl", hash = "sha256:7fa17d5a29c2e04b7d90e5e32388b8bfd0e7107cd8e616feef7ed3fa6bdab5c9", size = 423603, upload-time = "2025-05-28T19:25:41.198Z" },
-    { url = "https://files.pythonhosted.org/packages/44/3a/b15c4347dd4bf3a1b0ee882f384623e2063bb5cf9fa9d57990a4f7df2fb6/protobuf-6.31.1-cp310-abi3-win_amd64.whl", hash = "sha256:426f59d2964864a1a366254fa703b8632dcec0790d8862d30034d8245e1cd447", size = 435283, upload-time = "2025-05-28T19:25:44.275Z" },
-    { url = "https://files.pythonhosted.org/packages/6a/c9/b9689a2a250264a84e66c46d8862ba788ee7a641cdca39bccf64f59284b7/protobuf-6.31.1-cp39-abi3-macosx_10_9_universal2.whl", hash = "sha256:6f1227473dc43d44ed644425268eb7c2e488ae245d51c6866d19fe158e207402", size = 425604, upload-time = "2025-05-28T19:25:45.702Z" },
-    { url = "https://files.pythonhosted.org/packages/76/a1/7a5a94032c83375e4fe7e7f56e3976ea6ac90c5e85fac8576409e25c39c3/protobuf-6.31.1-cp39-abi3-manylinux2014_aarch64.whl", hash = "sha256:a40fc12b84c154884d7d4c4ebd675d5b3b5283e155f324049ae396b95ddebc39", size = 322115, upload-time = "2025-05-28T19:25:47.128Z" },
-    { url = "https://files.pythonhosted.org/packages/fa/b1/b59d405d64d31999244643d88c45c8241c58f17cc887e73bcb90602327f8/protobuf-6.31.1-cp39-abi3-manylinux2014_x86_64.whl", hash = "sha256:4ee898bf66f7a8b0bd21bce523814e6fbd8c6add948045ce958b73af7e8878c6", size = 321070, upload-time = "2025-05-28T19:25:50.036Z" },
-    { url = "https://files.pythonhosted.org/packages/f7/af/ab3c51ab7507a7325e98ffe691d9495ee3d3aa5f589afad65ec920d39821/protobuf-6.31.1-py3-none-any.whl", hash = "sha256:720a6c7e6b77288b85063569baae8536671b39f15cc22037ec7045658d80489e", size = 168724, upload-time = "2025-05-28T19:25:53.926Z" },
+    { url = "https://files.pythonhosted.org/packages/5f/11/6e40e9fc5bba02988a214c07cf324595789ca7820160bfd1f8be96e48539/protobuf-5.29.5-cp310-abi3-win32.whl", hash = "sha256:3f1c6468a2cfd102ff4703976138844f78ebd1fb45f49011afc5139e9e283079", size = 422963, upload-time = "2025-05-28T23:51:41.204Z" },
+    { url = "https://files.pythonhosted.org/packages/81/7f/73cefb093e1a2a7c3ffd839e6f9fcafb7a427d300c7f8aef9c64405d8ac6/protobuf-5.29.5-cp310-abi3-win_amd64.whl", hash = "sha256:3f76e3a3675b4a4d867b52e4a5f5b78a2ef9565549d4037e06cf7b0942b1d3fc", size = 434818, upload-time = "2025-05-28T23:51:44.297Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/73/10e1661c21f139f2c6ad9b23040ff36fee624310dc28fba20d33fdae124c/protobuf-5.29.5-cp38-abi3-macosx_10_9_universal2.whl", hash = "sha256:e38c5add5a311f2a6eb0340716ef9b039c1dfa428b28f25a7838ac329204a671", size = 418091, upload-time = "2025-05-28T23:51:45.907Z" },
+    { url = "https://files.pythonhosted.org/packages/6c/04/98f6f8cf5b07ab1294c13f34b4e69b3722bb609c5b701d6c169828f9f8aa/protobuf-5.29.5-cp38-abi3-manylinux2014_aarch64.whl", hash = "sha256:fa18533a299d7ab6c55a238bf8629311439995f2e7eca5caaff08663606e9015", size = 319824, upload-time = "2025-05-28T23:51:47.545Z" },
+    { url = "https://files.pythonhosted.org/packages/85/e4/07c80521879c2d15f321465ac24c70efe2381378c00bf5e56a0f4fbac8cd/protobuf-5.29.5-cp38-abi3-manylinux2014_x86_64.whl", hash = "sha256:63848923da3325e1bf7e9003d680ce6e14b07e55d0473253a690c3a8b8fd6e61", size = 319942, upload-time = "2025-05-28T23:51:49.11Z" },
+    { url = "https://files.pythonhosted.org/packages/7e/cc/7e77861000a0691aeea8f4566e5d3aa716f2b1dece4a24439437e41d3d25/protobuf-5.29.5-py3-none-any.whl", hash = "sha256:6cf42630262c59b2d8de33954443d94b746c952b01434fc58a417fdbd2e84bd5", size = 172823, upload-time = "2025-05-28T23:51:58.157Z" },
 ]
 
 [[package]]
@@ -3193,87 +3288,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/56/2c/444f465fb2c65f40c
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f3/40/b1c265d4b2b62b58576588510fc4d1fe60a86319c8de99fd8e9fec617d2c/virtualenv-20.31.2-py3-none-any.whl", hash = "sha256:36efd0d9650ee985f0cad72065001e66d49a6f24eb44d98980f630686243cf11", size = 6057982, upload-time = "2025-05-08T17:58:21.15Z" },
 ]
-
-[[package]]
-name = "getiprompt"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "efficientvit" },
-    { name = "flask" },
-    { name = "jsonargparse" },
-    { name = "markupsafe" },
-    { name = "matplotlib" },
-    { name = "numpy" },
-    { name = "opencv-python" },
-    { name = "openvino-model-api" },
-    { name = "pandas" },
-    { name = "pot" },
-    { name = "pycocotools" },
-    { name = "pytorch-labs-segment-anything-fast" },
-    { name = "requests" },
-    { name = "rich" },
-    { name = "sam-2" },
-    { name = "scikit-learn" },
-    { name = "scipy" },
-    { name = "segment-anything-hq" },
-    { name = "torch" },
-    { name = "torchvision" },
-    { name = "umap" },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "build" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "ruff" },
-    { name = "twine" },
-]
-extras = [
-    { name = "xformers" },
-]
-full = [
-    { name = "build" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "ruff" },
-    { name = "twine" },
-    { name = "xformers" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "build", marker = "extra == 'dev'", specifier = ">=1.2.2.post1" },
-    { name = "efficientvit", git = "https://github.com/mit-han-lab/efficientvit.git?rev=71b35be" },
-    { name = "flask", specifier = "==3.1.1" },
-    { name = "jsonargparse" },
-    { name = "markupsafe", specifier = "==3.0.2", index = "https://pypi.org/simple" },
-    { name = "matplotlib", specifier = "==3.10.3" },
-    { name = "numpy", specifier = "==1.26.4" },
-    { name = "opencv-python", specifier = "==4.11.0.86" },
-    { name = "openvino-model-api", specifier = "==0.3.0.2" },
-    { name = "pandas", specifier = "==2.2.3" },
-    { name = "pot", specifier = "==0.9.5" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = "==4.2.0" },
-    { name = "pycocotools", specifier = "==2.0.9" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = "==8.4.0" },
-    { name = "pytorch-labs-segment-anything-fast", git = "https://github.com/pytorch-labs/segment-anything-fast.git?rev=e6aadeb" },
-    { name = "requests", specifier = "==2.32.4" },
-    { name = "rich", specifier = "==14.0.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = "==0.11.12" },
-    { name = "sam-2", git = "https://github.com/facebookresearch/sam2.git?rev=2b90b9f" },
-    { name = "scikit-learn", specifier = "==1.6.1" },
-    { name = "scipy", specifier = "==1.15.3" },
-    { name = "segment-anything-hq", specifier = "==0.3" },
-    { name = "torch", specifier = "==2.7.0+cu126", index = "https://download.pytorch.org/whl/cu126" },
-    { name = "torchvision", specifier = "==0.22.0+cu126", index = "https://download.pytorch.org/whl/cu126" },
-    { name = "twine", marker = "extra == 'dev'", specifier = ">=6.1.0" },
-    { name = "umap", specifier = "==0.1.1" },
-    { name = "getiprompt", extras = ["dev", "extras"], marker = "extra == 'full'" },
-    { name = "xformers", marker = "extra == 'extras'", specifier = "==0.0.30", index = "https://download.pytorch.org/whl/cu126" },
-]
-provides-extras = ["extras", "dev", "full"]
 
 [[package]]
 name = "wandb"
