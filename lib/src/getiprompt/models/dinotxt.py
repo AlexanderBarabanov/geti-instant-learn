@@ -95,7 +95,7 @@ class DinoTextEncoder(nn.Module):
     @torch.no_grad()
     def encode_image(
         self,
-        target_images: torch.Tensor,
+        target_images: list,
     ) -> torch.Tensor:
         """Encode the reference images to image embedding."""
         images = [self.transforms(to_dtype(to_image(image), dtype=self.precision)) for image in target_images]
