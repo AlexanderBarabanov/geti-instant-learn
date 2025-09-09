@@ -3,9 +3,9 @@
 
 """Test the DINOv3 zero-shot classification pipeline."""
 
+import numpy as np
 import pytest
 import torch
-import numpy as np
 from skimage.draw import random_shapes
 
 from getiprompt.pipelines.dinotxt import DinoTxtZeroShotClassification
@@ -18,16 +18,17 @@ def pipeline_instance() -> DinoTxtZeroShotClassification:
     return DinoTxtZeroShotClassification(
         pretrained=False,  # Use False for testing to avoid downloading models
         device="cpu",  # Use CPU for testing
-        image_size=224,  # Smaller size for faster testing
-        precision=torch.bfloat16,
+        image_size=(224, 224),  # Smaller size for faster testing
+        precision="bf16",
     )
+
 
 @pytest.fixture
 def sample_dataset() -> tuple[list[np.ndarray], list[str]]:
     """Create sample images using skimage.draw.random_shapes."""
     images = []
     labels = []
-    label_names = ['circle', 'rectangle', 'triangle']
+    label_names = ["circle", "rectangle", "triangle"]
     for label in label_names:
         for _ in range(3):
             # Generate random shapes with different characteristics
@@ -38,7 +39,7 @@ def sample_dataset() -> tuple[list[np.ndarray], list[str]]:
                 min_size=20,
                 max_size=100,
                 num_channels=3,
-                shape=label,                
+                shape=label,
             )
             images.append(image.astype(np.uint8))
             labels.append(label_names.index(label))
@@ -46,13 +47,14 @@ def sample_dataset() -> tuple[list[np.ndarray], list[str]]:
 
 
 @pytest.fixture
-def sample_priors():
+def sample_priors() -> Priors:
     """Create sample text priors for classification."""
     return Priors(text={0: "circle", 1: "rectangle", 2: "triangle"})
 
 
 class TestDinoTxtZeroShotClassification:
     """Test cases for the DinoTxtZeroShotClassification pipeline."""
+
     @staticmethod
     def test_pipeline_initialization_with_custom_params() -> None:
         """Test pipeline initialization with custom parameters."""
@@ -60,12 +62,12 @@ class TestDinoTxtZeroShotClassification:
         pipeline = DinoTxtZeroShotClassification(
             pretrained=False,
             prompt_templates=custom_templates,
-            precision=torch.float32,
+            precision="fp16",
             device="cpu",
             image_size=512,
         )
         assert pipeline.prompt_templates == custom_templates
-        assert pipeline.precision == torch.float32
+        assert pipeline.precision == torch.float16
         assert pipeline.resize_images.size == 512
 
     @staticmethod
@@ -74,32 +76,36 @@ class TestDinoTxtZeroShotClassification:
         with pytest.raises(ValueError, match="reference_priors must be provided"):
             pipeline_instance.learn([], [])
 
-    @staticmethod    
-    def test_infer_without_learning(pipeline_instance: DinoTxtZeroShotClassification, sample_dataset) -> None:
+    @staticmethod
+    def test_infer_without_learning(
+        pipeline_instance: DinoTxtZeroShotClassification, sample_dataset: tuple[list[np.ndarray], list[str]]
+    ) -> None:
         """Test that infer raises AttributeError when learn hasn't been called."""
         sample_images, _ = sample_dataset
         with pytest.raises(AttributeError):
             pipeline_instance.infer(sample_images)
 
     @staticmethod
-    def test_infer(pipeline_instance: DinoTxtZeroShotClassification, sample_dataset, sample_priors) -> None:
-
+    def test_infer(
+        pipeline_instance: DinoTxtZeroShotClassification,
+        sample_dataset: tuple[list[np.ndarray], list[str]],
+        sample_priors: Priors,
+    ) -> None:
+        """Test the full learn and infer cycle of the pipeline."""
         sample_images, sample_labels = sample_dataset
 
         # Learn first
         pipeline_instance.learn([], [sample_priors])
-        
+
         # Then infer
         result = pipeline_instance.infer(sample_images)
-        
+
         # Verify results
         assert isinstance(result, Results)
-        assert hasattr(result, 'masks')
+        assert hasattr(result, "masks")
         assert len(result.masks) == len(sample_images)
-        
-        pred_labels = []
-        for mask in result.masks:
-            pred_labels.append(mask.class_ids()[0])
+
+        pred_labels = [mask.class_ids()[0] for mask in result.masks]
         pred_labels = torch.tensor(pred_labels)
         gt_labels = torch.tensor(sample_labels)
         assert (pred_labels.eq(gt_labels) / len(sample_labels)).mean() >= 0.0

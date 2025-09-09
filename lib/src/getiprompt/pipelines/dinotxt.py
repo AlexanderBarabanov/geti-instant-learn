@@ -4,44 +4,48 @@
 """DINOv3 zero-shot classification pipeline."""
 
 import torch
-from getiprompt.pipelines.pipeline_base import Pipeline
-from getiprompt.types import Image, Priors, Results, Masks
+
 from getiprompt.models.dinotxt import IMAGENET_TEMPLATES, DinoTextEncoder
+from getiprompt.pipelines.pipeline_base import Pipeline
+from getiprompt.types import Image, Masks, Priors, Results
+from getiprompt.utils import precision_to_torch_dtype
+
 
 class DinoTxtZeroShotClassification(Pipeline):
+    """DinoTxt pipeline.
+
+    Args:
+        pretrained: Whether to use pretrained weights.
+        prompt_templates: The prompt templates to use for the model.
+        precision: The precision to use for the model.
+        device: The device to use for the model.
+        image_size: The size of the image to use.
+
+    Examples:
+        >>> from getiprompt.pipelines import DinoTxtZeroShotClassification
+        >>> from getiprompt.types import Image, Priors
+        >>> from pathlib import Path
+        >>>
+        >>> dinotxt = DinoTxtZeroShotClassification(
+        >>>     pretrained=True,
+        >>>     prompt_templates=["a photo of a {}."],  # default is IMAGENET_TEMPLATES
+        >>>     precision="bf16",
+        >>>     device="cuda",
+        >>>     image_size=(512, 512),
+        >>> )
+        >>> ref_priors = Priors(text={0: "cat", 1: "dog"})
+    """
+
     def __init__(
         self,
         pretrained: bool = True,
         prompt_templates: list[str] = IMAGENET_TEMPLATES,
-        precision: str = torch.bfloat16,
+        precision: str = "bf16",
         device: str = "cuda",
-        image_size: int | tuple[int, int] | None = 512,
+        image_size: tuple[int, int] | None = (512, 512),
     ) -> None:
-        """DinoTxt pipeline.
-
-
-        Args:
-            pretrained: Whether to use pretrained weights.
-            prompt_templates: The prompt templates to use for the model.
-            precision: The precision to use for the model.
-            device: The device to use for the model.
-            image_size: The size of the image to use.
-
-        Examples:
-            >>> from getiprompt.pipelines import DINOTxt
-            >>> from getiprompt.types import Image, Priors
-            >>> from pathlib import Path
-            >>>
-            >>> dinotxt = DINOTxt(
-            >>>     pretrained=True,
-            >>>     prompt_templates=["a photo of a {}."],  # default is IMAGENET_TEMPLATES
-            >>>     precision=torch.bfloat16,
-            >>>     device="cuda",
-            >>>     image_size=(512, 512),
-            >>> )
-            >>> ref_priors = Priors(text={0: "cat", 1: "dog"})
-        """
         super().__init__(image_size=image_size)
+        self.precision = precision = precision_to_torch_dtype(precision)
         self.dino_encoder = DinoTextEncoder(
             repo_id="facebookresearch/dinov3",
             model_id="dinov3_vitl16_dinotxt_tet1280d20h24l",
@@ -51,11 +55,10 @@ class DinoTxtZeroShotClassification(Pipeline):
             precision=precision,
         )
         self.prompt_templates = prompt_templates
-        self.precision = precision
 
     def learn(
-        self, 
-        reference_images: list[Image], 
+        self,
+        reference_images: list[Image],  # noqa: ARG002
         reference_priors: list[Priors],
     ) -> None:
         """Perform learning step on the priors.
@@ -79,7 +82,6 @@ class DinoTxtZeroShotClassification(Pipeline):
             >>> dinotxt.learn(reference_images=[], reference_priors=[ref_priors])
             >>> dinotxt.infer(target_images=[Image()])
         """
-        
         if not reference_priors:
             msg = "reference_priors must be provided"
             raise ValueError(msg)
@@ -87,23 +89,40 @@ class DinoTxtZeroShotClassification(Pipeline):
         reference_prior = reference_priors[0]
         self.class_maps = reference_prior.text.items()
         # reference features is zero shot weights from DinoTxtEncoder
-        self.reference_features = self.dino_encoder.encode_text(
-            reference_prior,
-            self.prompt_templates
-        )
+        self.reference_features = self.dino_encoder.encode_text(reference_prior, self.prompt_templates)
 
     @torch.no_grad()
-    def infer(self, target_images: list[Image]):
+    def infer(self, target_images: list[Image]) -> Results:
+        """Perform inference on the target images.
+
+        Args:
+            target_images: A list of target images.
+
+        Returns:
+            Result object containing the masks.
+
+        Examples:
+            >>> import torch
+            >>> from getiprompt.pipelines import DinoTxtZeroShotClassification
+            >>> from getiprompt.types import Image, Priors
+            >>> dinotxt = DinoTxtZeroShotClassification()
+            >>> ref_priors = Priors(text={0: "cat", 1: "dog"})
+            >>> dinotxt.learn(reference_images=[], reference_priors=[ref_priors])
+            >>> target_image = Image(data=torch.randn(3, 512, 512))
+            >>> result = dinotxt.infer(target_images=[target_image])
+            >>> result.masks  # doctest: +SKIP
+            [Masks(num_masks=1)]
+        """
         target_features = self.dino_encoder.encode_image(target_images)
         target_features /= target_features.norm(dim=-1, keepdim=True)
-        logits = 100. * target_features @ self.reference_features
+        logits = 100.0 * target_features @ self.reference_features
         scores = logits.softmax(dim=1)
-        max_scores, max_class_ids = scores.max(dim=1)
+        _, max_class_ids = scores.max(dim=1)
 
         masks = []
-        for target_image, max_score, max_class_id in zip(target_images, max_scores, max_class_ids):
+        for target_image, max_class_id in zip(target_images, max_class_ids, strict=False):
             m = torch.zeros(target_image.shape)
-            # NOTE: Due to the current type contract, for zero-shot classification, 
+            # NOTE: Due to the current type contract, for zero-shot classification,
             # we need to create a mask for each target image
             # This part should be refactored when we have a Label type class
             mask_type = Masks()

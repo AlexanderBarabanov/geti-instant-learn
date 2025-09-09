@@ -4,118 +4,43 @@
 """DINOTxt model."""
 
 import torch
-from torch import nn
-
-from getiprompt.types import Priors
 import torchvision
-
+from torch import nn
 from torchvision.transforms.v2.functional import to_dtype, to_image
 
-
-# ImageNet templates for zero shot classification
-IMAGENET_TEMPLATES = [
-    "a bad photo of a {}.",
-    "a photo of many {}.",
-    "a sculpture of a {}.",
-    "a photo of the hard to see {}.",
-    "a low resolution photo of the {}.",
-    "a rendering of a {}.",
-    "graffiti of a {}.",
-    "a bad photo of the {}.",
-    "a cropped photo of the {}.",
-    "a tattoo of a {}.",
-    "the embroidered {}.",
-    "a photo of a hard to see {}.",
-    "a bright photo of a {}.",
-    "a photo of a clean {}.",
-    "a photo of a dirty {}.",
-    "a dark photo of the {}.",
-    "a drawing of a {}.",
-    "a photo of my {}.",
-    "the plastic {}.",
-    "a photo of the cool {}.",
-    "a close-up photo of a {}.",
-    "a black and white photo of the {}.",
-    "a painting of the {}.",
-    "a painting of a {}.",
-    "a pixelated photo of the {}.",
-    "a sculpture of the {}.",
-    "a bright photo of the {}.",
-    "a cropped photo of a {}.",
-    "a plastic {}.",
-    "a photo of the dirty {}.",
-    "a jpeg corrupted photo of a {}.",
-    "a blurry photo of the {}.",
-    "a photo of the {}.",
-    "a good photo of the {}.",
-    "a rendering of the {}.",
-    "a {} in a video game.",
-    "a photo of one {}.",
-    "a doodle of a {}.",
-    "a close-up photo of the {}.",
-    "a photo of a {}.",
-    "the origami {}.",
-    "the {} in a video game.",
-    "a sketch of a {}.",
-    "a doodle of the {}.",
-    "a origami {}.",
-    "a low resolution photo of a {}.",
-    "the toy {}.",
-    "a rendition of the {}.",
-    "a photo of the clean {}.",
-    "a photo of a large {}.",
-    "a rendition of a {}.",
-    "a photo of a nice {}.",
-    "a photo of a weird {}.",
-    "a blurry photo of a {}.",
-    "a cartoon {}.",
-    "art of a {}.",
-    "a sketch of the {}.",
-    "a embroidered {}.",
-    "a pixelated photo of a {}.",
-    "itap of the {}.",
-    "a jpeg corrupted photo of the {}.",
-    "a good photo of a {}.",
-    "a plushie {}.",
-    "a photo of the nice {}.",
-    "a photo of the small {}.",
-    "a photo of the weird {}.",
-    "the cartoon {}.",
-    "art of the {}.",
-    "a drawing of the {}.",
-    "a photo of the large {}.",
-    "a black and white photo of a {}.",
-    "the plushie {}.",
-    "a dark photo of a {}.",
-    "itap of a {}.",
-    "graffiti of the {}.",
-    "a toy {}.",
-    "itap of my {}.",
-    "a photo of a cool {}.",
-    "a photo of a small {}.",
-    "a tattoo of the {}.",
-    "a photo of {}.",
-    "a satellite photo of {}.",
-    "a medical photo of {}.",
-]
+from getiprompt.types import Priors
+from getiprompt.utils.constants import IMAGENET_TEMPLATES
 
 
 class DinoTextEncoder(nn.Module):
+    """DINOv3 text encoder for zero-shot classification.
+
+    Args:
+        pretrained: Whether to use a pretrained model.
+        image_size: The size of the input image.
+        repo_id: The repo id of the model.
+        model_id: The model id of the model.
+        precision: The precision to use for the model.
+        device: The device to use for the model.
+        mean: The mean to use for image normalization.
+        std: The standard deviation to use for image normalization.
+    """
+
     def __init__(
         self,
         pretrained: bool = True,
         image_size: int = 512,
-        repo_id = "facebookresearch/dinov3",
-        model_id = "dinov3_vitl16_dinotxt_tet1280d20h24l",
-        precision = torch.bfloat16,
+        repo_id: str = "facebookresearch/dinov3",
+        model_id: str = "dinov3_vitl16_dinotxt_tet1280d20h24l",
+        precision: torch.dtype = torch.bfloat16,
         device: str = "cuda",
-        mean: list[float] = [123.675, 116.28, 103.53],
-        std: list[float] = [58.395, 57.12, 57.375],
+        mean: tuple[float] = (123.675, 116.28, 103.53),
+        std: tuple[float] = (58.395, 57.12, 57.375),
     ) -> None:
         super().__init__()
         model, tokenizer = torch.hub.load(
-            repo_id, 
-            model_id, 
+            repo_id,
+            model_id,
             pretrained=pretrained,
         )
         self.tokenizer = tokenizer
@@ -132,14 +57,14 @@ class DinoTextEncoder(nn.Module):
 
     @torch.no_grad()
     def encode_text(
-        self, 
+        self,
         reference_prior: Priors,
         prompt_template: list[str] = IMAGENET_TEMPLATES,
     ) -> torch.Tensor:
         """Encode the class text prompt to text embedding.
-        
+
         Args:
-            reference_prior: The prior to encode. 
+            reference_prior: The prior to encode.
             prompt_template: The prompt template to use for the model.
 
         Returns:
@@ -155,8 +80,8 @@ class DinoTextEncoder(nn.Module):
             torch.Size([2, 4])
         """
         zero_shot_weights = []
-        for _, label_name in reference_prior.text.items():
-            texts = [template.format(label_name) for template in prompt_template] 
+        for label_name in reference_prior.text.values():
+            texts = [template.format(label_name) for template in prompt_template]
             texts = self.tokenizer.tokenize(texts)
             if self.device == "cuda":
                 texts = texts.cuda()
@@ -166,14 +91,13 @@ class DinoTextEncoder(nn.Module):
             class_embedding /= class_embedding.norm()
             zero_shot_weights.append(class_embedding)
         return torch.stack(zero_shot_weights, dim=1)
-    
+
     @torch.no_grad()
     def encode_image(
         self,
         target_images: torch.Tensor,
     ) -> torch.Tensor:
         """Encode the reference images to image embedding."""
-
         images = [self.transforms(to_dtype(to_image(image), dtype=self.precision)) for image in target_images]
         images = torch.stack(images, dim=0)
         if self.device == "cuda":
