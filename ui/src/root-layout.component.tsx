@@ -4,9 +4,9 @@
  */
 
 import { Grid, minmax, View } from '@geti/ui';
+import { Outlet } from 'react-router';
 
 import { Header } from './components/header.component';
-import { MainContent } from './components/main-content.component';
 import { Sidebar } from './components/sidebar.component';
 
 export const RootLayout = () => {
@@ -23,7 +23,7 @@ export const RootLayout = () => {
                 Toolbar
             </View>
 
-            <MainContent />
+            <Outlet />
 
             <Sidebar />
         </Grid>
