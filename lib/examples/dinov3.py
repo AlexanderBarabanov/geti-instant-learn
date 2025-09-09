@@ -11,6 +11,7 @@ from pathlib import Path
 from datumaro import Dataset
 import cv2
 from getiprompt.utils import precision_to_torch_dtype
+import timeit
 
 
 if __name__ == "__main__":
@@ -53,12 +54,13 @@ if __name__ == "__main__":
         pretrained=True,
     )
 
+    start_time = timeit.default_timer()
     # learn from text prompts
     dinotxt.learn(
         reference_images=[], 
         reference_priors=[Priors(text={i: label_name for i, label_name in enumerate(label_names)})],
     )
-
+    
     # infer
     pred_labels = []
     for i in range(0, len(target_images), batch_size):
@@ -72,3 +74,6 @@ if __name__ == "__main__":
     # calculate zero-shot classification accuracy
     accuracy = sum(pred_labels == gt_labels) / len(gt_labels)
     print(f"Accuracy: {accuracy}")
+    end_time = timeit.default_timer()
+    print(f"Time taken: {end_time - start_time} seconds")
+    print(f"Time per image: {(end_time - start_time) / len(target_images)} seconds")
