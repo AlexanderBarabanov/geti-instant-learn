@@ -10,13 +10,13 @@ import { clsx } from 'clsx';
 
 import styles from './disclosure-group.module.scss';
 
-interface RadioDisclosureGroupProps<Value extends string> {
+interface DisclosureGroupProps<Value extends string> {
     value: Value | null;
-    onChange: (value: Value) => void;
+    onChange?: (value: Value) => void;
     items: { value: Value; label: string; icon: ReactNode; content?: ReactNode }[];
 }
 
-export const DisclosureGroup = <Value extends string>({ onChange, items, value }: RadioDisclosureGroupProps<Value>) => {
+export const DisclosureGroup = <Value extends string>({ onChange, items, value }: DisclosureGroupProps<Value>) => {
     return (
         <Flex width={'100%'} direction={'column'} gap={'size-100'}>
             {items.map((item) => (
@@ -27,9 +27,8 @@ export const DisclosureGroup = <Value extends string>({ onChange, items, value }
                         [styles.selected]: item.value === value,
                     })}
                     onExpandedChange={() => {
-                        onChange(item.value);
+                        onChange !== undefined && onChange(item.value);
                     }}
-                    isExpanded={item.value === value}
                 >
                     <DisclosureTitle UNSAFE_className={styles.disclosureTitleContainer}>
                         <Flex alignItems={'center'} justifyContent={'space-between'} width={'100%'}>
