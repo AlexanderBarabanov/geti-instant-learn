@@ -3,11 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Grid, minmax, View } from '@geti/ui';
+import { Grid, minmax } from '@geti/ui';
+import { Outlet } from 'react-router';
 
 import { Header } from './components/header.component';
-import { MainContent } from './components/main-content.component';
 import { Sidebar } from './components/sidebar.component';
+import { Toolbar } from './components/toolbar.component';
 
 export const RootLayout = () => {
     return (
@@ -19,11 +20,9 @@ export const RootLayout = () => {
         >
             <Header />
 
-            <View gridArea={'toolbar'} borderColor={'blue-400'} borderWidth={'thin'}>
-                Toolbar
-            </View>
+            <Toolbar />
 
-            <MainContent />
+            <Outlet />
 
             <Sidebar />
         </Grid>

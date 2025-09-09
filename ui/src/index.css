@@ -15,3 +15,7 @@ html,
 #theme-provider {
     background-color: var(--spectrum-global-color-gray-100);
 }
+
+div[class*='spectrum-Tabs-selectionIndicator'] {
+    background-color: var(--energy-blue) !important;
+}

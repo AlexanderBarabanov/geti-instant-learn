@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Content, Flex, View } from '@adobe/react-spectrum';
 import { NoMedia } from '@geti-prompt/icons';
+import { Content, Flex, View } from '@geti/ui';
 
 import styles from './no-media-placeholder.module.scss';
 

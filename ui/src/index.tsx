@@ -7,7 +7,6 @@ import React from 'react';
 
 import ReactDOM from 'react-dom/client';
 
-import { App } from './app';
 import { Providers } from './providers';
 
 import './index.css';
@@ -19,9 +18,7 @@ if (rootEl) {
 
     root.render(
         <React.StrictMode>
-            <Providers>
-                <App />
-            </Providers>
+            <Providers />
         </React.StrictMode>
     );
 }
