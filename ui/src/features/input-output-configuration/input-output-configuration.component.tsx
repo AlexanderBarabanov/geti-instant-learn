@@ -4,19 +4,7 @@
  */
 
 import { InputOutput } from '@geti-prompt/icons';
-import {
-    Button,
-    ButtonGroup,
-    Content,
-    Dialog,
-    DialogTrigger,
-    Flex,
-    Item,
-    TabList,
-    TabPanels,
-    Tabs,
-    Text,
-} from '@geti/ui';
+import { Button, Content, Dialog, DialogTrigger, Flex, Item, TabList, TabPanels, Tabs, Text } from '@geti/ui';
 
 import { InputConfiguration } from './input-configuration/input-configuration.component';
 
@@ -49,14 +37,11 @@ export const InputOutputConfiguration = () => {
                     <Text>Input/Output Setup</Text>
                 </Flex>
             </Button>
-            {(close) => (
+            {(_close) => (
                 <Dialog>
                     <Content>
                         <InputOutputTabs />
                     </Content>
-                    <ButtonGroup>
-                        <Button onPress={close}>Close</Button>
-                    </ButtonGroup>
                 </Dialog>
             )}
         </DialogTrigger>

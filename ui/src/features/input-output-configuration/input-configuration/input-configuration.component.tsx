@@ -7,10 +7,10 @@ import { useState } from 'react';
 
 import { GenICam, ImagesFolder, IPCamera, VideoFile, WebCam } from '@geti-prompt/icons';
 
-import { RadioDisclosureGroup } from '../ui/radio-disclosure-group/radio-disclosure-group.component';
+import { DisclosureGroup } from '../ui/disclosure-group/disclosure-group.component';
 
 const inputs = [
-    { label: 'Webcam', value: 'webcam', icon: <WebCam width={'24px'} /> },
+    { label: 'Webcam', value: 'webcam', content: 'Test', icon: <WebCam width={'24px'} /> },
     { label: 'IP Camera', value: 'ip-camera', content: 'Test', icon: <IPCamera width={'24px'} /> },
     { label: 'GenICam', value: 'gen-i-cam', content: 'Test', icon: <GenICam width={'24px'} /> },
     { label: 'Video file', value: 'video-file', content: 'Test', icon: <VideoFile width={'24px'} /> },
@@ -20,12 +20,5 @@ const inputs = [
 export const InputConfiguration = () => {
     const [selectedInput, setSelectedInput] = useState<string | null>(null);
 
-    return (
-        <RadioDisclosureGroup
-            ariaLabel={'Select input configuration'}
-            onChange={setSelectedInput}
-            items={inputs}
-            value={selectedInput}
-        />
-    );
+    return <DisclosureGroup onChange={setSelectedInput} items={inputs} value={selectedInput} />;
 };

@@ -5,54 +5,43 @@
 
 import { ReactNode } from 'react';
 
-import { Disclosure, DisclosurePanel, DisclosureTitle, Flex, Radio, RadioGroup, Text } from '@geti/ui';
+import { Disclosure, DisclosurePanel, DisclosureTitle, Flex, Text } from '@geti/ui';
 import { clsx } from 'clsx';
 
-import styles from './radio-disclosure-group.module.scss';
+import styles from './disclosure-group.module.scss';
 
 interface RadioDisclosureGroupProps<Value extends string> {
-    ariaLabel: string;
     value: Value | null;
     onChange: (value: Value) => void;
     items: { value: Value; label: string; icon: ReactNode; content?: ReactNode }[];
 }
 
-export const RadioDisclosureGroup = <Value extends string>({
-    ariaLabel,
-    onChange,
-    items,
-    value,
-}: RadioDisclosureGroupProps<Value>) => {
+export const DisclosureGroup = <Value extends string>({ onChange, items, value }: RadioDisclosureGroupProps<Value>) => {
     return (
-        <RadioGroup
-            width={'100%'}
-            isEmphasized
-            aria-label={ariaLabel}
-            onChange={(newValue) => onChange(newValue as Value)}
-            value={value}
-        >
+        <Flex width={'100%'} direction={'column'} gap={'size-100'}>
             {items.map((item) => (
                 <Disclosure
                     isQuiet
                     key={item.label}
-                    UNSAFE_className={clsx(styles.disclosure)}
+                    UNSAFE_className={clsx(styles.disclosure, {
+                        [styles.selected]: item.value === value,
+                    })}
                     onExpandedChange={() => {
                         onChange(item.value);
                     }}
-                    isExpanded={item.value === value && item.content !== undefined}
+                    isExpanded={item.value === value}
                 >
                     <DisclosureTitle UNSAFE_className={styles.disclosureTitleContainer}>
                         <Flex alignItems={'center'} justifyContent={'space-between'} width={'100%'}>
-                            <Flex alignItems={'center'} gap={'size-100'}>
+                            <Flex marginStart={'size-50'} alignItems={'center'} gap={'size-100'}>
                                 {item.icon}
                                 <Text UNSAFE_className={styles.disclosureTitle}>{item.label}</Text>
                             </Flex>
-                            <Radio value={item.value} />
                         </Flex>
                     </DisclosureTitle>
                     <DisclosurePanel>{item.content}</DisclosurePanel>
                 </Disclosure>
             ))}
-        </RadioGroup>
+        </Flex>
     );
 };
