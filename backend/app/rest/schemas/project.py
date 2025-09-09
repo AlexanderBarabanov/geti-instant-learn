@@ -10,7 +10,7 @@ from rest.schemas.sink import SinkSchema
 from rest.schemas.source import SourceSchema
 
 
-class PipelineSchema(BaseModel):
+class ProjectSchema(BaseModel):
     id: UUID
     name: str = Field(max_length=80, min_length=1)
     source: SourceSchema | None = None
@@ -18,18 +18,18 @@ class PipelineSchema(BaseModel):
     sink: SinkSchema | None = None
 
 
-class PipelinePostPayload(BaseModel):
+class ProjectPostPayload(BaseModel):
     name: str = Field(max_length=80, min_length=1)
 
 
-class PipelinePutPayload(BaseModel):
+class ProjectPutPayload(BaseModel):
     name: str = Field(max_length=80, min_length=1)
 
 
-class PipelineListItem(BaseModel):
+class ProjectListItem(BaseModel):
     id: UUID
     name: str | None = None
 
 
-class PipelinesListSchema(BaseModel):
-    pipelines: list[PipelineListItem]
+class ProjectsListSchema(BaseModel):
+    projects: list[ProjectListItem]

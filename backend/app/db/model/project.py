@@ -15,17 +15,17 @@ if TYPE_CHECKING:
     from db.model.source import Source
 
 
-class Pipeline(Base):
-    __tablename__ = "Pipeline"
+class Project(Base):
+    __tablename__ = "Project"
     name: Mapped[str] = mapped_column(nullable=False)
     active: Mapped[bool] = mapped_column(nullable=False, default=False)
-    source: Mapped["Source"] = relationship(back_populates="pipeline")
-    processor: Mapped["Processor"] = relationship(back_populates="pipeline")
-    sink: Mapped["Sink"] = relationship(back_populates="pipeline")
+    source: Mapped["Source"] = relationship(back_populates="project")
+    processor: Mapped["Processor"] = relationship(back_populates="project")
+    sink: Mapped["Sink"] = relationship(back_populates="project")
 
     prompts: Mapped[list["Prompt"]] = relationship(
-        back_populates="pipeline", cascade="all, delete-orphan", passive_deletes=True
+        back_populates="project", cascade="all, delete-orphan", passive_deletes=True
     )
     labels: Mapped[list["Label"]] = relationship(
-        back_populates="pipeline", cascade="all, delete-orphan", passive_deletes=True
+        back_populates="project", cascade="all, delete-orphan", passive_deletes=True
     )
