@@ -10,3 +10,4 @@ export { ReactComponent as ImagesFolder } from './images-folder.svg';
 export { ReactComponent as IPCamera } from './ip-camera.svg';
 export { ReactComponent as VideoFile } from './video-file.svg';
 export { ReactComponent as WebCam } from './webcam.svg';
+export { ReactComponent as Image } from './image.svg';

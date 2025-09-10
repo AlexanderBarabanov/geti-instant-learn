@@ -31,7 +31,7 @@ const getSelectedPromptMode = (mode: string): PromptMode => {
     return 'text';
 };
 
-const usePromptMode = (): PromptMode => {
+export const usePromptMode = (): PromptMode => {
     const [searchParams] = useSearchParams();
     return (searchParams.get('mode') as PromptMode) ?? 'visual';
 };
