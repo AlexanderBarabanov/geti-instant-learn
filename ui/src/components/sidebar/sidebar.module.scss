@@ -6,10 +6,10 @@
     border-color: var(--spectrum-global-color-gray-50);
 }
 
-.promptSidebarContainer {
+.sidebarContent {
     overflow: hidden;
     will-change: opacity, filter;
-    opacity: 0.001;
+    opacity: 0;
     filter: blur(6px);
     transition:
         opacity 260ms ease-out,
@@ -19,13 +19,13 @@
     border-color: var(--spectrum-global-color-gray-50);
 }
 
-.container[data-expanded='true'] .promptSidebarContainer {
+.container[data-expanded='true'] .sidebarContent {
     opacity: 1;
     filter: blur(0px);
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .promptSidebarContainer {
+    .sidebarContent {
         filter: none !important;
         opacity: 1;
     }

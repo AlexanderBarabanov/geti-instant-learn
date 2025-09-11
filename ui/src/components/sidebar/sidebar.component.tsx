@@ -33,7 +33,7 @@ const SidebarTabs = ({ tabs, selectedTab }: TabProps) => {
             columns={gridTemplateColumns}
             data-expanded={tab !== null}
         >
-            <View gridColumn={'1/2'} UNSAFE_className={styles.promptSidebarContainer}>
+            <View gridColumn={'1/2'} UNSAFE_className={styles.sidebarContent}>
                 {content}
             </View>
             <View gridColumn={'2/3'} backgroundColor={'gray-200'} padding={'size-100'}>
