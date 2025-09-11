@@ -9,7 +9,7 @@ import { NoMediaPlaceholder } from './no-media-placeholder/no-media-placeholder.
 
 const NoSourcePlaceholder = () => {
     return (
-        <View paddingX={'size-800'} paddingY={'size-1000'} height={'100%'} UNSAFE_style={{ boxSizing: 'border-box' }}>
+        <View paddingX={'size-800'} paddingY={'size-1000'} height={'100%'}>
             <NoMediaPlaceholder title={'Setup your input source'} />
         </View>
     );

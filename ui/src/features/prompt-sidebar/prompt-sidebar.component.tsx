@@ -18,11 +18,10 @@ export const PromptSidebar = () => {
             backgroundColor={'gray-100'}
             padding={'size-300'}
             height={'100%'}
-            UNSAFE_style={{ boxSizing: 'border-box' }}
         >
             <Flex direction={'column'} height={'100%'}>
                 <Heading margin={0}>Prompt</Heading>
-                <View flex={1} padding={'size-300'} UNSAFE_style={{ boxSizing: 'border-box' }}>
+                <View flex={1} padding={'size-300'}>
                     <Flex direction={'column'} height={'100%'} gap={'size-300'}>
                         <PromptModes />
 
