@@ -38,7 +38,6 @@ class DinoTxtZeroShotClassification(Pipeline):
 
     def __init__(
         self,
-        pretrained: bool = True,
         prompt_templates: list[str] = IMAGENET_TEMPLATES,
         precision: str = "bf16",
         device: str = "cuda",
@@ -49,7 +48,6 @@ class DinoTxtZeroShotClassification(Pipeline):
         self.dino_encoder = DinoTextEncoder(
             repo_id="facebookresearch/dinov3",
             model_id="dinov3_vitl16_dinotxt_tet1280d20h24l",
-            pretrained=pretrained,
             device=device,
             image_size=image_size,
             precision=precision,
