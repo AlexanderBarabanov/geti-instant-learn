@@ -16,8 +16,8 @@ import {
     PhotoPlaceholder,
     Text,
     View,
-} from 'packages/ui';
-import { AddCircle } from 'packages/ui/icons';
+} from '@geti/ui';
+import { AddCircle } from '@geti/ui/icons';
 import { useParams } from 'react-router';
 
 import { ProjectsList } from './projects-list.component';
