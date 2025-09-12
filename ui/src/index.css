@@ -19,3 +19,7 @@ html,
 div[class*='spectrum-Tabs-selectionIndicator'] {
     background-color: var(--energy-blue) !important;
 }
+
+h2 {
+    font-weight: 500;
+}
