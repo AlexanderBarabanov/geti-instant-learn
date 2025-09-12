@@ -12,6 +12,10 @@ html,
     height: 100%;
 }
 
+* {
+    box-sizing: border-box;
+}
+
 #theme-provider {
     background-color: var(--spectrum-global-color-gray-100);
 }
@@ -22,4 +26,15 @@ div[class*='spectrum-Tabs-selectionIndicator'] {
 
 h2 {
     font-weight: 500;
+}
+
+button[data-variant='secondary'][data-style='fill'] {
+    --spectrum-button-color: var(--spectrum-gray-300) !important;
+    --spectrum-button-color-hover: var(--spectrum-gray-200) !important;
+}
+
+button[class*='toggleButton'][data-variant='accent']:disabled {
+    background: var(--spectrum-accent-background-color-default) !important;
+    color: var(--spectrum-gray-100) !important;
+    opacity: 0.5 !important;
 }

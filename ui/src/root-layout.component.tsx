@@ -7,7 +7,7 @@ import { Grid, minmax } from '@geti/ui';
 import { Outlet } from 'react-router';
 
 import { Header } from './components/header.component';
-import { Sidebar } from './components/sidebar.component';
+import { Sidebar } from './components/sidebar/sidebar.component';
 import { Toolbar } from './components/toolbar.component';
 
 export const RootLayout = () => {

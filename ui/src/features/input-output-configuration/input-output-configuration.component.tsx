@@ -31,7 +31,7 @@ const InputOutputTabs = () => {
 export const InputOutputConfiguration = () => {
     return (
         <DialogTrigger type={'popover'} hideArrow placement={'bottom right'}>
-            <Button variant={'primary'} style={'fill'}>
+            <Button variant={'secondary'} style={'fill'}>
                 <Flex alignItems={'center'} gap={'size-50'}>
                     <InputOutput />
                     <Text>Input/Output Setup</Text>
