@@ -2,18 +2,10 @@
  * Copyright (C) 2025 Intel Corporation
  * SPDX-License-Identifier: Apache-2.0
  */
+@import './fonts.css';
 
-@import './fonts/intel-one-display/intel-one-display.css';
-@import './fonts/intel-one-text/intel-one-text.css';
-@import './fonts/intel-one-mono/intel-one-mono.css';
-
-:root {
-    --spectrum-global-font-family-monospace: 'IntelOne Mono', 'Courier New', monospace;
-    --spectrum-global-font-family-display: 'IntelOne Display', Arial, sans-serif;
-}
-
-[class*='spectrum'] {
-    font-family: 'IntelOne Text';
+* {
+    box-sizing: border-box;
 }
 
 body,
@@ -27,4 +19,19 @@ html,
 
 #theme-provider {
     background-color: var(--spectrum-global-color-gray-100);
+}
+
+div[class*='spectrum-Tabs-selectionIndicator'] {
+    background-color: var(--energy-blue) !important;
+}
+
+button[data-variant='secondary'][data-style='fill'] {
+    --spectrum-button-color: var(--spectrum-gray-300) !important;
+    --spectrum-button-color-hover: var(--spectrum-gray-200) !important;
+}
+
+button[class*='toggleButton'][data-variant='accent']:disabled {
+    background: var(--spectrum-accent-background-color-default) !important;
+    color: var(--spectrum-gray-100) !important;
+    opacity: 0.5 !important;
 }
