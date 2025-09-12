@@ -2,6 +2,11 @@
  * Copyright (C) 2025 Intel Corporation
  * SPDX-License-Identifier: Apache-2.0
  */
+@import './fonts.css';
+
+* {
+    box-sizing: border-box;
+}
 
 body,
 html,
@@ -10,10 +15,6 @@ html,
     margin: 0;
     padding: 0;
     height: 100%;
-}
-
-* {
-    box-sizing: border-box;
 }
 
 #theme-provider {
