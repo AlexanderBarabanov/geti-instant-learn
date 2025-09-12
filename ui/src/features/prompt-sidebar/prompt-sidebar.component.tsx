@@ -13,10 +13,10 @@ export const PromptSidebar = () => {
     return (
         <View
             minWidth={'size-4600'}
-            width={'35vw'}
-            maxWidth={'36rem'}
+            width={'100%'}
             backgroundColor={'gray-100'}
-            padding={'size-300'}
+            paddingY={'size-200'}
+            paddingX={'size-300'}
             height={'100%'}
         >
             <Flex direction={'column'} height={'100%'}>
