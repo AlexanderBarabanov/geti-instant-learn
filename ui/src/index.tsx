@@ -9,7 +9,7 @@ import ReactDOM from 'react-dom/client';
 
 import { Providers } from './providers';
 
-import './index.css';
+import './css/index.css';
 
 const rootEl = document.getElementById('root');
 
