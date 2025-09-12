@@ -11,7 +11,6 @@ import {
     DialogTrigger,
     Divider,
     Flex,
-    Footer,
     Header,
     PhotoPlaceholder,
     Text,
