@@ -5,7 +5,7 @@
 
 import { ActionMenu, Flex, Item, Menu, Text } from 'packages/ui';
 
-import styles from './projects-list.module.css';
+import styles from './projects-list.module.scss';
 
 interface Project {
     name: string;

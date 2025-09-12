@@ -12,6 +12,7 @@ import {
     Divider,
     Flex,
     Header,
+    Heading,
     PhotoPlaceholder,
     Text,
     View,
@@ -21,7 +22,7 @@ import { useParams } from 'react-router';
 
 import { ProjectsList } from './projects-list.component';
 
-import styles from './projects-list.module.css';
+import styles from './projects-list.module.scss';
 
 interface SelectedProjectProps {
     name: string;
@@ -53,7 +54,7 @@ export const ProjectsListPanel = () => {
         <DialogTrigger type='popover' hideArrow>
             <SelectedProjectButton name={selectedProjectName} />
 
-            <Dialog width={'size-4600'}>
+            <Dialog width={'size-4600'} UNSAFE_className={styles.dialog}>
                 <Header>
                     <Flex direction={'column'} justifyContent={'center'} width={'100%'} alignItems={'center'}>
                         <PhotoPlaceholder
@@ -62,18 +63,26 @@ export const ProjectsListPanel = () => {
                             height={'size-1000'}
                             width={'size-1000'}
                         />
-                        <h2>{selectedProjectName}</h2>
+                        <Heading level={2} marginBottom={0}>
+                            {selectedProjectName}
+                        </Heading>
                     </Flex>
                 </Header>
                 <Content UNSAFE_className={styles.panelContent}>
-                    <Divider size={'S'} margin={'size-200'} />
+                    <Divider size={'S'} marginY={'size-200'} />
                     <ProjectsList projects={projects} />
-                    <Divider size={'S'} margin={'size-200'} />
+                    <Divider size={'S'} marginY={'size-200'} />
                 </Content>
 
                 <ButtonGroup UNSAFE_className={styles.panelButtons}>
-                    <ActionButton isQuiet width={'100%'} margin={'size-200'}>
-                        <AddCircle style={{ margin: 'size-100' }} />
+                    <ActionButton
+                        isQuiet
+                        width={'100%'}
+                        marginStart={'size-100'}
+                        marginEnd={'size-350'}
+                        UNSAFE_className={styles.addProjectButton}
+                    >
+                        <AddCircle />
                         <Text marginX='size-50'>Add project</Text>
                     </ActionButton>
                 </ButtonGroup>
