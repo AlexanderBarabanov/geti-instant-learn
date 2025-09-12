@@ -71,14 +71,13 @@ export const ProjectsListPanel = () => {
                     <ProjectsList projects={projects} />
                     <Divider size={'S'} margin={'size-200'} />
                 </Content>
-                <Footer UNSAFE_className={styles.panelFooter}>
-                    <ButtonGroup>
-                        <ActionButton isQuiet width={'100%'} margin={'size-200'}>
-                            <AddCircle style={{ margin: 'size-100' }} />
-                            <Text marginX='size-50'>Add project</Text>
-                        </ActionButton>
-                    </ButtonGroup>
-                </Footer>
+
+                <ButtonGroup UNSAFE_className={styles.panelButtons}>
+                    <ActionButton isQuiet width={'100%'} margin={'size-200'}>
+                        <AddCircle style={{ margin: 'size-100' }} />
+                        <Text marginX='size-50'>Add project</Text>
+                    </ActionButton>
+                </ButtonGroup>
             </Dialog>
         </DialogTrigger>
     );
