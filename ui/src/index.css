@@ -23,3 +23,14 @@ html,
 div[class*='spectrum-Tabs-selectionIndicator'] {
     background-color: var(--energy-blue) !important;
 }
+
+button[data-variant='secondary'][data-style='fill'] {
+    --spectrum-button-color: var(--spectrum-gray-300) !important;
+    --spectrum-button-color-hover: var(--spectrum-gray-200) !important;
+}
+
+button[class*='toggleButton'][data-variant='accent']:disabled {
+    background: var(--spectrum-accent-background-color-default) !important;
+    color: var(--spectrum-gray-100) !important;
+    opacity: 0.5 !important;
+}
