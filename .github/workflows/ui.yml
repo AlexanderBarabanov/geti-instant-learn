@@ -80,6 +80,8 @@ jobs:
   lint:
     name: Lint checks
     runs-on: ubuntu-latest
+    needs:
+      - generate-openapi-spec
     permissions:
       contents: read
     steps:
@@ -96,6 +98,16 @@ jobs:
       - name: Install dependencies
         working-directory: "ui"
         run: npm ci
+
+      - name: Download OpenAPI spec artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: openapi-spec
+          path: ui/src/api
+
+      - name: Build OpenAPI type definitions
+        working-directory: "ui"
+        run: npm run build:api:types
 
       - name: Prettier
         working-directory: "ui"
@@ -116,6 +128,8 @@ jobs:
   unit-tests:
     name: Unit tests
     runs-on: ubuntu-latest
+    needs:
+      - generate-openapi-spec
     permissions:
       contents: read
       pull-requests: write
@@ -134,6 +148,16 @@ jobs:
       - name: Install dependencies
         working-directory: "ui"
         run: npm ci
+
+      - name: Download OpenAPI spec artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: openapi-spec
+          path: ui/src/api
+
+      - name: Build OpenAPI type definitions
+        working-directory: "ui"
+        run: npm run build:api:types
 
       - name: Unit tests
         working-directory: "ui"
@@ -232,6 +256,16 @@ jobs:
       - name: Install dependencies
         working-directory: "ui"
         run: npm ci
+
+      - name: Download OpenAPI spec artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: openapi-spec
+          path: ui/src/api
+
+      - name: Build OpenAPI type definitions
+        working-directory: "ui"
+        run: npm run build:api:types
 
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
