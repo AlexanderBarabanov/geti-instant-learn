@@ -1,0 +1,36 @@
+.projectMenu {
+    & li[class*='spectrum-Menu-divider'] {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        background-color: var(--spectrum-global-color-gray-100) !important;
+        text-decoration-thickness: auto !important;
+    }
+}
+
+.panelContent {
+    div[class*='_spectrum-Menu-wrapper'] {
+        width: 100%;
+        border: none;
+        background-color: transparent;
+    }
+}
+
+.panelButtons {
+    padding-block-start: 0;
+}
+
+.addProjectButton {
+    color: var(--spectrum-global-color-gray-900);
+
+    & span[class*='spectrum-ActionButton-label'] {
+        text-align: start;
+        margin-left: var(--spectrum-global-dimension-size-100) !important;
+    }
+}
+
+.dialog {
+    & div[class*='spectrum-Dialog-grid'] {
+        --spectrum-dialog-padding-x: 0px;
+        --spectrum-dialog-padding-y: var(--spectrum-global-dimension-size-250);
+    }
+}

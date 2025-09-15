@@ -25,6 +25,10 @@ div[class*='spectrum-Tabs-selectionIndicator'] {
     background-color: var(--energy-blue) !important;
 }
 
+h2 {
+    font-weight: 500;
+}
+
 button[data-variant='secondary'][data-style='fill'] {
     --spectrum-button-color: var(--spectrum-gray-300) !important;
     --spectrum-button-color-hover: var(--spectrum-gray-200) !important;
