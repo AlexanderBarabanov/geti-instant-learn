@@ -34,7 +34,6 @@ export const WebcamSource = () => {
         updateDevices();
 
         navigator.mediaDevices.addEventListener('devicechange', updateDevices);
-        navigator.mediaDevices.addEventListener('devicechange', updateDevices);
         return () => navigator.mediaDevices.removeEventListener('devicechange', updateDevices);
     }, []);
 
