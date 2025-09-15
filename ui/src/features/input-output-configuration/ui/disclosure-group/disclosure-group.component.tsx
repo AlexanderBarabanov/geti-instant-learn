@@ -16,30 +16,45 @@ interface DisclosureGroupProps<Value extends string> {
     items: { value: Value; label: string; icon: ReactNode; content?: ReactNode }[];
 }
 
+interface DisclosureItemProps<Value extends string> {
+    item: { value: Value; label: string; icon: ReactNode; content?: ReactNode };
+    onChange?: (value: Value) => void;
+    value: Value | null;
+}
+
+const DisclosureItem = <Value extends string>({ item, value, onChange }: DisclosureItemProps<Value>) => {
+    const isExpanded = item.value === value;
+
+    return (
+        <Disclosure
+            isQuiet
+            key={item.label}
+            defaultExpanded={isExpanded}
+            UNSAFE_className={clsx(styles.disclosure, {
+                [styles.selected]: item.value === value,
+            })}
+            onExpandedChange={() => {
+                onChange !== undefined && onChange(item.value);
+            }}
+        >
+            <DisclosureTitle UNSAFE_className={styles.disclosureTitleContainer}>
+                <Flex alignItems={'center'} justifyContent={'space-between'} width={'100%'}>
+                    <Flex marginStart={'size-50'} alignItems={'center'} gap={'size-100'}>
+                        {item.icon}
+                        <Text UNSAFE_className={styles.disclosureTitle}>{item.label}</Text>
+                    </Flex>
+                </Flex>
+            </DisclosureTitle>
+            <DisclosurePanel>{isExpanded && item.content}</DisclosurePanel>
+        </Disclosure>
+    );
+};
+
 export const DisclosureGroup = <Value extends string>({ onChange, items, value }: DisclosureGroupProps<Value>) => {
     return (
         <Flex width={'100%'} direction={'column'} gap={'size-100'}>
             {items.map((item) => (
-                <Disclosure
-                    isQuiet
-                    key={item.label}
-                    UNSAFE_className={clsx(styles.disclosure, {
-                        [styles.selected]: item.value === value,
-                    })}
-                    onExpandedChange={() => {
-                        onChange !== undefined && onChange(item.value);
-                    }}
-                >
-                    <DisclosureTitle UNSAFE_className={styles.disclosureTitleContainer}>
-                        <Flex alignItems={'center'} justifyContent={'space-between'} width={'100%'}>
-                            <Flex marginStart={'size-50'} alignItems={'center'} gap={'size-100'}>
-                                {item.icon}
-                                <Text UNSAFE_className={styles.disclosureTitle}>{item.label}</Text>
-                            </Flex>
-                        </Flex>
-                    </DisclosureTitle>
-                    <DisclosurePanel>{item.content}</DisclosurePanel>
-                </Disclosure>
+                <DisclosureItem item={item} key={item.label} onChange={onChange} value={value} />
             ))}
         </Flex>
     );
