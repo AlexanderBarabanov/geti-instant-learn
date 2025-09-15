@@ -6,9 +6,10 @@
 import { GenICam, ImagesFolder, IPCamera, VideoFile, WebCam } from '@geti-prompt/icons';
 
 import { DisclosureGroup } from '../ui/disclosure-group/disclosure-group.component';
+import { WebcamSource } from './webcam/webcam-source.component';
 
 const inputs = [
-    { label: 'Webcam', value: 'webcam', content: 'Test', icon: <WebCam width={'24px'} />, isActive: true },
+    { label: 'Webcam', value: 'webcam', content: <WebcamSource />, icon: <WebCam width={'24px'} />, isActive: true },
     { label: 'IP Camera', value: 'ip-camera', content: 'Test', icon: <IPCamera width={'24px'} />, isActive: false },
     { label: 'GenICam', value: 'gen-i-cam', content: 'Test', icon: <GenICam width={'24px'} />, isActive: false },
     { label: 'Video file', value: 'video-file', content: 'Test', icon: <VideoFile width={'24px'} />, isActive: false },
