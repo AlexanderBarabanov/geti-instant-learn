@@ -7,9 +7,10 @@ import { GenICam, ImagesFolder, IPCamera, VideoFile, WebCam } from '@geti-prompt
 
 import { DisclosureGroup } from '../ui/disclosure-group/disclosure-group.component';
 import { IPCameraForm } from './ip-camera.component';
+import { WebcamSource } from './webcam/webcam-source.component';
 
 const inputs = [
-    { label: 'Webcam', value: 'webcam', content: 'Test', icon: <WebCam width={'24px'} />, isActive: true },
+    { label: 'Webcam', value: 'webcam', content: <WebcamSource />, icon: <WebCam width={'24px'} />, isActive: true },
     {
         label: 'IP Camera',
         value: 'ip-camera',

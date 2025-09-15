@@ -2,6 +2,11 @@
  * Copyright (C) 2025 Intel Corporation
  * SPDX-License-Identifier: Apache-2.0
  */
+@import './fonts.css';
+
+* {
+    box-sizing: border-box;
+}
 
 body,
 html,
@@ -12,16 +17,16 @@ html,
     height: 100%;
 }
 
-* {
-    box-sizing: border-box;
-}
-
 #theme-provider {
     background-color: var(--spectrum-global-color-gray-100);
 }
 
 div[class*='spectrum-Tabs-selectionIndicator'] {
     background-color: var(--energy-blue) !important;
+}
+
+h2 {
+    font-weight: 500;
 }
 
 button[data-variant='secondary'][data-style='fill'] {
