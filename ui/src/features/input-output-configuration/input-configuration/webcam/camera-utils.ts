@@ -23,13 +23,9 @@ export const getVideoDevices = async () => {
     return uniqBy(videoDevices, (device) => device.deviceId);
 };
 
-export async function getBrowserPermission(): Promise<{
-    stream: MediaStream | null;
-    permission: CameraPermissionStatus;
-}>;
-export async function getBrowserPermission(): Promise<
+export const getBrowserPermission = async (): Promise<
     { stream: MediaStream; permission: 'granted' } | { stream: null; permission: 'denied' }
-> {
+> => {
     try {
         const stream = await getVideoUserMedia();
 
@@ -37,7 +33,7 @@ export async function getBrowserPermission(): Promise<
     } catch {
         return { permission: 'denied', stream: null };
     }
-}
+};
 
 export const getAvailableVideoDevices = async () => {
     const { permission, stream } = await getBrowserPermission();
