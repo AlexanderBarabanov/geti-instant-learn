@@ -15,7 +15,7 @@ export const RootLayout = () => {
         <Grid
             areas={['header header header', 'toolbar prompt-sidebar sidebar', 'main prompt-sidebar sidebar']}
             rows={['size-800', 'size-700', '1fr']}
-            columns={[minmax('60%', '1fr'), 'auto']}
+            columns={[minmax('50%', '1fr'), 'auto']}
             height={'100vh'}
         >
             <Header />

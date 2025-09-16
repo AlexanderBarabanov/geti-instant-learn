@@ -22,7 +22,7 @@ interface TabProps {
 const SidebarTabs = ({ tabs, selectedTab }: TabProps) => {
     const [tab, setTab] = useState<string | null>(selectedTab);
 
-    const gridTemplateColumns = tab !== null ? ['clamp(size-4600, 35vw, 36rem)', 'size-600'] : ['0px', 'size-600'];
+    const gridTemplateColumns = tab !== null ? ['clamp(size-4600, 35vw, 40rem)', 'size-600'] : ['0px', 'size-600'];
 
     const content = tabs.find(({ label }) => label === tab)?.content;
 
