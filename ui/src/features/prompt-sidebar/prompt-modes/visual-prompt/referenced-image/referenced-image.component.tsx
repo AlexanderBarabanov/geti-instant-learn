@@ -6,12 +6,12 @@
 import { ActionButton, View } from '@geti/ui';
 import { Delete } from '@geti/ui/icons';
 
-import type { ReferenceImage } from '../types';
+import type { ReferencedImageType } from '../types';
 
 import styles from './referenced-image.module.scss';
 
 interface ReferencedImageProps {
-    image: ReferenceImage;
+    image: ReferencedImageType;
 }
 
 export const ReferencedImage = ({ image }: ReferencedImageProps) => {

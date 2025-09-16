@@ -3,5 +3,5 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type CapturedImage = string;
-export type ReferenceImage = string;
+export type CapturedImageType = string;
+export type ReferencedImageType = string;

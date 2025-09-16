@@ -5,13 +5,14 @@
 
 import { Grid, minmax, View } from '@geti/ui';
 
-import { CapturedImage } from './types';
+import { type CapturedImageType } from '../types';
+import { Labels } from './labels.component';
 
-interface ImageContainerProps {
-    image: CapturedImage;
+interface CapturedImageProps {
+    image: CapturedImageType;
 }
 
-export const ImageContainer = ({ image }: ImageContainerProps) => {
+export const CapturedImage = ({ image }: CapturedImageProps) => {
     return (
         <Grid
             width={'100%'}
@@ -19,8 +20,8 @@ export const ImageContainer = ({ image }: ImageContainerProps) => {
             rows={[minmax('size-500', 'auto'), '1fr', 'size-500']}
             height={'100%'}
         >
-            <View gridArea={'labels'} backgroundColor={'gray-200'}>
-                Labels
+            <View gridArea={'labels'} backgroundColor={'gray-200'} padding={'size-100'}>
+                <Labels />
             </View>
             <View gridArea={'image'} backgroundColor={'gray-50'}>
                 <img
