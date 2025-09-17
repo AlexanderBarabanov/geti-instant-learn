@@ -43,3 +43,10 @@ button[class*='toggleButton'][data-variant='accent']:disabled {
 svg {
     fill: currentColor;
 }
+
+[data-testid='underlay'] {
+    & + div[class*='spectrum-Modal-wrapper'] {
+        z-index: 100000 !important;
+    }
+    z-index: 100000 !important;
+}
