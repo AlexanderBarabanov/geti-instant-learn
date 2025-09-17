@@ -4,9 +4,12 @@
  */
 
 import { Image } from '@geti-prompt/icons';
-import { View } from '@geti/ui';
+import { Button, Flex, View } from '@geti/ui';
 
 import { NoMediaPlaceholder } from '../../../../components/no-media-placeholder/no-media-placeholder.component';
+import { CapturedImageLayout } from './captured-image/captured-image-layout.component';
+import { ReferencedImages } from './referenced-images.component';
+import TestImage from './test.jpg';
 
 const NoImagesPlaceholder = () => {
     return (
@@ -16,6 +19,34 @@ const NoImagesPlaceholder = () => {
     );
 };
 
+const useImage = () => {
+    return TestImage;
+};
+
+interface VisualPromptContentProps {
+    image: string;
+}
+
+const VisualPromptContent = ({ image }: VisualPromptContentProps) => {
+    return (
+        <Flex height={'100%'} direction={'column'} gap={'size-300'}>
+            <View flex={1}>
+                <CapturedImageLayout image={image} />
+            </View>
+            <Button alignSelf={'end'} variant={'secondary'}>
+                Add to reference images
+            </Button>
+            <ReferencedImages />
+        </Flex>
+    );
+};
+
 export const VisualPrompt = () => {
+    const image = useImage();
+
+    if (image) {
+        return <VisualPromptContent image={image} />;
+    }
+
     return <NoImagesPlaceholder />;
 };

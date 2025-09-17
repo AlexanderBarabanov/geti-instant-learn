@@ -39,3 +39,7 @@ button[class*='toggleButton'][data-variant='accent']:disabled {
     color: var(--spectrum-gray-100) !important;
     opacity: 0.5 !important;
 }
+
+svg {
+    fill: currentColor;
+}
