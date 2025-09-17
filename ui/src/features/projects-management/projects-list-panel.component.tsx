@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { useState } from 'react';
+
 import {
     ActionButton,
     ButtonGroup,
@@ -39,16 +41,26 @@ const SelectedProjectButton = ({ name }: SelectedProjectProps) => {
     );
 };
 
-const projects = [
-    { name: 'Project 1', id: '1' },
-    { name: 'Project 2', id: '2' },
-    { name: 'Project 3', id: '3' },
+const MOCKED_PROJECTS = [
+    { name: 'Project #1', id: '1' },
+    { name: 'Project #2', id: '2' },
+    { name: 'Project #3', id: '3' },
 ];
 
 export const ProjectsListPanel = () => {
     const { projectId } = useParams();
 
+    const [projects, setProjects] = useState(MOCKED_PROJECTS);
+    const [projectInEdition, setProjectInEdition] = useState<string | null>(null);
+
     const selectedProjectName = projects.find((project) => project.id === projectId)?.name || '';
+
+    const addProject = () => {
+        const newProjectId = (projects.length + 1).toString();
+
+        setProjects((prevProjects) => [...prevProjects, { name: `Project #${newProjectId}`, id: newProjectId }]);
+        setProjectInEdition(newProjectId);
+    };
 
     return (
         <DialogTrigger type='popover' hideArrow>
@@ -70,7 +82,11 @@ export const ProjectsListPanel = () => {
                 </Header>
                 <Content UNSAFE_className={styles.panelContent}>
                     <Divider size={'S'} marginY={'size-200'} />
-                    <ProjectsList projects={projects} />
+                    <ProjectsList
+                        projects={projects}
+                        projectInEdition={projectInEdition}
+                        setProjectInEdition={setProjectInEdition}
+                    />
                     <Divider size={'S'} marginY={'size-200'} />
                 </Content>
 
@@ -81,6 +97,7 @@ export const ProjectsListPanel = () => {
                         marginStart={'size-100'}
                         marginEnd={'size-350'}
                         UNSAFE_className={styles.addProjectButton}
+                        onPress={addProject}
                     >
                         <AddCircle />
                         <Text marginX='size-50'>Add project</Text>
