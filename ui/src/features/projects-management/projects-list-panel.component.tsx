@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 
+import { useProjectIdentifier } from '@geti-prompt/hooks';
 import {
     ActionButton,
     ButtonGroup,
@@ -20,7 +21,6 @@ import {
     View,
 } from '@geti/ui';
 import { AddCircle } from '@geti/ui/icons';
-import { useParams } from 'react-router';
 
 import { ProjectsList } from './projects-list.component';
 
@@ -48,7 +48,7 @@ const MOCKED_PROJECTS = [
 ];
 
 export const ProjectsListPanel = () => {
-    const { projectId } = useParams();
+    const { projectId } = useProjectIdentifier();
 
     const [projects, setProjects] = useState(MOCKED_PROJECTS);
     const [projectInEdition, setProjectInEdition] = useState<string | null>(null);
