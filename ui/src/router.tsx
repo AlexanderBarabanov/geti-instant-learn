@@ -8,7 +8,7 @@ import { createBrowserRouter } from 'react-router-dom';
 import { path } from 'static-path';
 
 import { MainContent } from './components/main-content.component';
-import { RootLayout } from './root-layout.component';
+import { ProjectLayout } from './project-layout.component';
 
 export const routes = {
     root: path('/'),
@@ -29,7 +29,7 @@ export const router = createBrowserRouter([
     },
     {
         path: routes.project.pattern,
-        element: <RootLayout />,
+        element: <ProjectLayout />,
         children: [
             {
                 index: true,
