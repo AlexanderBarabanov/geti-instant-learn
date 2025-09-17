@@ -7,7 +7,7 @@ import { Image } from '@geti-prompt/icons';
 import { Button, Flex, View } from '@geti/ui';
 
 import { NoMediaPlaceholder } from '../../../../components/no-media-placeholder/no-media-placeholder.component';
-import { CapturedImage } from './captured-image/captured-image.component';
+import { CapturedImageLayout } from './captured-image/captured-image-layout.component';
 import { ReferencedImages } from './referenced-images.component';
 import TestImage from './test.jpg';
 
@@ -31,7 +31,7 @@ const VisualPromptContent = ({ image }: VisualPromptContentProps) => {
     return (
         <Flex height={'100%'} direction={'column'} gap={'size-300'}>
             <View flex={1}>
-                <CapturedImage image={image} />
+                <CapturedImageLayout image={image} />
             </View>
             <Button alignSelf={'end'} variant={'secondary'}>
                 Add to reference images

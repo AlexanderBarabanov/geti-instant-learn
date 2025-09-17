@@ -17,6 +17,10 @@ const useReferencedImages = () => {
 export const ReferencedImages = () => {
     const referencedImages = useReferencedImages();
 
+    if (referencedImages === undefined || referencedImages.length === 0) {
+        return null;
+    }
+
     return (
         <Grid columns={[repeat('auto-fit', minmax('size-1600', '1fr'))]} gap={'size-100'}>
             {referencedImages.map((image, index) => (

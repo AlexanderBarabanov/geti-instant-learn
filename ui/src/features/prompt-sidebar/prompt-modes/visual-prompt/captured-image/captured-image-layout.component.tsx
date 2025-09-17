@@ -6,13 +6,14 @@
 import { Grid, minmax, View } from '@geti/ui';
 
 import { type CapturedImageType } from '../types';
+import { CapturedImageActions } from './captured-image-actions.component';
 import { Labels } from './labels.component';
 
-interface CapturedImageProps {
+interface CapturedImageLayoutProps {
     image: CapturedImageType;
 }
 
-export const CapturedImage = ({ image }: CapturedImageProps) => {
+export const CapturedImageLayout = ({ image }: CapturedImageLayoutProps) => {
     return (
         <Grid
             width={'100%'}
@@ -30,8 +31,8 @@ export const CapturedImage = ({ image }: CapturedImageProps) => {
                     style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                 />
             </View>
-            <View gridArea={'actions'} backgroundColor={'gray-200'}>
-                Actions
+            <View gridArea={'actions'} backgroundColor={'gray-200'} padding={'size-100'}>
+                <CapturedImageActions />
             </View>
         </Grid>
     );
