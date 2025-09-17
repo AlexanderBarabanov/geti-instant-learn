@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 
 import { Disclosure, DisclosurePanel, DisclosureTitle, Flex, Text } from '@geti/ui';
 import { clsx } from 'clsx';
@@ -23,19 +23,22 @@ interface DisclosureItemProps<Value extends string> {
 }
 
 const DisclosureItem = <Value extends string>({ item, value, onChange }: DisclosureItemProps<Value>) => {
-    const isExpanded = item.value === value;
+    const [isExpanded, setIsExpanded] = useState<boolean>(item.value === value);
+
+    const handleExpandedChange = (expanded: boolean) => {
+        setIsExpanded(expanded);
+        onChange !== undefined && onChange(item.value);
+    };
 
     return (
         <Disclosure
             isQuiet
             key={item.label}
-            defaultExpanded={isExpanded}
+            isExpanded={isExpanded}
             UNSAFE_className={clsx(styles.disclosure, {
                 [styles.selected]: item.value === value,
             })}
-            onExpandedChange={() => {
-                onChange !== undefined && onChange(item.value);
-            }}
+            onExpandedChange={handleExpandedChange}
         >
             <DisclosureTitle UNSAFE_className={styles.disclosureTitleContainer}>
                 <Flex alignItems={'center'} justifyContent={'space-between'} width={'100%'}>
