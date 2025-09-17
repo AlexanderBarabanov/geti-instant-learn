@@ -1,11 +1,3 @@
-.panelContent {
-    div[class*='_spectrum-Menu-wrapper'] {
-        width: 100%;
-        border: none;
-        background-color: transparent;
-    }
-}
-
 .panelButtons {
     padding-block-start: 0;
 }
@@ -29,17 +21,4 @@
 .projectList {
     list-style: none;
     padding-inline-start: 0;
-}
-
-.projectListItem {
-    padding: var(--spectrum-global-dimension-size-100);
-
-    &:hover,
-    &:has(.actionMenu[aria-expanded='true']) {
-        background-color: var(--spectrum-global-color-gray-100);
-    }
-}
-
-.actionMenu svg {
-    transform: rotate(90deg);
 }

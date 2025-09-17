@@ -61,6 +61,16 @@ export const ProjectsListPanel = () => {
         setProjectInEdition(newProjectId);
     };
 
+    const updateProjectName = (id: string, name: string): void => {
+        setProjects((prevProjects) =>
+            prevProjects.map((project) => (project.id === id ? { ...project, name } : project))
+        );
+    };
+
+    const deleteProject = (id: string): void => {
+        setProjects((prevProjects) => prevProjects.filter((project) => project.id !== id));
+    };
+
     return (
         <DialogTrigger type='popover' hideArrow>
             <SelectedProjectButton name={selectedProjectName} />
@@ -79,12 +89,14 @@ export const ProjectsListPanel = () => {
                         </Heading>
                     </Flex>
                 </Header>
-                <Content UNSAFE_className={styles.panelContent}>
+                <Content>
                     <Divider size={'S'} marginY={'size-200'} />
                     <ProjectsList
                         projects={projects}
                         projectInEdition={projectInEdition}
                         setProjectInEdition={setProjectInEdition}
+                        onDeleteProject={deleteProject}
+                        onUpdateProjectName={updateProjectName}
                     />
                     <Divider size={'S'} marginY={'size-200'} />
                 </Content>
