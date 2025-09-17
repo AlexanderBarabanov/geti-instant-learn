@@ -55,6 +55,14 @@ export default [
                             group: ['@spectrum-icons'],
                             message: 'Use icons from the @geti/ui/icons folder instead.',
                         },
+                        {
+                            group: ['packages/ui'],
+                            message: 'Use components from the @geti/ui folder instead.',
+                        },
+                        {
+                            group: ['packages/ui/icons'],
+                            message: 'Use icons from the @geti/ui/icons folder instead.',
+                        },
                     ],
                 },
             ],

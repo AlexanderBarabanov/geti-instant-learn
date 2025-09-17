@@ -57,7 +57,6 @@ export const ProjectsListPanel = () => {
 
     const addProject = () => {
         const newProjectId = Math.random().toString(36).substring(2, 15);
-        console.log('newProjectId', newProjectId);
         setProjects((prevProjects) => [...prevProjects, { name: `Project #${newProjectId}`, id: newProjectId }]);
         setProjectInEdition(newProjectId);
     };

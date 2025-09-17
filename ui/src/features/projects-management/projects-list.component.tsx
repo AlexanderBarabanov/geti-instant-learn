@@ -5,7 +5,7 @@
 
 import { Key, useState } from 'react';
 
-import { ActionMenu, Flex, Item, TextField } from 'packages/ui';
+import { ActionMenu, Flex, Item, TextField } from '@geti/ui';
 
 import styles from './projects-list.module.scss';
 
@@ -51,7 +51,7 @@ interface ProjectActionsProps {
 
 const ProjectActions = ({ onAction }: ProjectActionsProps) => {
     return (
-        <ActionMenu isQuiet onAction={onAction} aria-label={'Project actions'}>
+        <ActionMenu isQuiet onAction={onAction} aria-label={'Project actions'} UNSAFE_className={styles.actionMenu}>
             {[PROJECT_ACTIONS.RENAME, PROJECT_ACTIONS.DELETE].map((action) => (
                 <Item key={action}>{action}</Item>
             ))}
