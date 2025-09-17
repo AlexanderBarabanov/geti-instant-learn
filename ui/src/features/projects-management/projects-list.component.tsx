@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Key, useEffect, useRef } from 'react';
+import { Key, useState } from 'react';
 
-import { ActionMenu, Flex, Item, Menu, Text, TextField, TextFieldRef } from 'packages/ui';
+import { ActionMenu, Flex, Item, TextField } from 'packages/ui';
 
 import styles from './projects-list.module.scss';
 
@@ -14,59 +14,95 @@ interface Project {
     id: string;
 }
 interface ProjectListProps {
-    menuWidth?: string;
     projects: Project[];
     projectInEdition: string | null;
     setProjectInEdition: (projectId: string | null) => void;
 }
 
-const ProjectEdition = ({ name, onBlur }: { name: string; onBlur: () => void }) => {
-    const inputRef = useRef<TextFieldRef<HTMLInputElement>>(null);
+interface ProjectEditionProps {
+    onBlur: () => void;
+    name: string;
+}
 
-    useEffect(() => {
-        inputRef.current?.select();
-    }, []);
+const ProjectEdition = ({ name, onBlur }: ProjectEditionProps) => {
+    const [newName, setNewName] = useState<string>(name);
 
-    return <TextField ref={inputRef} value={name} onBlur={onBlur} onChange={(e) => console.log(e.target.value)} />;
+    return (
+        <TextField
+            isQuiet
+            ref={(ref) => {
+                ref?.select();
+            }}
+            value={newName}
+            onBlur={onBlur}
+            onChange={setNewName}
+        />
+    );
 };
 
-export const ProjectsList = ({
-    menuWidth = '100%',
-    projects,
-    setProjectInEdition,
-    projectInEdition,
-}: ProjectListProps) => {
-    const isInEditionMode = (projectId: string) => projectInEdition === projectId;
+const PROJECT_ACTIONS = {
+    RENAME: 'Rename',
+    DELETE: 'Delete',
+};
 
-    const looseFocus = () => {
+interface ProjectActionsProps {
+    onAction: (key: Key) => void;
+}
+
+const ProjectActions = ({ onAction }: ProjectActionsProps) => {
+    return (
+        <ActionMenu isQuiet onAction={onAction} aria-label={'Project actions'}>
+            {[PROJECT_ACTIONS.RENAME, PROJECT_ACTIONS.DELETE].map((action) => (
+                <Item key={action}>{action}</Item>
+            ))}
+        </ActionMenu>
+    );
+};
+
+interface ProjectListItemProps {
+    project: Project;
+    isInEditMode: boolean;
+    onBlur: () => void;
+    onAction: (key: Key) => void;
+}
+
+const ProjectListItem = ({ project, isInEditMode, onAction, onBlur }: ProjectListItemProps) => {
+    return (
+        <li className={styles.projectListItem}>
+            <Flex justifyContent='space-between' alignItems='center' marginX={'size-200'}>
+                {isInEditMode ? <ProjectEdition name={project.name} onBlur={onBlur} /> : project.name}
+                <ProjectActions onAction={onAction} />
+            </Flex>
+        </li>
+    );
+};
+
+export const ProjectsList = ({ projects, setProjectInEdition, projectInEdition }: ProjectListProps) => {
+    const isInEditionMode = (projectId: string) => {
+        return projectInEdition === projectId;
+    };
+
+    const handleBlur = () => {
         setProjectInEdition(null);
     };
 
-    const onActionHandler = (key: Key, id: string) => {
-        if (key === 'Rename') {
-            setProjectInEdition(id);
+    const handleAction = (projectId: string) => (key: Key) => {
+        if (key === PROJECT_ACTIONS.RENAME) {
+            setProjectInEdition(projectId);
         }
     };
 
     return (
-        <Menu UNSAFE_className={styles.projectMenu} width={menuWidth} items={projects}>
-            {(item) => (
-                <Item key={item.id} textValue={item.name}>
-                    <Text>
-                        <Flex justifyContent='space-between' alignItems='center' marginX={'size-200'}>
-                            {isInEditionMode(item.id) ? (
-                                <ProjectEdition name={item.name} onBlur={looseFocus} />
-                            ) : (
-                                item.name
-                            )}
-                            <ActionMenu isQuiet onAction={(key) => onActionHandler(key, item.id)}>
-                                <Item>Rename</Item>
-                                <Item>Delete</Item>
-                            </ActionMenu>
-                        </Flex>
-                    </Text>
-                </Item>
-            )}
-        </Menu>
+        <ul className={styles.projectList}>
+            {projects.map((project) => (
+                <ProjectListItem
+                    key={project.id}
+                    project={project}
+                    onAction={handleAction(project.id)}
+                    onBlur={handleBlur}
+                    isInEditMode={isInEditionMode(project.id)}
+                />
+            ))}
+        </ul>
     );
 };

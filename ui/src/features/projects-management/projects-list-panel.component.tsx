@@ -56,8 +56,8 @@ export const ProjectsListPanel = () => {
     const selectedProjectName = projects.find((project) => project.id === projectId)?.name || '';
 
     const addProject = () => {
-        const newProjectId = (projects.length + 1).toString();
-
+        const newProjectId = Math.random().toString(36).substring(2, 15);
+        console.log('newProjectId', newProjectId);
         setProjects((prevProjects) => [...prevProjects, { name: `Project #${newProjectId}`, id: newProjectId }]);
         setProjectInEdition(newProjectId);
     };
