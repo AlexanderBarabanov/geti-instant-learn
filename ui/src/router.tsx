@@ -25,14 +25,14 @@ const RedirectToProject = () => {
 export const router = createBrowserRouter([
     {
         path: routes.root.pattern,
+        element: <RedirectToProject />,
+    },
+    {
+        path: routes.project.pattern,
         element: <RootLayout />,
         children: [
             {
                 index: true,
-                element: <RedirectToProject />,
-            },
-            {
-                path: routes.project.pattern,
                 element: <MainContent />,
             },
         ],
