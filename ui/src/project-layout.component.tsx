@@ -10,7 +10,7 @@ import { Header } from './components/header.component';
 import { Sidebar } from './components/sidebar/sidebar.component';
 import { Toolbar } from './components/toolbar.component';
 
-export const RootLayout = () => {
+export const ProjectLayout = () => {
     return (
         <Grid
             areas={['header header header', 'toolbar prompt-sidebar sidebar', 'main prompt-sidebar sidebar']}
