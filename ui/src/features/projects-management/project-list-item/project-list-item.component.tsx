@@ -119,7 +119,7 @@ export const ProjectListItem = ({ project, isInEditMode, onBlur, onRename, onDel
 
     return (
         <>
-            <li className={styles.projectListItem} onClick={handleNavigateToProject}>
+            <li className={styles.projectListItem} onClick={isInEditMode ? undefined : handleNavigateToProject}>
                 <Flex justifyContent='space-between' alignItems='center' marginX={'size-200'}>
                     {isInEditMode ? (
                         <ProjectEdition name={project.name} onBlur={handleBlur(project.id)} />
