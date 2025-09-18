@@ -14,7 +14,7 @@ class ResourceType(str, Enum):
     SOURCE = "Source"
     PROCESSOR = "Processor"
     SINK = "Sink"
-    PIPELINE = "Project"
+    PROJECT = "Project"
 
 
 class ResourceError(Exception):
@@ -30,7 +30,7 @@ class ResourceNotFoundError(ResourceError):
     """Exception raised when a resource is not found."""
 
     def __init__(self, resource_type: ResourceType, resource_id: str | None = None, message: str | None = None):
-        msg = message or f"{resource_type.name} with ID {resource_id} not found."
+        msg = message or f"{resource_type.value} with ID {resource_id} not found."
         super().__init__(resource_type, resource_id, msg)
 
 
@@ -38,7 +38,7 @@ class ResourceInUseError(ResourceError):
     """Exception raised when trying to delete a resource that is currently in use."""
 
     def __init__(self, resource_type: ResourceType, resource_id: str, message: str | None = None):
-        msg = message or f"{resource_type.name} with ID {resource_id} cannot be deleted because it is in use."
+        msg = message or f"{resource_type.value} with ID {resource_id} cannot be deleted because it is in use."
         super().__init__(resource_type, resource_id, msg)
 
 
@@ -46,7 +46,7 @@ class ResourceAlreadyExistsError(ResourceError):
     """Exception raised when a resource with the same name already exists."""
 
     def __init__(self, resource_type: ResourceType, resource_name: str, message: str | None = None):
-        msg = message or f"{resource_type.name} with name '{resource_name}' already exists."
+        msg = message or f"{resource_type.value} with name '{resource_name}' already exists."
         super().__init__(resource_type, resource_name, msg)
 
 

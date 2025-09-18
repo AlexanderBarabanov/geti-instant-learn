@@ -8,8 +8,8 @@ from fastapi import HTTPException, status
 from db.repository.common import ResourceNotFoundError, ResourceType
 from db.repository.project import ProjectRepository
 from dependencies import SessionDep
-from rest.schemas.project import ProjectSchema
 from rest.schemas.processor import ProcessorSchema
+from rest.schemas.project import ProjectSchema
 from rest.schemas.sink import SinkSchema
 from rest.schemas.source import SourceSchema
 from routers import projects_router
@@ -42,7 +42,7 @@ def get_active_project(db_session: SessionDep) -> ProjectSchema:
     try:
         active_project = repo.get_active_project()
         if not active_project:
-            raise ResourceNotFoundError(resource_type=ResourceType.PIPELINE, message="No active project found.")
+            raise ResourceNotFoundError(resource_type=ResourceType.PROJECT, message="No active project found.")
 
         logger.info(f"Active project retrieved: {active_project.name} with id {active_project.id}")
 

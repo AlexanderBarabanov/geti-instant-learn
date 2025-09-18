@@ -27,7 +27,7 @@ class ProjectRepository(BaseRepository):
         """
         existing_project: Project | None = self.session.scalars(select(Project).where(Project.name == name)).first()
         if existing_project:
-            raise ResourceAlreadyExistsError(resource_type=ResourceType.PIPELINE, resource_name=name)
+            raise ResourceAlreadyExistsError(resource_type=ResourceType.PROJECT, resource_name=name)
 
         new_project = Project(name=name)
         self.session.add(new_project)
@@ -87,7 +87,7 @@ class ProjectRepository(BaseRepository):
         """
         project: Project | None = self.session.scalars(select(Project).where(Project.id == project_id)).first()
         if not project:
-            raise ResourceNotFoundError(resource_type=ResourceType.PIPELINE, resource_id=str(project_id))
+            raise ResourceNotFoundError(resource_type=ResourceType.PROJECT, resource_id=str(project_id))
         project.name = new_name
         self.session.commit()
         self.session.refresh(project)
@@ -102,7 +102,7 @@ class ProjectRepository(BaseRepository):
         """
         project: Project | None = self.session.scalars(select(Project).where(Project.id == project_id)).first()
         if not project:
-            raise ResourceNotFoundError(resource_type=ResourceType.PIPELINE, resource_id=str(project_id))
+            raise ResourceNotFoundError(resource_type=ResourceType.PROJECT, resource_id=str(project_id))
         return project
 
     def get_all_projects(self) -> Sequence[Project]:
@@ -126,7 +126,7 @@ class ProjectRepository(BaseRepository):
         """
         project: Project | None = self.session.scalars(select(Project).where(Project.id == project_id)).first()
         if not project:
-            raise ResourceNotFoundError(resource_type=ResourceType.PIPELINE, resource_id=str(project_id))
+            raise ResourceNotFoundError(resource_type=ResourceType.PROJECT, resource_id=str(project_id))
 
         if project.source:
             self.session.delete(project.source)

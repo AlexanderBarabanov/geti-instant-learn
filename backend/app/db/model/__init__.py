@@ -4,10 +4,10 @@
 from .annotation import Annotation
 from .base import Base
 from .label import Label
-from .project import Project
 from .processor import Processor
+from .project import Project
 from .prompt import Prompt
 from .sink import Sink
 from .source import Source
 
-__all__ = ["Annotation", "Base", "Label", "Project", "Processor", "Prompt", "Sink", "Source"]
+__all__ = ["Annotation", "Base", "Label", "Processor", "Project", "Prompt", "Sink", "Source"]

@@ -8,9 +8,10 @@ from typing import Annotated, Any
 from fastapi import Depends
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
-from settings import Settings
+
 from alembic import command
 from alembic.config import Config
+from settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -42,4 +43,4 @@ def run_db_migrations(settings: Settings) -> None:
         command.upgrade(alembic_cfg, "head")
         logger.info("✓ Database migrations completed successfully")
     except Exception:
-        logger.exception(f"✗ Database migration failed")
+        logger.exception("✗ Database migration failed")

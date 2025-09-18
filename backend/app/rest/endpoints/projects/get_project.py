@@ -9,8 +9,8 @@ from fastapi import HTTPException, status
 from db.repository.common import ResourceNotFoundError
 from db.repository.project import ProjectRepository
 from dependencies import SessionDep
-from rest.schemas.project import ProjectSchema
 from rest.schemas.processor import ProcessorSchema
+from rest.schemas.project import ProjectSchema
 from rest.schemas.sink import SinkSchema
 from rest.schemas.source import SourceSchema
 from routers import projects_router

@@ -1,7 +1,7 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-from logging.config import fileConfig
+# from logging.config import fileConfig
 
 from alembic import context
 from db.model import Base
@@ -17,8 +17,8 @@ section = config.config_ini_section
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+# if config.config_file_name is not None:
+#     fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
