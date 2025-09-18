@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { useState } from 'react';
+
+import { useProjectIdentifier } from '@geti-prompt/hooks';
 import {
     ActionButton,
     ButtonGroup,
@@ -18,7 +21,6 @@ import {
     View,
 } from '@geti/ui';
 import { AddCircle } from '@geti/ui/icons';
-import { useParams } from 'react-router';
 
 import { ProjectsList } from './projects-list.component';
 
@@ -39,16 +41,35 @@ const SelectedProjectButton = ({ name }: SelectedProjectProps) => {
     );
 };
 
-const projects = [
-    { name: 'Project 1', id: '1' },
-    { name: 'Project 2', id: '2' },
-    { name: 'Project 3', id: '3' },
+const MOCKED_PROJECTS = [
+    { name: 'Project #1', id: '1' },
+    { name: 'Project #2', id: '2' },
+    { name: 'Project #3', id: '3' },
 ];
 
 export const ProjectsListPanel = () => {
-    const { projectId } = useParams();
+    const { projectId } = useProjectIdentifier();
+
+    const [projects, setProjects] = useState(MOCKED_PROJECTS);
+    const [projectInEdition, setProjectInEdition] = useState<string | null>(null);
 
     const selectedProjectName = projects.find((project) => project.id === projectId)?.name || '';
+
+    const addProject = () => {
+        const newProjectId = Math.random().toString(36).substring(2, 15);
+        setProjects((prevProjects) => [...prevProjects, { name: `Project #${newProjectId}`, id: newProjectId }]);
+        setProjectInEdition(newProjectId);
+    };
+
+    const updateProjectName = (id: string, name: string): void => {
+        setProjects((prevProjects) =>
+            prevProjects.map((project) => (project.id === id ? { ...project, name } : project))
+        );
+    };
+
+    const deleteProject = (id: string): void => {
+        setProjects((prevProjects) => prevProjects.filter((project) => project.id !== id));
+    };
 
     return (
         <DialogTrigger type='popover' hideArrow>
@@ -68,9 +89,15 @@ export const ProjectsListPanel = () => {
                         </Heading>
                     </Flex>
                 </Header>
-                <Content UNSAFE_className={styles.panelContent}>
+                <Content>
                     <Divider size={'S'} marginY={'size-200'} />
-                    <ProjectsList projects={projects} />
+                    <ProjectsList
+                        projects={projects}
+                        projectIdInEdition={projectInEdition}
+                        setProjectInEdition={setProjectInEdition}
+                        onDeleteProject={deleteProject}
+                        onUpdateProjectName={updateProjectName}
+                    />
                     <Divider size={'S'} marginY={'size-200'} />
                 </Content>
 
@@ -81,6 +108,7 @@ export const ProjectsListPanel = () => {
                         marginStart={'size-100'}
                         marginEnd={'size-350'}
                         UNSAFE_className={styles.addProjectButton}
+                        onPress={addProject}
                     >
                         <AddCircle />
                         <Text marginX='size-50'>Add project</Text>

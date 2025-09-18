@@ -43,3 +43,11 @@ button[class*='toggleButton'][data-variant='accent']:disabled {
 svg {
     fill: currentColor;
 }
+
+// Increase the modal’s background when a dialog is opened inside another dialog.
+[data-testid='underlay'] {
+    & + div[class*='spectrum-Modal-wrapper'] {
+        z-index: 100000 !important;
+    }
+    z-index: 100000 !important;
+}
