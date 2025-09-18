@@ -5,21 +5,13 @@
 
 import { render } from '@geti-prompt/test-utils';
 import { screen } from '@testing-library/react';
-import { vi } from 'vitest';
 
+import { routes } from '../router';
 import { Header } from './header.component';
-
-vi.mock('react-router-dom', async () => {
-    const actual = await vi.importActual('react-router-dom');
-    return {
-        ...actual,
-        useParams: () => ({ projectId: '123' }),
-    };
-});
 
 describe('Header', () => {
     it('renders header properly', () => {
-        render(<Header />);
+        render(<Header />, { route: routes.project({ projectId: '1' }), path: routes.project.pattern });
 
         expect(screen.getByText('Geti Prompt')).toBeInTheDocument();
     });
