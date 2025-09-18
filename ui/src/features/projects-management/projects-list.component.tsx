@@ -9,7 +9,7 @@ import styles from './projects-list.module.scss';
 
 interface ProjectListProps {
     projects: Project[];
-    projectInEdition: string | null;
+    projectIdInEdition: string | null;
     setProjectInEdition: (projectId: string | null) => void;
     onUpdateProjectName: (projectId: string, newName: string) => void;
     onDeleteProject: (projectId: string) => void;
@@ -18,12 +18,12 @@ interface ProjectListProps {
 export const ProjectsList = ({
     projects,
     setProjectInEdition,
-    projectInEdition,
+    projectIdInEdition,
     onDeleteProject,
     onUpdateProjectName,
 }: ProjectListProps) => {
     const isInEditionMode = (projectId: string) => {
-        return projectInEdition === projectId;
+        return projectIdInEdition === projectId;
     };
 
     const handleBlur = (projectId: string, newName: string) => {

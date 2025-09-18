@@ -93,7 +93,7 @@ export const ProjectsListPanel = () => {
                     <Divider size={'S'} marginY={'size-200'} />
                     <ProjectsList
                         projects={projects}
-                        projectInEdition={projectInEdition}
+                        projectIdInEdition={projectInEdition}
                         setProjectInEdition={setProjectInEdition}
                         onDeleteProject={deleteProject}
                         onUpdateProjectName={updateProjectName}
