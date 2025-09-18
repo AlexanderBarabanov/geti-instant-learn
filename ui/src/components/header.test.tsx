@@ -5,8 +5,17 @@
 
 import { render } from '@geti-prompt/test-utils';
 import { screen } from '@testing-library/react';
+import { vi } from 'vitest';
 
 import { Header } from './header.component';
+
+vi.mock('react-router-dom', async () => {
+    const actual = await vi.importActual('react-router-dom');
+    return {
+        ...actual,
+        useParams: () => ({ projectId: '123' }),
+    };
+});
 
 describe('Header', () => {
     it('renders header properly', () => {
