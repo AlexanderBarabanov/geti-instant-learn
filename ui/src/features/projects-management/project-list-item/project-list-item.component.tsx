@@ -44,7 +44,16 @@ const ProjectEdition = ({ name, onBlur }: ProjectEditionProps) => {
         textFieldRef.current?.select();
     }, []);
 
-    return <TextField isQuiet ref={textFieldRef} value={newName} onBlur={handleBlur} onChange={setNewName} />;
+    return (
+        <TextField
+            isQuiet
+            ref={textFieldRef}
+            value={newName}
+            onBlur={handleBlur}
+            onChange={setNewName}
+            aria-label='Edit project name'
+        />
+    );
 };
 
 const PROJECT_ACTIONS = {
