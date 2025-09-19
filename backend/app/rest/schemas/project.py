@@ -19,7 +19,7 @@ class ProjectSchema(BaseModel):
 
 
 class ProjectPostPayload(BaseModel):
-    id: UUID
+    id: UUID | None = None
     name: str = Field(max_length=80, min_length=1)
 
 

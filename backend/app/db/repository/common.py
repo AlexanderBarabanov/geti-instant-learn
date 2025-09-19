@@ -43,11 +43,19 @@ class ResourceInUseError(ResourceError):
 
 
 class ResourceAlreadyExistsError(ResourceError):
-    """Exception raised when a resource with the same name already exists."""
+    """Exception raised when a resource with the same name or id already exists."""
 
-    def __init__(self, resource_type: ResourceType, resource_name: str, message: str | None = None):
-        msg = message or f"{resource_type.value} with name '{resource_name}' already exists."
-        super().__init__(resource_type, resource_name, msg)
+    def __init__(
+        self, resource_type: ResourceType, resource_value: str, raised_by: str = "name", message: str | None = None
+    ):
+        if not message:
+            if raised_by == "id":
+                msg = f"{resource_type.value} with id '{resource_value}' already exists."
+            else:
+                msg = f"{resource_type.value} with name '{resource_value}' already exists."
+        else:
+            msg = message
+        super().__init__(resource_type, resource_value, msg)
 
 
 class BaseRepository:

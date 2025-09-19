@@ -5,7 +5,7 @@ import logging
 from collections.abc import Sequence
 from uuid import UUID
 
-from sqlalchemy import select, or_
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from db.model import Project
@@ -18,24 +18,29 @@ class ProjectRepository(BaseRepository):
     def __init__(self, session: Session):
         self.session = session
 
-    def create_project(self, id: UUID, name: str) -> Project:
+    def create_project(self, name: str, project_id: UUID | None = None) -> Project:
         """
         Create a new Project in the database.
 
         Raises:
-            ValueError: If a project with the given name or id already exists.
+            ResourceAlreadyExistsError: If a project with the given name or id already exists.
         """
-        # Check for existing project with the same name or id in a single query
-        existing_project: Project | None = self.session.scalars(
-            select(Project).where(or_(Project.name == name, Project.id == id))
-        ).first()
+        filters = [Project.name == name]
+        if project_id is not None:
+            filters.append(Project.id == project_id)
+        existing_project: Project | None = self.session.scalars(select(Project).where(or_(*filters))).first()
         if existing_project:
             if existing_project.name == name:
-                raise ResourceAlreadyExistsError(resource_type=ResourceType.PROJECT, resource_name=name)
-            else:
-                raise ResourceAlreadyExistsError(resource_type=ResourceType.PROJECT, resource_name=str(id))
+                raise ResourceAlreadyExistsError(
+                    resource_type=ResourceType.PROJECT, resource_value=existing_project.name, raised_by="name"
+                )
+            raise ResourceAlreadyExistsError(
+                resource_type=ResourceType.PROJECT, resource_value=str(existing_project.id), raised_by="id"
+            )
 
-        new_project = Project(name=name, id=id)
+        new_project = Project(name=name)
+        if project_id is not None:
+            new_project.id = project_id
         self.session.add(new_project)
         self.session.flush()
         self.session.refresh(new_project)

@@ -29,6 +29,4 @@ def delete_sink(project_id: UUID) -> Response:
     """
     logger.debug(f"Received DELETE project {project_id} sink request.")
 
-    return Response(
-        status_code=status.HTTP_200_OK, content=f"Sink for the project {project_id} deleted successfully."
-    )
+    return Response(status_code=status.HTTP_200_OK, content=f"Sink for the project {project_id} deleted successfully.")
