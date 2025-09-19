@@ -36,7 +36,7 @@ def create_project(payload: ProjectPostPayload, db_session: SessionDep) -> Respo
     repo = ProjectRepository(db_session)
 
     try:
-        project = repo.create_project(payload.name)
+        project = repo.create_project(payload.id, payload.name)
         logger.info(f"Successfully created {project.name} project with id {project.id}")
     except ResourceAlreadyExistsError as e:
         logger.error(f"Project creation failed: {e}")

@@ -18,7 +18,7 @@ class ProjectRepository(BaseRepository):
     def __init__(self, session: Session):
         self.session = session
 
-    def create_project(self, name: str) -> Project:
+    def create_project(self, id: UUID, name: str) -> Project:
         """
         Create a new Project in the database.
 
@@ -29,7 +29,7 @@ class ProjectRepository(BaseRepository):
         if existing_project:
             raise ResourceAlreadyExistsError(resource_type=ResourceType.PROJECT, resource_name=name)
 
-        new_project = Project(name=name)
+        new_project = Project(name=name, id=id)
         self.session.add(new_project)
         self.session.flush()
         self.session.refresh(new_project)
