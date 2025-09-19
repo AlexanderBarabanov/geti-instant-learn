@@ -5,7 +5,7 @@ import logging
 from collections.abc import Sequence
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.orm import Session
 
 from db.model import Project
@@ -23,11 +23,17 @@ class ProjectRepository(BaseRepository):
         Create a new Project in the database.
 
         Raises:
-            ValueError: If a project with the given name already exists.
+            ValueError: If a project with the given name or id already exists.
         """
-        existing_project: Project | None = self.session.scalars(select(Project).where(Project.name == name)).first()
+        # Check for existing project with the same name or id in a single query
+        existing_project: Project | None = self.session.scalars(
+            select(Project).where(or_(Project.name == name, Project.id == id))
+        ).first()
         if existing_project:
-            raise ResourceAlreadyExistsError(resource_type=ResourceType.PROJECT, resource_name=name)
+            if existing_project.name == name:
+                raise ResourceAlreadyExistsError(resource_type=ResourceType.PROJECT, resource_name=name)
+            else:
+                raise ResourceAlreadyExistsError(resource_type=ResourceType.PROJECT, resource_name=str(id))
 
         new_project = Project(name=name, id=id)
         self.session.add(new_project)
