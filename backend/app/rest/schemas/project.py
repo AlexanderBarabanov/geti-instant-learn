@@ -29,7 +29,7 @@ class ProjectPutPayload(BaseModel):
 
 class ProjectListItem(BaseModel):
     id: UUID
-    name: str | None = None
+    name: str
 
 
 class ProjectsListSchema(BaseModel):
