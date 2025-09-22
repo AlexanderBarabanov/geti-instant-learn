@@ -119,7 +119,7 @@ export const ProjectsListPanel = () => {
                 <ButtonGroup UNSAFE_className={styles.panelButtons}>
                     <AddProjectButton
                         onSetProjectInEdition={setProjectInEdition}
-                        projectsCount={data?.projects.length}
+                        projectsCount={data.projects.length}
                     />
                 </ButtonGroup>
             </Dialog>
