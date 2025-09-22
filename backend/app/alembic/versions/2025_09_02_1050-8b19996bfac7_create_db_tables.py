@@ -41,67 +41,68 @@ def upgrade() -> None:
     context.execute("PRAGMA foreign_keys=ON")  # enable foreign keys for SQLite
 
     op.create_table('Project',
-    sa.Column('name', sa.String(), nullable=False),
-    sa.Column('active', sa.Boolean(), nullable=False),
-    sa.Column('id', sa.Uuid(), nullable=False),
-    sa.PrimaryKeyConstraint('id')
-    )
+                    sa.Column('name', sa.String(), nullable=False),
+                    sa.Column('active', sa.Boolean(), nullable=False),
+                    sa.Column('id', sa.Uuid(), nullable=False),
+                    sa.PrimaryKeyConstraint('id')
+                    )
     op.create_table('Processor',
-    sa.Column('name', sa.String(), nullable=True),
-    sa.Column('type', sa.Enum('DUMMY', name='processortype'), nullable=False),
-    sa.Column('config', sqlite.JSON(), nullable=False),
-    sa.Column('project_id', sa.Uuid(), nullable=False),
-    sa.Column('id', sa.Uuid(), nullable=False),
-    sa.ForeignKeyConstraint(['project_id'], ['Project.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('project_id')
-    )
+                    sa.Column('name', sa.String(), nullable=True),
+                    sa.Column('type', sa.Enum('DUMMY', name='processortype'), nullable=False),
+                    sa.Column('config', sqlite.JSON(), nullable=False),
+                    sa.Column('project_id', sa.Uuid(), nullable=False),
+                    sa.Column('id', sa.Uuid(), nullable=False),
+                    sa.ForeignKeyConstraint(['project_id'], ['Project.id'], ondelete='CASCADE'),
+                    sa.PrimaryKeyConstraint('id'),
+                    sa.UniqueConstraint('project_id')
+                    )
     op.create_table('Prompt',
-    sa.Column('type', sa.Enum('TEXT', 'VISUAL', name='prompttype'), nullable=False),
-    sa.Column('name', sa.Text(), nullable=False),
-    sa.Column('project_id', sa.Uuid(), nullable=False),
-    sa.Column('text', sa.String(), nullable=True),
-    sa.Column('image_path', sa.String(), nullable=True),
-    sa.Column('id', sa.Uuid(), nullable=False),
-    sa.ForeignKeyConstraint(['project_id'], ['Project.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id')
-    )
+                    sa.Column('type', sa.Enum('TEXT', 'VISUAL', name='prompttype'), nullable=False),
+                    sa.Column('name', sa.Text(), nullable=False),
+                    sa.Column('project_id', sa.Uuid(), nullable=False),
+                    sa.Column('text', sa.String(), nullable=True),
+                    sa.Column('image_path', sa.String(), nullable=True),
+                    sa.Column('id', sa.Uuid(), nullable=False),
+                    sa.ForeignKeyConstraint(['project_id'], ['Project.id'], ondelete='CASCADE'),
+                    sa.PrimaryKeyConstraint('id')
+                    )
     op.create_table('Sink',
-    sa.Column('config', sqlite.JSON(), nullable=False),
-    sa.Column('project_id', sa.Uuid(), nullable=False),
-    sa.Column('id', sa.Uuid(), nullable=False),
-    sa.ForeignKeyConstraint(['project_id'], ['Project.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('project_id')
-    )
+                    sa.Column('config', sqlite.JSON(), nullable=False),
+                    sa.Column('project_id', sa.Uuid(), nullable=False),
+                    sa.Column('id', sa.Uuid(), nullable=False),
+                    sa.ForeignKeyConstraint(['project_id'], ['Project.id'], ondelete='CASCADE'),
+                    sa.PrimaryKeyConstraint('id'),
+                    sa.UniqueConstraint('project_id')
+                    )
     op.create_table('Source',
-    sa.Column('type', sa.Enum('VIDEO_FILE', 'WEB_CAMERA', 'IMAGE_DIRECTORY', name='sourcetype'), nullable=False),
-    sa.Column('config', sqlite.JSON(), nullable=False),
-    sa.Column('project_id', sa.Uuid(), nullable=False),
-    sa.Column('id', sa.Uuid(), nullable=False),
-    sa.ForeignKeyConstraint(['project_id'], ['Project.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('project_id')
-    )
+                    sa.Column('type', sa.Enum('VIDEO_FILE', 'WEB_CAMERA', 'IMAGE_DIRECTORY', name='sourcetype'),
+                              nullable=False),
+                    sa.Column('config', sqlite.JSON(), nullable=False),
+                    sa.Column('project_id', sa.Uuid(), nullable=False),
+                    sa.Column('id', sa.Uuid(), nullable=False),
+                    sa.ForeignKeyConstraint(['project_id'], ['Project.id'], ondelete='CASCADE'),
+                    sa.PrimaryKeyConstraint('id'),
+                    sa.UniqueConstraint('project_id')
+                    )
     op.create_table('Annotation',
-    sa.Column('config', sqlite.JSON(), nullable=False),
-    sa.Column('prompt_id', sa.Uuid(), nullable=False),
-    sa.Column('id', sa.Uuid(), nullable=False),
-    sa.ForeignKeyConstraint(['prompt_id'], ['Prompt.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('prompt_id')
-    )
+                    sa.Column('config', sqlite.JSON(), nullable=False),
+                    sa.Column('prompt_id', sa.Uuid(), nullable=False),
+                    sa.Column('id', sa.Uuid(), nullable=False),
+                    sa.ForeignKeyConstraint(['prompt_id'], ['Prompt.id'], ondelete='CASCADE'),
+                    sa.PrimaryKeyConstraint('id'),
+                    sa.UniqueConstraint('prompt_id')
+                    )
     op.create_table('Label',
-    sa.Column('name', sa.String(), nullable=False),
-    sa.Column('color', sa.String(), nullable=False),
-    sa.Column('project_id', sa.Uuid(), nullable=True),
-    sa.Column('prompt_id', sa.Uuid(), nullable=True),
-    sa.Column('id', sa.Uuid(), nullable=False),
-    sa.CheckConstraint('project_id IS NOT NULL OR prompt_id IS NOT NULL', name='label_parent_check'),
-    sa.ForeignKeyConstraint(['project_id'], ['Project.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['prompt_id'], ['Prompt.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id')
-    )
+                    sa.Column('name', sa.String(), nullable=False),
+                    sa.Column('color', sa.String(), nullable=False),
+                    sa.Column('project_id', sa.Uuid(), nullable=True),
+                    sa.Column('prompt_id', sa.Uuid(), nullable=True),
+                    sa.Column('id', sa.Uuid(), nullable=False),
+                    sa.CheckConstraint('project_id IS NOT NULL OR prompt_id IS NOT NULL', name='label_parent_check'),
+                    sa.ForeignKeyConstraint(['project_id'], ['Project.id'], ondelete='CASCADE'),
+                    sa.ForeignKeyConstraint(['prompt_id'], ['Prompt.id'], ondelete='CASCADE'),
+                    sa.PrimaryKeyConstraint('id')
+                    )
     _add_initial_project()
 
 
