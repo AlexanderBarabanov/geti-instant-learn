@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { $api } from '@geti-prompt/api';
 import { Grid, minmax } from '@geti/ui';
 import { Outlet } from 'react-router';
 
