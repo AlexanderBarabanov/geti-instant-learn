@@ -6,19 +6,21 @@
 import { useState } from 'react';
 
 import { Button, Flex, Form, Item, Picker, TextField } from '@geti/ui';
+import { isNull } from 'lodash-es';
 
 export const IPCameraForm = () => {
+    const protocols = ['RTSP', 'HTTP', 'HTTPS', 'ONVIF', 'SMTP', 'TCP'];
+
     const [ip, setIp] = useState('');
     const [port, setPort] = useState('');
     const [streamPath, setStreamPath] = useState('');
+    const [selectedProtocol, setSelectedProtocol] = useState(protocols[0]);
 
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
     };
 
-    const protocols = ['RTSP', 'HTTP', 'HTTPS', 'ONVIF', 'SMTP', 'TCP'];
-
-    const isFormValid = !ip || !port || !streamPath;
+    const isFormValid = ip && port && streamPath && selectedProtocol;
 
     return (
         <Form onSubmit={handleSubmit}>
@@ -27,12 +29,17 @@ export const IPCameraForm = () => {
                 <TextField label='Port' value={port} onChange={setPort} />
             </Flex>
             <TextField label='Stream Path' value={streamPath} onChange={setStreamPath} />
-            <Picker label='Protocol' defaultSelectedKey={protocols[0]} items={protocols}>
+            <Picker
+                label='Protocol'
+                defaultSelectedKey={selectedProtocol}
+                items={protocols}
+                onSelectionChange={(key) => !isNull(key) && setSelectedProtocol(key as string)}
+            >
                 {protocols.map((protocol) => (
                     <Item key={protocol}>{protocol}</Item>
                 ))}
             </Picker>
-            <Button type='submit' width={'size-700'} isDisabled={isFormValid}>
+            <Button type='submit' isDisabled={!isFormValid} width={'fit-content'}>
                 Apply
             </Button>
         </Form>
