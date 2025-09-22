@@ -8,7 +8,7 @@ import { createBrowserRouter } from 'react-router-dom';
 import { path } from 'static-path';
 
 import { MainContent } from './components/main-content.component';
-import { RootLayout } from './root-layout.component';
+import { ProjectLayout } from './project-layout.component';
 
 export const routes = {
     root: path('/'),
@@ -25,14 +25,14 @@ const RedirectToProject = () => {
 export const router = createBrowserRouter([
     {
         path: routes.root.pattern,
-        element: <RootLayout />,
+        element: <RedirectToProject />,
+    },
+    {
+        path: routes.project.pattern,
+        element: <ProjectLayout />,
         children: [
             {
                 index: true,
-                element: <RedirectToProject />,
-            },
-            {
-                path: routes.project.pattern,
                 element: <MainContent />,
             },
         ],

@@ -3,35 +3,54 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ActionMenu, Flex, Item, Menu, Text } from 'packages/ui';
+import { Project, ProjectListItem } from './project-list-item/project-list-item.component';
 
 import styles from './projects-list.module.scss';
 
-interface Project {
-    name: string;
-    id: string;
-}
 interface ProjectListProps {
-    menuWidth?: string;
     projects: Project[];
+    projectIdInEdition: string | null;
+    setProjectInEdition: (projectId: string | null) => void;
+    onUpdateProjectName: (projectId: string, newName: string) => void;
+    onDeleteProject: (projectId: string) => void;
 }
 
-export const ProjectsList = ({ menuWidth = '100%', projects }: ProjectListProps) => {
+export const ProjectsList = ({
+    projects,
+    setProjectInEdition,
+    projectIdInEdition,
+    onDeleteProject,
+    onUpdateProjectName,
+}: ProjectListProps) => {
+    const isInEditionMode = (projectId: string) => {
+        return projectIdInEdition === projectId;
+    };
+
+    const handleBlur = (projectId: string, newName: string) => {
+        setProjectInEdition(null);
+        onUpdateProjectName(projectId, newName);
+    };
+
+    const handleRename = (projectId: string) => {
+        setProjectInEdition(projectId);
+    };
+
+    const deleteProject = (projectId: string) => {
+        onDeleteProject(projectId);
+    };
+
     return (
-        <Menu UNSAFE_className={styles.projectMenu} width={menuWidth} items={projects}>
-            {(item) => (
-                <Item key={item.id} textValue={item.name}>
-                    <Text>
-                        <Flex justifyContent='space-between' alignItems='center' marginX={'size-200'}>
-                            {item.name}
-                            <ActionMenu isQuiet>
-                                <Item>Rename</Item>
-                                <Item>Delete</Item>
-                            </ActionMenu>
-                        </Flex>
-                    </Text>
-                </Item>
-            )}
-        </Menu>
+        <ul className={styles.projectList}>
+            {projects.map((project) => (
+                <ProjectListItem
+                    key={project.id}
+                    project={project}
+                    onRename={handleRename}
+                    onDelete={deleteProject}
+                    onBlur={handleBlur}
+                    isInEditMode={isInEditionMode(project.id)}
+                />
+            ))}
+        </ul>
     );
 };
