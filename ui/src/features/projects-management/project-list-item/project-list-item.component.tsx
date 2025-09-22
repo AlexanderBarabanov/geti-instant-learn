@@ -44,6 +44,10 @@ const ProjectEdition = ({ name, onBlur }: ProjectEditionProps) => {
         if (e.key === 'Enter') {
             e.preventDefault();
             onBlur(newName);
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            setNewName(name);
+            onBlur(name);
         }
     };
 
