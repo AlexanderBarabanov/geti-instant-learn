@@ -9,10 +9,12 @@ import { setupServer } from 'msw/node';
 import fetchPolyfill, { Request as RequestPolyfill } from 'node-fetch';
 import { afterAll, afterEach, beforeAll } from 'vitest';
 
-import { handlers } from './api/utils';
+import { handlers, http } from './api/utils';
 
 // Initialize msw's mock server with the handlers
-export const server = setupServer(...handlers);
+const server = setupServer(...handlers);
+
+export { server, http };
 
 beforeAll(() => {
     server.listen({ onUnhandledRequest: 'bypass' });
