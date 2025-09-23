@@ -43,7 +43,7 @@ const initialHandlers = [
         });
     }),
 
-    http.get('/api/v1/projects/:project_id', () => {
+    http.get('/api/v1/projects/{project_id}', () => {
         return HttpResponse.json({
             id: '1',
             name: 'Project #1',
