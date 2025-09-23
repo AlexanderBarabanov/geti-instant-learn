@@ -5,13 +5,35 @@
 
 import { render } from '@geti-prompt/test-utils';
 import { screen } from '@testing-library/react';
+import { HttpResponse } from 'msw';
+import { rest, server } from 'src/setup-test';
 
 import { Header } from './header.component';
 
 describe('Header', () => {
-    it('renders header properly', () => {
-        render(<Header />);
+    it('renders header properly', async () => {
+        server.use(
+            rest.get('/api/v1/projects', (req, res, ctx) => {
+                return HttpResponse.json({
+                    projects: [
+                        {
+                            id: '1',
+                            name: 'Project #1',
+                        },
+                    ],
+                });
+            }),
 
-        expect(screen.getByText('Geti Prompt')).toBeInTheDocument();
+            rest.get('/api/v1/projects/:project_id', (req, res, ctx) => {
+                return HttpResponse.json({
+                    id: '1',
+                    name: 'Project #1',
+                });
+            })
+        );
+
+        render(<Header />);
+        screen.debug();
+        expect(await screen.findByText('Geti Prompt')).toBeInTheDocument();
     });
 });
