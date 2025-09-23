@@ -84,7 +84,7 @@ class ProjectRepository(BaseRepository):
             self.session.commit()
         else:
             self.session.rollback()
-            raise ValueError(f"Project with id {project_id} not found.")
+            raise ResourceNotFoundError(resource_type=ResourceType.PROJECT, resource_id=str(project_id))
 
     def update_project(self, project_id: UUID, new_name: str) -> Project:
         """
