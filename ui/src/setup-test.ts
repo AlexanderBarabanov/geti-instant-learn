@@ -14,8 +14,6 @@ import { handlers } from './api/utils';
 // Initialize msw's mock server with the handlers
 export const server = setupServer(...handlers);
 
-process.env.PUBLIC_API_BASE_URL = 'http://localhost:7860';
-
 beforeAll(() => {
     server.listen({ onUnhandledRequest: 'bypass' });
 });
