@@ -4,16 +4,16 @@
  */
 
 import { render } from '@geti-prompt/test-utils';
-import { screen } from '@testing-library/react';
+import { screen, waitForElementToBeRemoved } from '@testing-library/react';
 import { HttpResponse } from 'msw';
-import { rest, server } from 'src/setup-test';
+import { http, server } from 'src/setup-test';
 
 import { Header } from './header.component';
 
 describe('Header', () => {
     it('renders header properly', async () => {
         server.use(
-            rest.get('/api/v1/projects', (req, res, ctx) => {
+            http.get('/api/v1/projects', () => {
                 return HttpResponse.json({
                     projects: [
                         {
@@ -24,7 +24,7 @@ describe('Header', () => {
                 });
             }),
 
-            rest.get('/api/v1/projects/:project_id', (req, res, ctx) => {
+            http.get('/api/v1/projects/{project_id}', () => {
                 return HttpResponse.json({
                     id: '1',
                     name: 'Project #1',
@@ -33,7 +33,9 @@ describe('Header', () => {
         );
 
         render(<Header />);
-        screen.debug();
+
+        await waitForElementToBeRemoved(screen.getByRole('progressbar'));
+        // screen.debug();
         expect(await screen.findByText('Geti Prompt')).toBeInTheDocument();
     });
 });

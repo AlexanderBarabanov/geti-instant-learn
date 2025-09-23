@@ -12,9 +12,9 @@ import { afterAll, afterEach, beforeAll } from 'vitest';
 import { handlers, http } from './api/utils';
 
 // Initialize msw's mock server with the handlers
-export const server = setupServer(...handlers);
+const server = setupServer(...handlers);
 
-export const rest = http;
+export { server, http };
 
 beforeAll(() => {
     server.listen({ onUnhandledRequest: 'bypass' });
@@ -28,7 +28,7 @@ afterAll(() => {
     server.close();
 });
 
-// Why we need these polyfills:
+/*// Why we need these polyfills:
 // https://github.com/reduxjs/redux-toolkit/issues/4966#issuecomment-3115230061
 Object.defineProperty(global, 'fetch', {
     // MSW will overwrite this to intercept requests
@@ -39,4 +39,4 @@ Object.defineProperty(global, 'fetch', {
 Object.defineProperty(global, 'Request', {
     writable: false,
     value: RequestPolyfill,
-});
+});*/
