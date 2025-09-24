@@ -24,7 +24,6 @@ from rest.endpoints.projects import get_project as get_project_mod
 from rest.endpoints.projects import update_project as update_project_mod
 from routers import projects_router
 
-# Reusable IDs
 PROJECT_ID = uuid4()
 PROJECT_ID_STR = str(PROJECT_ID)
 SECOND_PROJECT_ID = uuid4()
@@ -34,7 +33,6 @@ PROCESSOR_ID = uuid4()
 SINK_ID = uuid4()
 
 
-# Fake model dataclasses
 @dataclass
 class FakeSource:
     id: UUID
@@ -65,7 +63,6 @@ class FakeProject:
     sink: FakeSink | None = None
 
 
-# Factories
 def make_source() -> FakeSource:
     return FakeSource(
         id=SOURCE_ID,
@@ -106,7 +103,6 @@ def make_project(
     )
 
 
-# Assertion helpers
 def assert_minimal_project_payload(data: dict, project_id: str, name: str):
     assert data["id"] == project_id
     assert data["name"] == name
@@ -260,8 +256,8 @@ def test_get_active_project(client, monkeypatch, behavior, expected_status, expe
 @pytest.mark.parametrize(
     "behavior,expected_status,expected_count,expected_detail",
     [
-        ("empty", 200, 0, None),
-        ("some", 200, 2, None),
+        ("no_projects", 200, 0, None),
+        ("some_projects", 200, 2, None),
         ("error", 500, None, "Failed to retrieve projects due to internal server error."),
     ],
 )
@@ -271,9 +267,9 @@ def test_get_projects_list(client, monkeypatch, behavior, expected_status, expec
             pass
 
         def get_all_projects(self):
-            if behavior == "empty":
+            if behavior == "no_projects":
                 return []
-            if behavior == "some":
+            if behavior == "some_projects":
                 return [
                     make_project(PROJECT_ID, "proj1"),
                     make_project(SECOND_PROJECT_ID, "proj2"),
@@ -295,12 +291,12 @@ def test_get_projects_list(client, monkeypatch, behavior, expected_status, expec
     assert "projects" in data
     projects = data["projects"]
     assert len(projects) == expected_count
-    if behavior == "some":
+    if behavior == "some_projects":
         ids = {p["id"] for p in projects}
         assert ids == {PROJECT_ID_STR, SECOND_PROJECT_ID_STR}
-        lookup = {p["id"]: p["name"] for p in projects}
-        assert lookup[PROJECT_ID_STR] == "proj1"
-        assert lookup[SECOND_PROJECT_ID_STR] == "proj2"
+        project_names_by_id = {p["id"]: p["name"] for p in projects}
+        assert project_names_by_id[PROJECT_ID_STR] == "proj1"
+        assert project_names_by_id[SECOND_PROJECT_ID_STR] == "proj2"
 
 
 @pytest.mark.parametrize(
@@ -389,4 +385,4 @@ def test_update_project(client, monkeypatch, behavior, expected_status, expected
 
 def test_update_project_validation_error(client):
     resp = client.put(f"/api/v1/projects/{PROJECT_ID_STR}", json={"name": ""})
-    assert resp.status_code == 422
+    assert resp.status_code == 422222
