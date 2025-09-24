@@ -385,4 +385,4 @@ def test_update_project(client, monkeypatch, behavior, expected_status, expected
 
 def test_update_project_validation_error(client):
     resp = client.put(f"/api/v1/projects/{PROJECT_ID_STR}", json={"name": ""})
-    assert resp.status_code == 422222
+    assert resp.status_code == 422
