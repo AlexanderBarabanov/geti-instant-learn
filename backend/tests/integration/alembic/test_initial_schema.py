@@ -25,9 +25,7 @@ def test_database_schema_applied(fxt_session):
 
 def test_initial_project_exists(fxt_session):
     """Test that the initial project is created with the default name and active state."""
-    result = fxt_session.execute(
-        text("SELECT name, active FROM Project")
-    ).fetchall()
+    result = fxt_session.execute(text("SELECT name, active FROM Project")).fetchall()
     assert len(result) == 1
     name, active = result[0]
     assert name == "Project #1"

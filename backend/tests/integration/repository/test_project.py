@@ -165,6 +165,3 @@ def test_delete_project_not_found(fxt_session, request, fxt_clean_table) -> None
 
     with pytest.raises(ResourceNotFoundError):
         repo.delete_project(uuid4())
-
-
-

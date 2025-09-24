@@ -1,6 +1,7 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+from dataclasses import dataclass
 from uuid import UUID, uuid4
 
 import pytest
@@ -9,21 +10,129 @@ from fastapi.testclient import TestClient
 
 from db.model.processor import ProcessorType
 from db.model.source import SourceType
-from db.repository.common import ResourceAlreadyExistsError, ResourceNotFoundError, ResourceType
+from db.repository.common import (
+    ResourceAlreadyExistsError,
+    ResourceNotFoundError,
+    ResourceType,
+)
 from dependencies import SessionDep  # type: ignore
 from rest.endpoints.projects import create as create_mod
-from rest.endpoints.projects import delete_project, get_active, get_list, get_project, update_project
+from rest.endpoints.projects import delete_project as delete_mod
+from rest.endpoints.projects import get_active as get_active_mod
+from rest.endpoints.projects import get_list as get_list_mod
+from rest.endpoints.projects import get_project as get_project_mod
+from rest.endpoints.projects import update_project as update_project_mod
 from routers import projects_router
 
+# Reusable IDs
 PROJECT_ID = uuid4()
 PROJECT_ID_STR = str(PROJECT_ID)
-
 SECOND_PROJECT_ID = uuid4()
 SECOND_PROJECT_ID_STR = str(SECOND_PROJECT_ID)
-
 SOURCE_ID = uuid4()
 PROCESSOR_ID = uuid4()
 SINK_ID = uuid4()
+
+
+# Fake model dataclasses
+@dataclass
+class FakeSource:
+    id: UUID
+    type: SourceType
+    config: dict
+
+
+@dataclass
+class FakeProcessor:
+    id: UUID
+    type: ProcessorType
+    config: dict
+    name: str
+
+
+@dataclass
+class FakeSink:
+    id: UUID
+    config: dict
+
+
+@dataclass
+class FakeProject:
+    id: UUID
+    name: str
+    source: FakeSource | None = None
+    processor: FakeProcessor | None = None
+    sink: FakeSink | None = None
+
+
+# Factories
+def make_source() -> FakeSource:
+    return FakeSource(
+        id=SOURCE_ID,
+        type=SourceType.VIDEO_FILE,
+        config={"path": "/tmp/data.txt"},
+    )
+
+
+def make_processor() -> FakeProcessor:
+    return FakeProcessor(
+        id=PROCESSOR_ID,
+        type=ProcessorType.DUMMY,
+        config={"mode": "fast"},
+        name="proc1",
+    )
+
+
+def make_sink() -> FakeSink:
+    return FakeSink(
+        id=SINK_ID,
+        config={"dest": "stdout"},
+    )
+
+
+def make_project(
+    project_id: UUID,
+    name: str,
+    source: FakeSource | None = None,
+    processor: FakeProcessor | None = None,
+    sink: FakeSink | None = None,
+) -> FakeProject:
+    return FakeProject(
+        id=project_id,
+        name=name,
+        source=source,
+        processor=processor,
+        sink=sink,
+    )
+
+
+# Assertion helpers
+def assert_minimal_project_payload(data: dict, project_id: str, name: str):
+    assert data["id"] == project_id
+    assert data["name"] == name
+    assert data["source"] is None
+    assert data["processor"] is None
+    assert data["sink"] is None
+
+
+def assert_full_project_payload(data: dict):
+    assert data["id"] == PROJECT_ID_STR
+    assert data["name"] == "fullproj"
+    assert data["source"] == {
+        "id": str(SOURCE_ID),
+        "type": "VIDEO_FILE",
+        "config": {"path": "/tmp/data.txt"},
+    }
+    assert data["processor"] == {
+        "id": str(PROCESSOR_ID),
+        "type": "DUMMY",
+        "config": {"mode": "fast"},
+        "name": "proc1",
+    }
+    assert data["sink"] == {
+        "id": str(SINK_ID),
+        "config": {"dest": "stdout"},
+    }
 
 
 @pytest.fixture
@@ -39,12 +148,6 @@ def client(app):
     return TestClient(app)
 
 
-class _FakeProject:
-    def __init__(self, project_id: UUID, name: str):
-        self.id = project_id
-        self.name = name
-
-
 @pytest.mark.parametrize(
     "behavior,expected_status,expected_location,expected_detail",
     [
@@ -53,14 +156,7 @@ class _FakeProject:
         ("error", 500, None, "Failed to create a project due to internal server error."),
     ],
 )
-def test_create_project(
-    client: TestClient,
-    monkeypatch: pytest.MonkeyPatch,
-    behavior: str,
-    expected_status: int,
-    expected_location: str | None,
-    expected_detail: str | None,
-):
+def test_create_project(client, monkeypatch, behavior, expected_status, expected_location, expected_detail):
     class FakeRepo:
         def __init__(self, session):
             pass
@@ -68,7 +164,7 @@ def test_create_project(
         def create_project(self, name: str, project_id):
             if behavior == "success":
                 assert project_id == PROJECT_ID
-                return _FakeProject(PROJECT_ID, name)
+                return make_project(PROJECT_ID, name)
             if behavior == "conflict":
                 raise ResourceAlreadyExistsError(
                     ResourceType.PROJECT,
@@ -82,18 +178,18 @@ def test_create_project(
     monkeypatch.setattr(create_mod, "ProjectRepository", FakeRepo)
 
     payload = {"id": PROJECT_ID_STR, "name": "myproj"}
-    response = client.post("/api/v1/projects", json=payload)
+    resp = client.post("/api/v1/projects", json=payload)
 
-    assert response.status_code == expected_status
+    assert resp.status_code == expected_status
     if expected_location:
-        assert response.headers.get("Location") == expected_location
-        assert response.text == ""
+        assert resp.headers.get("Location") == expected_location
+        assert resp.text == ""
     else:
-        assert "Location" not in response.headers
+        assert "Location" not in resp.headers
     if expected_detail:
-        assert response.json()["detail"] == expected_detail
+        assert resp.json()["detail"] == expected_detail
     else:
-        assert response.text == ""
+        assert resp.text == ""
 
 
 @pytest.mark.parametrize(
@@ -104,13 +200,7 @@ def test_create_project(
         ("error", 500, f"Failed to delete project with id {PROJECT_ID_STR} due to an internal error."),
     ],
 )
-def test_delete_project(
-    client: TestClient,
-    monkeypatch: pytest.MonkeyPatch,
-    behavior: str,
-    expected_status: int,
-    expected_detail: str | None,
-):
+def test_delete_project(client, monkeypatch, behavior, expected_status, expected_detail):
     class FakeRepo:
         def __init__(self, session):
             pass
@@ -125,17 +215,14 @@ def test_delete_project(
                 raise RuntimeError("boom")
             raise AssertionError("Unhandled behavior")
 
-    monkeypatch.setattr(delete_project, "ProjectRepository", FakeRepo)
+    monkeypatch.setattr(delete_mod, "ProjectRepository", FakeRepo)
 
     resp = client.delete(f"/api/v1/projects/{PROJECT_ID_STR}")
-
     assert resp.status_code == expected_status
     if expected_detail:
         assert resp.json()["detail"] == expected_detail
     else:
-        # FastAPI returns empty body for Response(status_code=204)
         assert resp.text == ""
-
 
 
 @pytest.mark.parametrize(
@@ -147,40 +234,27 @@ def test_delete_project(
     ],
 )
 def test_get_active_project(client, monkeypatch, behavior, expected_status, expected_detail):
-    class FakeActiveProject:
-        def __init__(self, project_id, name):
-            self.id = project_id
-            self.name = name
-            self.source = None
-            self.processor = None
-            self.sink = None
-
     class FakeRepo:
         def __init__(self, session):
             pass
 
         def get_active_project(self):
             if behavior == "success":
-                return FakeActiveProject(PROJECT_ID, "activeproj")
+                return make_project(PROJECT_ID, "activeproj")
             if behavior == "notfound":
                 return None
             if behavior == "error":
                 raise RuntimeError("boom")
             raise AssertionError("Unhandled behavior")
 
-    monkeypatch.setattr(get_active, "ProjectRepository", FakeRepo)
+    monkeypatch.setattr(get_active_mod, "ProjectRepository", FakeRepo)
 
     resp = client.get("/api/v1/projects/active")
     assert resp.status_code == expected_status
     if expected_detail:
         assert resp.json()["detail"] == expected_detail
-    else:
-        data = resp.json()
-        assert data["id"] == PROJECT_ID_STR
-        assert data["name"] == "activeproj"
-        assert data["source"] is None
-        assert data["processor"] is None
-        assert data["sink"] is None
+    elif behavior == "success":
+        assert_minimal_project_payload(resp.json(), PROJECT_ID_STR, "activeproj")
 
 
 @pytest.mark.parametrize(
@@ -191,9 +265,7 @@ def test_get_active_project(client, monkeypatch, behavior, expected_status, expe
         ("error", 500, None, "Failed to retrieve projects due to internal server error."),
     ],
 )
-def test_get_projects_list(client: TestClient, monkeypatch: pytest.MonkeyPatch,
-                           behavior: str, expected_status: int,
-                           expected_count: int | None, expected_detail: str | None):
+def test_get_projects_list(client, monkeypatch, behavior, expected_status, expected_count, expected_detail):
     class FakeRepo:
         def __init__(self, session):
             pass
@@ -203,14 +275,14 @@ def test_get_projects_list(client: TestClient, monkeypatch: pytest.MonkeyPatch,
                 return []
             if behavior == "some":
                 return [
-                    _FakeProject(PROJECT_ID, "proj1"),
-                    _FakeProject(SECOND_PROJECT_ID, "proj2"),
+                    make_project(PROJECT_ID, "proj1"),
+                    make_project(SECOND_PROJECT_ID, "proj2"),
                 ]
             if behavior == "error":
                 raise RuntimeError("boom")
             raise AssertionError("Unhandled behavior")
 
-    monkeypatch.setattr(get_list, "ProjectRepository", FakeRepo)
+    monkeypatch.setattr(get_list_mod, "ProjectRepository", FakeRepo)
 
     resp = client.get("/api/v1/projects")
     assert resp.status_code == expected_status
@@ -224,11 +296,11 @@ def test_get_projects_list(client: TestClient, monkeypatch: pytest.MonkeyPatch,
     projects = data["projects"]
     assert len(projects) == expected_count
     if behavior == "some":
-        assert {p["id"] for p in projects} == {PROJECT_ID_STR, SECOND_PROJECT_ID_STR}
-        # Optional: verify names align with IDs
-        id_to_name = {p["id"]: p["name"] for p in projects}
-        assert id_to_name[PROJECT_ID_STR] == "proj1"
-        assert id_to_name[SECOND_PROJECT_ID_STR] == "proj2"
+        ids = {p["id"] for p in projects}
+        assert ids == {PROJECT_ID_STR, SECOND_PROJECT_ID_STR}
+        lookup = {p["id"]: p["name"] for p in projects}
+        assert lookup[PROJECT_ID_STR] == "proj1"
+        assert lookup[SECOND_PROJECT_ID_STR] == "proj2"
 
 
 @pytest.mark.parametrize(
@@ -240,45 +312,7 @@ def test_get_projects_list(client: TestClient, monkeypatch: pytest.MonkeyPatch,
         ("error", 500, "Failed to retrieve the project due to internal server error."),
     ],
 )
-def test_get_project(client: TestClient,
-                     monkeypatch: pytest.MonkeyPatch,
-                     behavior: str,
-                     expected_status: int,
-                     expected_detail: str | None):
-    class _FakeSource:
-        def __init__(self):
-            self.id = SOURCE_ID
-            self.type = SourceType.VIDEO_FILE
-            self.config = {"path": "/tmp/data.txt"}
-
-    class _FakeProcessor:
-        def __init__(self):
-            self.id = PROCESSOR_ID
-            self.type = ProcessorType.DUMMY
-            self.config = {"mode": "fast"}
-            self.name = "proc1"
-
-    class _FakeSink:
-        def __init__(self):
-            self.id = SINK_ID
-            self.config = {"dest": "stdout"}
-
-    class FakeProjectFull:
-        def __init__(self):
-            self.id = PROJECT_ID
-            self.name = "fullproj"
-            self.source = _FakeSource()
-            self.processor = _FakeProcessor()
-            self.sink = _FakeSink()
-
-    class FakeProjectMinimal:
-        def __init__(self):
-            self.id = PROJECT_ID
-            self.name = "minproj"
-            self.source = None
-            self.processor = None
-            self.sink = None
-
+def test_get_project(client, monkeypatch, behavior, expected_status, expected_detail):
     class FakeRepo:
         def __init__(self, session):
             pass
@@ -286,16 +320,22 @@ def test_get_project(client: TestClient,
         def get_project_by_id(self, project_id: UUID):
             assert project_id == PROJECT_ID
             if behavior == "minimal":
-                return FakeProjectMinimal()
+                return make_project(PROJECT_ID, "minproj")
             if behavior == "full":
-                return FakeProjectFull()
+                return make_project(
+                    PROJECT_ID,
+                    "fullproj",
+                    source=make_source(),
+                    processor=make_processor(),
+                    sink=make_sink(),
+                )
             if behavior == "notfound":
                 raise ResourceNotFoundError(ResourceType.PROJECT, resource_id=str(project_id))
             if behavior == "error":
                 raise RuntimeError("boom")
             raise AssertionError("Unhandled behavior")
 
-    monkeypatch.setattr(get_project, "ProjectRepository", FakeRepo)
+    monkeypatch.setattr(get_project_mod, "ProjectRepository", FakeRepo)
 
     resp = client.get(f"/api/v1/projects/{PROJECT_ID_STR}")
     assert resp.status_code == expected_status
@@ -305,29 +345,10 @@ def test_get_project(client: TestClient,
         return
 
     data = resp.json()
-    assert data["id"] == PROJECT_ID_STR
     if behavior == "minimal":
-        assert data["name"] == "minproj"
-        assert data["source"] is None
-        assert data["processor"] is None
-        assert data["sink"] is None
+        assert_minimal_project_payload(data, PROJECT_ID_STR, "minproj")
     if behavior == "full":
-        assert data["name"] == "fullproj"
-        assert data["source"] == {
-            "id": str(SOURCE_ID),
-            "type": "VIDEO_FILE",  # UPDATED expected value
-            "config": {"path": "/tmp/data.txt"},
-        }
-        assert data["processor"] == {
-            "id": str(PROCESSOR_ID),
-            "type": "DUMMY",
-            "config": {"mode": "fast"},
-            "name": "proc1",
-        }
-        assert data["sink"] == {
-            "id": str(SINK_ID),
-            "config": {"dest": "stdout"},
-        }
+        assert_full_project_payload(data)
 
 
 @pytest.mark.parametrize(
@@ -338,21 +359,8 @@ def test_get_project(client: TestClient,
         ("error", 500, "Failed to update the project due to internal server error."),
     ],
 )
-def test_update_project(client: TestClient,
-                        monkeypatch: pytest.MonkeyPatch,
-                        behavior: str,
-                        expected_status: int,
-                        expected_detail: str | None):
+def test_update_project(client, monkeypatch, behavior, expected_status, expected_detail):
     NEW_NAME = "renamed"
-
-    class _UpdatedProject:
-        def __init__(self, project_id: UUID, name: str):
-            self.id = project_id
-            self.name = name
-            # Simulate no related components
-            self.source = None
-            self.processor = None
-            self.sink = None
 
     class FakeRepo:
         def __init__(self, session):
@@ -362,29 +370,23 @@ def test_update_project(client: TestClient,
             assert project_id == PROJECT_ID
             assert new_name == NEW_NAME
             if behavior == "success":
-                return _UpdatedProject(PROJECT_ID, new_name)
+                return make_project(PROJECT_ID, NEW_NAME)
             if behavior == "notfound":
                 raise ResourceNotFoundError(ResourceType.PROJECT, resource_id=str(project_id))
             if behavior == "error":
                 raise RuntimeError("boom")
             raise AssertionError("Unhandled behavior")
 
-    monkeypatch.setattr(update_project, "ProjectRepository", FakeRepo)
+    monkeypatch.setattr(update_project_mod, "ProjectRepository", FakeRepo)
 
     resp = client.put(f"/api/v1/projects/{PROJECT_ID_STR}", json={"name": NEW_NAME})
     assert resp.status_code == expected_status
     if expected_detail:
         assert resp.json()["detail"] == expected_detail
-    else:
-        data = resp.json()
-        assert data["id"] == PROJECT_ID_STR
-        assert data["name"] == NEW_NAME
-        assert data["source"] is None
-        assert data["processor"] is None
-        assert data["sink"] is None
+    elif behavior == "success":
+        assert_minimal_project_payload(resp.json(), PROJECT_ID_STR, NEW_NAME)
 
 
-def test_update_project_validation_error(client: TestClient):
-    # Empty name violates min_length=1 -> 422
+def test_update_project_validation_error(client):
     resp = client.put(f"/api/v1/projects/{PROJECT_ID_STR}", json={"name": ""})
     assert resp.status_code == 422

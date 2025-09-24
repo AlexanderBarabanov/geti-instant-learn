@@ -64,4 +64,5 @@ def fxt_clean_table(fxt_session):
     def _clean(model_cls):
         fxt_session.query(model_cls).delete()
         fxt_session.commit()
+
     return _clean
