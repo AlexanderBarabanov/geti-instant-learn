@@ -51,6 +51,7 @@ class DINOv3BackboneSize(Enum):
 
 DATA_PATH = Path("~/data").expanduser()
 DINOV3_WEIGHTS_PATH = DATA_PATH.joinpath("dinov3_weights")
+DINOV3_TXT_HEAD_FILENAME = "dinov3_vitl16_dinotxt_vision_head_and_text_encoder-a442d8f5.pth"
 
 # DINOv3 backbone model mapping
 DINOV3_BACKBONE_MAP = {

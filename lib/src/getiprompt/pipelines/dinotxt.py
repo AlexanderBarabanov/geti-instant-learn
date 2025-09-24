@@ -107,7 +107,7 @@ class DinoTxtZeroShotClassification(Pipeline):
             >>> dinotxt = DinoTxtZeroShotClassification()
             >>> ref_priors = Priors(text={0: "cat", 1: "dog"})
             >>> dinotxt.learn(reference_images=[], reference_priors=[ref_priors])
-            >>> target_image = Image(data=torch.randn(3, 512, 512))
+            >>> target_image = Image(data=torch.randn(512, 512, 3))
             >>> result = dinotxt.infer(target_images=[target_image])
             >>> result.masks  # doctest: +SKIP
             [Masks(num_masks=1)]
