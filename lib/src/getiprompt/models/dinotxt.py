@@ -3,13 +3,15 @@
 
 """DINOTxt model."""
 
+from pathlib import Path
+
 import torch
 import torchvision
 from torch import nn
 from torchvision.transforms.v2.functional import to_dtype, to_image
 
 from getiprompt.types import Priors
-from getiprompt.utils.constants import IMAGENET_TEMPLATES
+from getiprompt.utils.constants import DINOV3_BACKBONE_MAP, DINOV3_WEIGHTS_PATH, IMAGENET_TEMPLATES, DINOv3BackboneSize
 
 
 class DinoTextEncoder(nn.Module):
@@ -28,32 +30,100 @@ class DinoTextEncoder(nn.Module):
 
     def __init__(
         self,
-        pretrained: bool = True,
         image_size: int = 512,
-        repo_id: str = "facebookresearch/dinov3",
-        model_id: str = "dinov3_vitl16_dinotxt_tet1280d20h24l",
         precision: torch.dtype = torch.bfloat16,
         device: str = "cuda",
+        backbone_size: DINOv3BackboneSize = DINOv3BackboneSize.LARGE,
         mean: tuple[float] = (123.675, 116.28, 103.53),
         std: tuple[float] = (58.395, 57.12, 57.375),
     ) -> None:
         super().__init__()
-        model, tokenizer = torch.hub.load(
-            repo_id,
-            model_id,
-            pretrained=pretrained,
-        )
-        self.tokenizer = tokenizer
+
+        # Load model and tokenizer from local weights
+        segmentor_file = "dinov3_vitl16_dinotxt_vision_head_and_text_encoder-a442d8f5.pth"
+        segmentor_path = DINOV3_WEIGHTS_PATH / segmentor_file
         self.device = device
         self.precision = precision
-        self.model = model.to(dtype=self.precision)
-        if self.device == "cuda":
-            self.model = self.model.cuda()
+        self.model, self.tokenizer = DinoTextEncoder._load_model(str(segmentor_path), backbone_size.value, device)
+
         self.transforms = torchvision.transforms.Compose([
             torchvision.transforms.v2.Resize(image_size),
             torchvision.transforms.v2.Normalize(mean=mean, std=std),
             torchvision.transforms.v2.ToDtype(dtype=self.precision),
         ])
+
+    @staticmethod
+    def _load_model(
+        segmentor_weights_path: str,
+        backbone_size: str = "large",
+        device: str = "cuda",
+    ) -> tuple[torch.nn.Module, object]:
+        """Load DINOv3 model and tokenizer from local weights.
+
+        Args:
+            segmentor_weights_path: Path to the DINOv3 segmentor weights file.
+            backbone_size: Size of the backbone model ("small", "small-plus", "base", "large", "huge").
+            device: The device to use for the model.
+
+        Returns:
+            Tuple of (model, tokenizer).
+
+        Raises:
+            FileNotFoundError: If weights files don't exist.
+            RuntimeError: If weights loading fails.
+        """
+        segmentor_path = Path(segmentor_weights_path)
+        backbone_filename = DINOV3_BACKBONE_MAP.get(backbone_size)
+        if not backbone_filename:
+            valid_sizes = list(DINOV3_BACKBONE_MAP.keys())
+            msg = f"Invalid backbone size: {backbone_size}. Must be one of: {valid_sizes}"
+            raise ValueError(msg)
+        backbone_path = segmentor_path.parent / backbone_filename
+
+        # Check if segmentor weights exist
+        if not segmentor_path.exists():
+            msg = (
+                f"DINOv3 segmentor weights not found at {segmentor_path}.\n"
+                f"Please download the DINOv3 weights from Meta's official website:\n"
+                f"https://ai.meta.com/resources/models-and-libraries/dinov3-downloads/\n"
+                f"Save the weights file 'dinov3_vitl16_dinotxt_vision_head_and_text_encoder-a442d8f5.pth' "
+                f"in the directory: {segmentor_path.parent}\n"
+                f"Then rerun geti-prompt."
+            )
+            raise FileNotFoundError(msg)
+
+        # Check if backbone weights exist
+        if not backbone_path.exists():
+            msg = (
+                f"DINOv3 backbone weights not found at {backbone_path}.\n"
+                f"Please download the DINOv3 backbone weights from Meta's official website:\n"
+                f"https://ai.meta.com/resources/models-and-libraries/dinov3-downloads/\n"
+                f"Save the weights file '{backbone_filename}' "
+                f"in the directory: {backbone_path.parent}\n"
+                f"Then rerun geti-prompt."
+            )
+            raise FileNotFoundError(msg)
+
+        try:
+            # Initialize model architecture using torch.hub.load with both weights
+            model, tokenizer = torch.hub.load(
+                "facebookresearch/dinov3",
+                "dinov3_vitl16_dinotxt_tet1280d20h24l",
+                pretrained=False,  # weights are loaded from local weights
+                weights=str(segmentor_path),
+                backbone_weights=str(backbone_path),
+            )
+            model = model.to(device)
+
+        except Exception as e:
+            msg = (
+                f"Failed to load DINOv3 weights from {segmentor_path} and {backbone_path}.\n"
+                f"Error: {e!s}\n"
+                f"Please ensure the weights files are valid and try again."
+            )
+            raise RuntimeError(msg) from e
+
+        return model, tokenizer
 
     @torch.no_grad()
     def encode_text(
@@ -77,18 +147,18 @@ class DinoTextEncoder(nn.Module):
             >>> prior = Priors(text={0: "cat", 1: "dog"})
             >>> text_embedding = encoder.encode_text(prior)
             >>> text_embedding.shape
-            torch.Size([2, 4])
+            torch.Size([2048, 2])
         """
         zero_shot_weights = []
         for label_name in reference_prior.text.values():
             texts = [template.format(label_name) for template in prompt_template]
             texts = self.tokenizer.tokenize(texts)
-            if self.device == "cuda":
-                texts = texts.cuda()
-            class_embeddings = self.model.encode_text(texts)
-            class_embeddings /= class_embeddings.norm(dim=-1, keepdim=True)
-            class_embedding = class_embeddings.mean(dim=0)
-            class_embedding /= class_embedding.norm()
+            texts = texts.to(self.device)
+            with torch.autocast(device_type=self.device, dtype=self.precision):
+                class_embeddings = self.model.encode_text(texts)
+                class_embeddings /= class_embeddings.norm(dim=-1, keepdim=True)
+                class_embedding = class_embeddings.mean(dim=0)
+                class_embedding /= class_embedding.norm()
             zero_shot_weights.append(class_embedding)
         return torch.stack(zero_shot_weights, dim=1)
 
@@ -100,8 +170,7 @@ class DinoTextEncoder(nn.Module):
         """Encode the reference images to image embedding."""
         images = [self.transforms(to_dtype(to_image(image), dtype=self.precision)) for image in target_images]
         images = torch.stack(images, dim=0)
-        if self.device == "cuda":
-            images = images.cuda()
+        images = images.to(self.device)
         with torch.autocast(device_type=self.device, dtype=self.precision):
             image_features = self.model.encode_image(images)
             image_features /= image_features.norm(dim=-1, keepdim=True)
