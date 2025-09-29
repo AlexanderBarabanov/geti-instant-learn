@@ -50,7 +50,7 @@ def test_create_project_success(service, repo_mock, session_mock, explicit_id):
     assert result is project
     assert project.active is True
     repo_mock.add.assert_called_once_with(project)
-    session_mock.flush.assert_called_once()
+    assert session_mock.flush.call_count == 2
     session_mock.commit.assert_called_once()
     session_mock.refresh.assert_called_once_with(project)
     repo_mock.exists_by_name.assert_called_once_with("alpha")
