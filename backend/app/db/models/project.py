@@ -8,24 +8,24 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 
 if TYPE_CHECKING:
-    from db.model.label import Label
-    from db.model.processor import Processor
-    from db.model.prompt import Prompt
-    from db.model.sink import Sink
-    from db.model.source import Source
+    from db.models.label import LabelDB
+    from db.models.processor import ProcessorDB
+    from db.models.prompt import PromptDB
+    from db.models.sink import SinkDB
+    from db.models.source import SourceDB
 
 
-class Project(Base):
+class ProjectDB(Base):
     __tablename__ = "Project"
     name: Mapped[str] = mapped_column(nullable=False)
     active: Mapped[bool] = mapped_column(nullable=False, default=False)
-    source: Mapped["Source"] = relationship(back_populates="project")
-    processor: Mapped["Processor"] = relationship(back_populates="project")
-    sink: Mapped["Sink"] = relationship(back_populates="project")
+    source: Mapped["SourceDB"] = relationship(back_populates="project")
+    processor: Mapped["ProcessorDB"] = relationship(back_populates="project")
+    sink: Mapped["SinkDB"] = relationship(back_populates="project")
 
-    prompts: Mapped[list["Prompt"]] = relationship(
+    prompts: Mapped[list["PromptDB"]] = relationship(
         back_populates="project", cascade="all, delete-orphan", passive_deletes=True
     )
-    labels: Mapped[list["Label"]] = relationship(
+    labels: Mapped[list["LabelDB"]] = relationship(
         back_populates="project", cascade="all, delete-orphan", passive_deletes=True
     )

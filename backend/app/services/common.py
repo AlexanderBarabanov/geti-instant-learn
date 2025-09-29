@@ -55,7 +55,3 @@ class ResourceAlreadyExistsError(ResourceError):
         else:
             msg = message
         super().__init__(resource_type, resource_value, msg)
-
-
-class BaseRepository:
-    pass

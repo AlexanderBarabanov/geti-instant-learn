@@ -8,8 +8,8 @@ from sqlalchemy import ForeignKey, UniqueConstraint
 from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from db.model import Base
-from db.model.project import Project
+from db.models import Base
+from db.models.project import ProjectDB
 
 
 class ProcessorType(str, Enum):
@@ -19,11 +19,11 @@ class ProcessorType(str, Enum):
     DUMMY = "DUMMY"
 
 
-class Processor(Base):
+class ProcessorDB(Base):
     __tablename__ = "Processor"
     name: Mapped[str | None] = mapped_column(nullable=True)
     type: Mapped[ProcessorType] = mapped_column(nullable=False)
     config: Mapped[dict] = mapped_column(JSON, nullable=False)
     project_id: Mapped[UUID] = mapped_column(ForeignKey("Project.id", ondelete="CASCADE"))
-    project: Mapped["Project"] = relationship(back_populates="processor", single_parent=True)
+    project: Mapped["ProjectDB"] = relationship(back_populates="processor", single_parent=True)
     __table_args__ = (UniqueConstraint("project_id"),)

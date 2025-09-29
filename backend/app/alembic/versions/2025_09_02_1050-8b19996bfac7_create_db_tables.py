@@ -18,7 +18,7 @@ from alembic import context, op
 import sqlalchemy as sa
 from sqlalchemy.dialects import sqlite
 from sqlalchemy.orm import Session
-from db.model.project import Project
+from db.models.project import ProjectDB
 
 
 DEFAULT_PROJECT_NAME = "Project #1"
@@ -32,7 +32,7 @@ depends_on: str | (Sequence[str] | None) = None
 
 def _add_initial_project():
     with Session(bind=op.get_bind()) as session:
-        default_project = Project(name=os.getenv("DEFAULT_PROJECT_NAME", DEFAULT_PROJECT_NAME), active=True)
+        default_project = ProjectDB(name=os.getenv("DEFAULT_PROJECT_NAME", DEFAULT_PROJECT_NAME), active=True)
         session.add(default_project)
         session.commit()
 
