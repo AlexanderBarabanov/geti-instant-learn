@@ -1,7 +1,6 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine
@@ -9,15 +8,13 @@ from sqlalchemy.orm import sessionmaker
 
 from alembic import command
 from alembic.config import Config
+from settings import get_settings
 
 
 def _run_migrations(db_url: str) -> None:
-    app_dir = Path(__file__).resolve().parents[3] / "app"
-    alembic_ini_path = app_dir / "alembic.ini"
-    script_location = app_dir / "alembic"
-
-    alembic_cfg = Config(str(alembic_ini_path))
-    alembic_cfg.set_main_option("script_location", str(script_location))
+    settings = get_settings()
+    alembic_cfg = Config(str(settings.alembic_config_path))
+    alembic_cfg.set_main_option("script_location", str(settings.alembic_script_location))
     alembic_cfg.set_main_option("sqlalchemy.url", db_url)
     command.upgrade(alembic_cfg, "head")
 

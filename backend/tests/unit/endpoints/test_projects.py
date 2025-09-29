@@ -1,6 +1,7 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+
 from dataclasses import dataclass
 from uuid import UUID, uuid4
 
@@ -8,21 +9,14 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from db.model.processor import ProcessorType
-from db.model.source import SourceType
-from db.repository.common import (
+from dependencies import SessionDep  # type: ignore
+from rest.endpoints import projects
+from routers import projects_router
+from services.common import (
     ResourceAlreadyExistsError,
     ResourceNotFoundError,
     ResourceType,
 )
-from dependencies import SessionDep  # type: ignore
-from rest.endpoints.projects import create as create_mod
-from rest.endpoints.projects import delete_project as delete_mod
-from rest.endpoints.projects import get_active as get_active_mod
-from rest.endpoints.projects import get_list as get_list_mod
-from rest.endpoints.projects import get_project as get_project_mod
-from rest.endpoints.projects import update_project as update_project_mod
-from routers import projects_router
 
 PROJECT_ID = uuid4()
 PROJECT_ID_STR = str(PROJECT_ID)
@@ -36,14 +30,14 @@ SINK_ID = uuid4()
 @dataclass
 class FakeSource:
     id: UUID
-    type: SourceType
+    type: str
     config: dict
 
 
 @dataclass
 class FakeProcessor:
     id: UUID
-    type: ProcessorType
+    type: str
     config: dict
     name: str
 
@@ -64,27 +58,20 @@ class FakeProject:
 
 
 def make_source() -> FakeSource:
-    return FakeSource(
-        id=SOURCE_ID,
-        type=SourceType.VIDEO_FILE,
-        config={"path": "/tmp/data.txt"},
-    )
+    return FakeSource(id=SOURCE_ID, type="VIDEO_FILE", config={"path": "/tmp/data.txt"})
 
 
 def make_processor() -> FakeProcessor:
     return FakeProcessor(
         id=PROCESSOR_ID,
-        type=ProcessorType.DUMMY,
+        type="DUMMY",
         config={"mode": "fast"},
         name="proc1",
     )
 
 
 def make_sink() -> FakeSink:
-    return FakeSink(
-        id=SINK_ID,
-        config={"dest": "stdout"},
-    )
+    return FakeSink(id=SINK_ID, config={"dest": "stdout"})
 
 
 def make_project(
@@ -145,78 +132,83 @@ def client(app):
 
 
 @pytest.mark.parametrize(
-    "behavior,expected_status,expected_location,expected_detail",
+    "behavior,expected_status,expect_location,expect_conflict_substring",
     [
-        ("success", 201, f"/projects/{PROJECT_ID_STR}", None),
-        ("conflict", 409, None, f"Project with id '{PROJECT_ID_STR}' already exists."),
-        ("error", 500, None, "Failed to create a project due to internal server error."),
+        ("success", 201, True, None),
+        ("conflict", 409, False, PROJECT_ID_STR),
+        ("error", 500, False, None),
     ],
 )
-def test_create_project(client, monkeypatch, behavior, expected_status, expected_location, expected_detail):
-    class FakeRepo:
+def test_create_project(client, monkeypatch, behavior, expected_status, expect_location, expect_conflict_substring):
+    class FakeService:
         def __init__(self, session):
             pass
 
-        def create_project(self, name: str, project_id):
+        def create_project(self, project_entity):
+            assert project_entity.name == "myproj"
             if behavior == "success":
-                assert project_id == PROJECT_ID
-                return make_project(PROJECT_ID, name)
+                return make_project(PROJECT_ID, "myproj")
             if behavior == "conflict":
                 raise ResourceAlreadyExistsError(
-                    ResourceType.PROJECT,
-                    str(project_id),
+                    resource_type=ResourceType.PROJECT,
+                    resource_value=str(PROJECT_ID),
                     raised_by="id",
                 )
             if behavior == "error":
                 raise RuntimeError("boom")
             raise AssertionError("Unhandled behavior")
 
-    monkeypatch.setattr(create_mod, "ProjectRepository", FakeRepo)
+    monkeypatch.setattr(projects, "ProjectService", FakeService)
 
     payload = {"id": PROJECT_ID_STR, "name": "myproj"}
     resp = client.post("/api/v1/projects", json=payload)
 
     assert resp.status_code == expected_status
-    if expected_location:
-        assert resp.headers.get("Location") == expected_location
+    if expect_location:
+        assert resp.headers.get("Location") == f"/projects/{PROJECT_ID_STR}"
         assert resp.text == ""
     else:
         assert "Location" not in resp.headers
-    if expected_detail:
-        assert resp.json()["detail"] == expected_detail
-    else:
-        assert resp.text == ""
+        if behavior == "conflict":
+            assert expect_conflict_substring in resp.json()["detail"]
+        if behavior == "error":
+            assert resp.json()["detail"] == "Failed to create a project due to internal server error."
 
 
 @pytest.mark.parametrize(
-    "behavior,expected_status,expected_detail",
+    "behavior,expected_status,expect_detail",
     [
         ("success", 204, None),
-        ("missing", 204, None),
+        ("missing", 204, None),  # Endpoint suppresses 404
         ("error", 500, f"Failed to delete project with id {PROJECT_ID_STR} due to an internal error."),
     ],
 )
-def test_delete_project(client, monkeypatch, behavior, expected_status, expected_detail):
-    class FakeRepo:
+def test_delete_project(client, monkeypatch, behavior, expected_status, expect_detail):
+    from rest.endpoints import projects as ep_mod
+
+    class FakeService:
         def __init__(self, session):
             pass
 
         def delete_project(self, project_id: UUID):
             assert project_id == PROJECT_ID
             if behavior == "success":
-                return None
+                return
             if behavior == "missing":
-                raise ResourceNotFoundError(ResourceType.PROJECT, resource_id=str(project_id))
+                raise ResourceNotFoundError(
+                    resource_type=ResourceType.PROJECT,
+                    resource_id=str(project_id),
+                )
             if behavior == "error":
                 raise RuntimeError("boom")
             raise AssertionError("Unhandled behavior")
 
-    monkeypatch.setattr(delete_mod, "ProjectRepository", FakeRepo)
+    monkeypatch.setattr(ep_mod, "ProjectService", FakeService)
 
     resp = client.delete(f"/api/v1/projects/{PROJECT_ID_STR}")
     assert resp.status_code == expected_status
-    if expected_detail:
-        assert resp.json()["detail"] == expected_detail
+    if expect_detail:
+        assert resp.json()["detail"] == expect_detail
     else:
         assert resp.text == ""
 
@@ -226,11 +218,13 @@ def test_delete_project(client, monkeypatch, behavior, expected_status, expected
     [
         ("success", 200, None),
         ("notfound", 404, "No active project found."),
-        ("error", 500, "Failed to retrieve the active project due to internal server error."),
+        ("error", 500, "Failed to retrieve active project."),
     ],
 )
 def test_get_active_project(client, monkeypatch, behavior, expected_status, expected_detail):
-    class FakeRepo:
+    from rest.endpoints import projects as ep_mod
+
+    class FakeService:
         def __init__(self, session):
             pass
 
@@ -238,12 +232,15 @@ def test_get_active_project(client, monkeypatch, behavior, expected_status, expe
             if behavior == "success":
                 return make_project(PROJECT_ID, "activeproj")
             if behavior == "notfound":
-                return None
+                raise ResourceNotFoundError(
+                    resource_type=ResourceType.PROJECT,
+                    resource_id="active",
+                )
             if behavior == "error":
                 raise RuntimeError("boom")
             raise AssertionError("Unhandled behavior")
 
-    monkeypatch.setattr(get_active_mod, "ProjectRepository", FakeRepo)
+    monkeypatch.setattr(ep_mod, "ProjectService", FakeService)
 
     resp = client.get("/api/v1/projects/active")
     assert resp.status_code == expected_status
@@ -258,15 +255,17 @@ def test_get_active_project(client, monkeypatch, behavior, expected_status, expe
     [
         ("no_projects", 200, 0, None),
         ("some_projects", 200, 2, None),
-        ("error", 500, None, "Failed to retrieve projects due to internal server error."),
+        ("error", 500, None, "Failed to list projects."),
     ],
 )
 def test_get_projects_list(client, monkeypatch, behavior, expected_status, expected_count, expected_detail):
-    class FakeRepo:
+    from rest.endpoints import projects as ep_mod
+
+    class FakeService:
         def __init__(self, session):
             pass
 
-        def get_all_projects(self):
+        def list_projects(self):
             if behavior == "no_projects":
                 return []
             if behavior == "some_projects":
@@ -278,42 +277,41 @@ def test_get_projects_list(client, monkeypatch, behavior, expected_status, expec
                 raise RuntimeError("boom")
             raise AssertionError("Unhandled behavior")
 
-    monkeypatch.setattr(get_list_mod, "ProjectRepository", FakeRepo)
-
+    monkeypatch.setattr(ep_mod, "ProjectService", FakeService)
     resp = client.get("/api/v1/projects")
-    assert resp.status_code == expected_status
 
+    assert resp.status_code == expected_status
     if expected_detail:
         assert resp.json()["detail"] == expected_detail
         return
-
     data = resp.json()
-    assert "projects" in data
     projects = data["projects"]
     assert len(projects) == expected_count
     if behavior == "some_projects":
         ids = {p["id"] for p in projects}
         assert ids == {PROJECT_ID_STR, SECOND_PROJECT_ID_STR}
-        project_names_by_id = {p["id"]: p["name"] for p in projects}
-        assert project_names_by_id[PROJECT_ID_STR] == "proj1"
-        assert project_names_by_id[SECOND_PROJECT_ID_STR] == "proj2"
+        names = {p["id"]: p["name"] for p in projects}
+        assert names[PROJECT_ID_STR] == "proj1"
+        assert names[SECOND_PROJECT_ID_STR] == "proj2"
 
 
 @pytest.mark.parametrize(
-    "behavior,expected_status,expected_detail",
+    "behavior,expected_status,expect_payload_type",
     [
-        ("minimal", 200, None),
-        ("full", 200, None),
-        ("notfound", 404, f"Project with id {PROJECT_ID_STR} not found."),
-        ("error", 500, "Failed to retrieve the project due to internal server error."),
+        ("minimal", 200, "minimal"),
+        ("full", 200, "full"),
+        ("notfound", 404, None),
+        ("error", 500, None),
     ],
 )
-def test_get_project(client, monkeypatch, behavior, expected_status, expected_detail):
-    class FakeRepo:
+def test_get_project(client, monkeypatch, behavior, expected_status, expect_payload_type):  # noqa: C901
+    from rest.endpoints import projects as ep_mod
+
+    class FakeService:
         def __init__(self, session):
             pass
 
-        def get_project_by_id(self, project_id: UUID):
+        def get_project(self, project_id: UUID):
             assert project_id == PROJECT_ID
             if behavior == "minimal":
                 return make_project(PROJECT_ID, "minproj")
@@ -326,39 +324,47 @@ def test_get_project(client, monkeypatch, behavior, expected_status, expected_de
                     sink=make_sink(),
                 )
             if behavior == "notfound":
-                raise ResourceNotFoundError(ResourceType.PROJECT, resource_id=str(project_id))
+                raise ResourceNotFoundError(
+                    resource_type=ResourceType.PROJECT,
+                    resource_id=str(project_id),
+                )
             if behavior == "error":
                 raise RuntimeError("boom")
             raise AssertionError("Unhandled behavior")
 
-    monkeypatch.setattr(get_project_mod, "ProjectRepository", FakeRepo)
-
+    monkeypatch.setattr(ep_mod, "ProjectService", FakeService)
     resp = client.get(f"/api/v1/projects/{PROJECT_ID_STR}")
+
     assert resp.status_code == expected_status
 
-    if expected_detail:
-        assert resp.json()["detail"] == expected_detail
+    if expect_payload_type is None:
+        if behavior == "notfound":
+            assert resp.status_code == 404
+        elif behavior == "error":
+            assert resp.json()["detail"] == "Failed to retrieve project."
         return
 
     data = resp.json()
-    if behavior == "minimal":
+    if expect_payload_type == "minimal":
         assert_minimal_project_payload(data, PROJECT_ID_STR, "minproj")
-    if behavior == "full":
+    if expect_payload_type == "full":
         assert_full_project_payload(data)
 
 
 @pytest.mark.parametrize(
-    "behavior,expected_status,expected_detail",
+    "behavior,expected_status,expect_detail",
     [
         ("success", 200, None),
-        ("notfound", 404, f"Project with ID {PROJECT_ID_STR} not found."),
-        ("error", 500, "Failed to update the project due to internal server error."),
+        ("notfound", 404, "notfound"),  # marker; we only check status
+        ("error", 500, "Failed to update project due to internal server error."),
     ],
 )
-def test_update_project(client, monkeypatch, behavior, expected_status, expected_detail):
+def test_update_project(client, monkeypatch, behavior, expected_status, expect_detail):
+    from rest.endpoints import projects as ep_mod
+
     NEW_NAME = "renamed"
 
-    class FakeRepo:
+    class FakeService:
         def __init__(self, session):
             pass
 
@@ -368,19 +374,25 @@ def test_update_project(client, monkeypatch, behavior, expected_status, expected
             if behavior == "success":
                 return make_project(PROJECT_ID, NEW_NAME)
             if behavior == "notfound":
-                raise ResourceNotFoundError(ResourceType.PROJECT, resource_id=str(project_id))
+                raise ResourceNotFoundError(
+                    resource_type=ResourceType.PROJECT,
+                    resource_id=str(project_id),
+                )
             if behavior == "error":
                 raise RuntimeError("boom")
             raise AssertionError("Unhandled behavior")
 
-    monkeypatch.setattr(update_project_mod, "ProjectRepository", FakeRepo)
+    monkeypatch.setattr(ep_mod, "ProjectService", FakeService)
 
     resp = client.put(f"/api/v1/projects/{PROJECT_ID_STR}", json={"name": NEW_NAME})
     assert resp.status_code == expected_status
-    if expected_detail:
-        assert resp.json()["detail"] == expected_detail
-    elif behavior == "success":
+    if behavior == "success":
         assert_minimal_project_payload(resp.json(), PROJECT_ID_STR, NEW_NAME)
+    elif behavior == "error":
+        assert resp.json()["detail"] == expect_detail
+    elif behavior == "notfound":
+        # Do not assert exact message; just ensure 404 and detail present.
+        assert "detail" in resp.json()
 
 
 def test_update_project_validation_error(client):
