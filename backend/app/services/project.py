@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class ProjectService:
     """
-    Service layer orchestrating project use cases.
+    Service layer orchestrating project configs use cases.
 
     Responsibilities:
       - Enforce business rules (uniqueness, activation semantics).
@@ -207,16 +207,6 @@ class ProjectService:
                 resource_type=ResourceType.PROJECT,
                 resource_id=str(project_id),
             )
-
-        if project.source:
-            logger.debug(f"Deleting related source for project id={project_id}")
-            self.session.delete(project.source)
-        if project.processor:
-            logger.debug(f"Deleting related processor for project id={project_id}")
-            self.session.delete(project.processor)
-        if project.sink:
-            logger.debug(f"Deleting related sink for project id={project_id}")
-            self.session.delete(project.sink)
 
         self.project_repository.delete(project)
         self.session.commit()

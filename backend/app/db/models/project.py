@@ -3,6 +3,7 @@
 
 from typing import TYPE_CHECKING
 
+from sqlalchemy import Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
@@ -28,4 +29,13 @@ class ProjectDB(Base):
     )
     labels: Mapped[list["LabelDB"]] = relationship(
         back_populates="project", cascade="all, delete-orphan", passive_deletes=True
+    )
+    __table_args__ = (
+        # ensures at most one row where active is true
+        Index(
+            "single_active_project",
+            "active",
+            unique=True,
+            sqlite_where=active.is_(True),
+        ),
     )
