@@ -214,13 +214,18 @@ class ProjectService:
 
     def _activate_project(self, project: ProjectDB) -> None:
         """
-        Internal: ensure only one active project at a time.
-
-        Parameters:
-            project: Project to mark active.
+        Ensure only one project is active.
+        Deactivate the currently active project (if different) and activate the target.
         """
         current = self.project_repository.get_active()
-        if current and current.id != project.id:
-            logger.debug(f"Deactivating previously active project id={current.id} in favor of id={project.id}")
+
+        if current and current.id == project.id:
+            return
+
+        if current:
+            logger.debug(f"Deactivating project id={current.id} before activating id={project.id}")
             current.active = False
+            self.session.flush()
+
         project.active = True
+        self.session.flush()
