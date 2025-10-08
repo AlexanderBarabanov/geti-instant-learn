@@ -5,6 +5,7 @@ import argparse
 from enum import Enum
 from typing import TypeVar
 
+from getiprompt.processes.encoders import AVAILABLE_IMAGE_ENCODERS
 from getiprompt.processes.prompt_generators import GroundingModel
 from getiprompt.utils.constants import DatasetName, PipelineName, SAMModelName
 
@@ -199,6 +200,13 @@ def populate_benchmark_parser(parser: argparse.ArgumentParser) -> None:
         type=str,
         default="cuda",
         help="The device to use for the models",
+    )
+    parser.add_argument(
+        "--encoder_model",
+        type=str,
+        default="dinov3_large",
+        choices=list(AVAILABLE_IMAGE_ENCODERS),
+        help="ImageEncoder model id",
     )
     parser.add_argument(
         "--grounding_model",

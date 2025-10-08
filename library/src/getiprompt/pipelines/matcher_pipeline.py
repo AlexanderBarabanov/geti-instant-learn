@@ -6,9 +6,9 @@
 from typing import TYPE_CHECKING
 
 from getiprompt.filters.priors import MaxPointFilter, PriorFilter, PriorMaskFromPoints
-from getiprompt.models.models import load_sam_model
+from getiprompt.models import load_sam_model
 from getiprompt.pipelines.pipeline_base import Pipeline
-from getiprompt.processes.encoders import DinoEncoder, Encoder
+from getiprompt.processes.encoders import ImageEncoder
 from getiprompt.processes.feature_selectors import AllFeaturesSelector, FeatureSelector
 from getiprompt.processes.mask_processors import MaskProcessor, MasksToPolygons
 from getiprompt.processes.prompt_generators import BidirectionalPromptGenerator
@@ -64,6 +64,7 @@ class Matcher(Pipeline):
         sam: SAMModelName = SAMModelName.SAM_HQ_TINY,
         num_foreground_points: int = 40,
         num_background_points: int = 2,
+        encoder_model: str = "dinov3_large",
         mask_similarity_threshold: float | None = 0.38,
         precision: str = "bf16",
         compile_models: bool = False,
@@ -78,6 +79,7 @@ class Matcher(Pipeline):
             num_foreground_points: The number of foreground points to use.
             num_background_points: The number of background points to use.
             mask_similarity_threshold: The similarity threshold for the mask.
+            encoder_model: ImageEncoder model ID to use.
             precision: The precision to use for the model.
             compile_models: Whether to compile the models.
             benchmark_inference_speed: Whether to benchmark the inference speed.
@@ -92,15 +94,16 @@ class Matcher(Pipeline):
             compile_models=compile_models,
             benchmark_inference_speed=benchmark_inference_speed,
         )
-        self.encoder: Encoder = DinoEncoder(
+        self.encoder: ImageEncoder = ImageEncoder(
+            model_id=encoder_model,
+            device=device,
             precision=precision,
             compile_models=compile_models,
             benchmark_inference_speed=benchmark_inference_speed,
-            device=device,
         )
         self.feature_selector: FeatureSelector = AllFeaturesSelector()
         self.prompt_generator: PromptGenerator = BidirectionalPromptGenerator(
-            encoder_input_size=self.encoder.encoder_input_size,
+            encoder_input_size=self.encoder.input_size,
             encoder_patch_size=self.encoder.patch_size,
             encoder_feature_size=self.encoder.feature_size,
             num_background_points=num_background_points,
