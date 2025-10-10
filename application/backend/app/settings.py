@@ -35,9 +35,14 @@ class Settings(BaseSettings):
     port: int = Field(default=9100, alias="PORT")
 
     # Database
-    database_url: str = Field(
-        default="sqlite:///./geti_prompt.db", alias="DATABASE_URL", description="Database connection URL"
-    )
+    db_data_dir: Path = Field(default=Path("data"), alias="DB_DATA_DIR")
+    db_filename: str = "geti_prompt.db"
+
+    @property
+    def database_url(self) -> str:
+        """Database connection URL"""
+        return f"sqlite:///{self.db_data_dir / self.db_filename}"
+
     db_echo: bool = Field(default=False, alias="DB_ECHO")
 
     # Alembic
