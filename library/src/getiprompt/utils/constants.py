@@ -19,8 +19,8 @@ class SAMModelName(Enum):
     SAM2_LARGE = "SAM2-large"
 
 
-class PipelineName(Enum):
-    """Enum for pipeline types."""
+class ModelName(Enum):
+    """Enum for model types."""
 
     GROUNDED_SAM = "GroundedSAM"
     MATCHER = "Matcher"
