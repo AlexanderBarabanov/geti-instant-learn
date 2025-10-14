@@ -7,7 +7,7 @@ import { Grid, minmax, View } from '@geti/ui';
 
 import { type CapturedImageType } from '../types';
 import { CapturedImageActions } from './captured-image-actions.component';
-import { Labels } from './labels.component';
+import { Labels } from './labels-management/labels.component';
 
 interface CapturedImageLayoutProps {
     image: CapturedImageType;
@@ -21,7 +21,7 @@ export const CapturedImageLayout = ({ image }: CapturedImageLayoutProps) => {
             rows={[minmax('size-500', 'auto'), '1fr', 'size-500']}
             height={'100%'}
         >
-            <View gridArea={'labels'} backgroundColor={'gray-200'} padding={'size-100'}>
+            <View gridArea={'labels'} backgroundColor={'gray-200'} paddingX={'size-100'} paddingY={'size-50'}>
                 <Labels />
             </View>
             <View gridArea={'image'} backgroundColor={'gray-50'}>
