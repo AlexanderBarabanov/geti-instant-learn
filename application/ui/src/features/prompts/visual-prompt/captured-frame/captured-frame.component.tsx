@@ -3,10 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CSSProperties, ReactNode, Suspense } from 'react';
+import { ReactNode, Suspense } from 'react';
 
 import { Image } from '@geti-prompt/icons';
-import { Content, Flex, Grid, IntelBrandedLoading, minmax, View } from '@geti/ui';
+import { Content, Flex, Grid, Loading, View } from '@geti/ui';
 
 import { ZoomProvider } from '../../../../components/zoom/zoom.provider';
 import { AnnotatorCanvas } from '../../../annotator/annotator-canvas';
@@ -24,11 +24,16 @@ interface CapturedFrameAnnotatorProps {
     children: ReactNode;
     frameId: string;
 }
-
 const CapturedFrameProviders = ({ children, frameId }: CapturedFrameAnnotatorProps) => {
     return (
         <ZoomProvider>
-            <Suspense fallback={<IntelBrandedLoading />}>
+            <Suspense
+                fallback={
+                    <View gridRow={'1/-1'} alignSelf={'center'}>
+                        <Loading mode={'inline'} />
+                    </View>
+                }
+            >
                 <AnnotatorProvider frameId={frameId}>
                     <SelectAnnotationProvider>
                         <AnnotationActionsProvider>
@@ -46,9 +51,7 @@ const NoCapturedFramePlaceholder = () => {
         <View backgroundColor={'gray-300'} height={'100%'}>
             <Flex height={'100%'} width={'100%'} justifyContent={'center'} alignItems={'center'}>
                 <Flex direction={'column'} gap={'size-100'} alignItems={'center'}>
-                    <View>
-                        <Image />
-                    </View>
+                    <Image />
                     <Content UNSAFE_className={styles.noFramePlaceholder}>Capture frames for visual prompt</Content>
                 </Flex>
             </Flex>
@@ -59,40 +62,31 @@ const NoCapturedFramePlaceholder = () => {
 export const CapturedFrame = () => {
     const { selectedFrameId } = useSelectedFrame();
 
-    const disabledStyles: CSSProperties = selectedFrameId === null ? { opacity: 0.5, pointerEvents: 'none' } : {};
-
-    const rows =
-        selectedFrameId === null ? [minmax(0, '1fr')] : [minmax('size-500', 'auto'), minmax(0, '1fr'), 'size-500'];
+    if (selectedFrameId === null) {
+        return <NoCapturedFramePlaceholder />;
+    }
 
     return (
-        <Grid width={'100%'} areas={['labels', 'image', 'actions']} rows={rows} height={'100%'}>
-            {selectedFrameId === null ? (
-                <NoCapturedFramePlaceholder />
-            ) : (
-                <CapturedFrameProviders frameId={selectedFrameId}>
-                    <View
-                        gridArea={'labels'}
-                        backgroundColor={'gray-200'}
-                        paddingX={'size-100'}
-                        paddingY={'size-50'}
-                        UNSAFE_style={disabledStyles}
-                    >
-                        <Labels />
-                    </View>
+        <Grid
+            width={'100%'}
+            areas={['labels', 'image', 'actions']}
+            rows={['size-500', 'size-6000', 'size-500']}
+            UNSAFE_style={{
+                backgroundColor: 'var(--spectrum-global-color-gray-200)',
+            }}
+        >
+            <CapturedFrameProviders frameId={selectedFrameId}>
+                <View gridArea={'labels'} backgroundColor={'gray-200'} paddingX={'size-100'} paddingY={'size-50'}>
+                    <Labels />
+                </View>
 
-                    <View gridArea={'image'} backgroundColor={'gray-50'}>
-                        <AnnotatorCanvas frameId={selectedFrameId} />
-                    </View>
-                    <View
-                        gridArea={'actions'}
-                        backgroundColor={'gray-200'}
-                        padding={'size-100'}
-                        UNSAFE_style={disabledStyles}
-                    >
-                        <CapturedFrameActions />
-                    </View>
-                </CapturedFrameProviders>
-            )}
+                <View gridArea={'image'} backgroundColor={'gray-50'} overflow={'hidden'}>
+                    <AnnotatorCanvas frameId={selectedFrameId} />
+                </View>
+                <View gridArea={'actions'} backgroundColor={'gray-200'} padding={'size-100'}>
+                    <CapturedFrameActions />
+                </View>
+            </CapturedFrameProviders>
         </Grid>
     );
 };

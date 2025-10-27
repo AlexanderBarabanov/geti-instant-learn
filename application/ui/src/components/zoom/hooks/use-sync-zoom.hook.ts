@@ -47,7 +47,7 @@ export const useSyncZoom = ({ container, target, zoomInMultiplier }: useSyncZoom
                 x: Number(targetZoom.x.toFixed(3)),
                 y: Number(targetZoom.y.toFixed(3)),
             },
-            initialCoordinates: { ...targetZoom },
+            initialCoordinates: targetZoom,
         });
     }, [setZoom, zoomInMultiplier, targetZoom]);
 };
