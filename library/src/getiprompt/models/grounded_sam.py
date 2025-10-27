@@ -8,8 +8,8 @@ from getiprompt.components.filters import MultiInstancePriorFilter
 from getiprompt.components.prompt_generators import GroundingModel, TextToBoxPromptGenerator
 from getiprompt.models import Model, load_sam_model
 from getiprompt.types import Image, Priors, Results, Text
+from getiprompt.utils.benchmark import track_duration
 from getiprompt.utils.constants import SAMModelName
-from getiprompt.utils.decorators import track_duration
 
 
 class GroundedSAM(Model):
@@ -25,7 +25,6 @@ class GroundedSAM(Model):
         box_threshold: float = 0.4,
         text_threshold: float = 0.3,
         device: str = "cuda",
-        image_size: int | tuple[int, int] | None = None,
     ) -> None:
         """Initialize the model.
 
@@ -38,9 +37,8 @@ class GroundedSAM(Model):
             box_threshold: The box threshold.
             text_threshold: The text threshold.
             device: The device to use.
-            image_size: The size of the image to use, if None, the image will not be resized.
         """
-        super().__init__(image_size=image_size)
+        super().__init__()
         self.sam_predictor = load_sam_model(
             sam,
             device,
@@ -67,7 +65,15 @@ class GroundedSAM(Model):
 
     @track_duration
     def learn(self, reference_images: list[Image], reference_priors: list[Priors]) -> Results:  # noqa: ARG002
-        """Perform learning step on the reference images and priors."""
+        """Perform learning step on the reference images and priors.
+
+        Args:
+            reference_images: The reference images.
+            reference_priors: The reference priors.
+
+        Raises:
+            ValueError: If the reference priors do not have all text types.
+        """
         if not all(p.text is not None for p in reference_priors):
             msg = "reference_priors must have all text types"
             raise ValueError(msg)
@@ -82,7 +88,6 @@ class GroundedSAM(Model):
     def infer(self, target_images: list[Image]) -> Results:
         """Perform inference step on the target images."""
         # Start running the model
-        target_images = self.resize_images(target_images)
         priors = self.prompt_generator(target_images, [self.text_priors] * len(target_images))
         priors = self.multi_instance_prior_filter(priors)
         masks, _, used_boxes = self.segmenter(target_images, priors)

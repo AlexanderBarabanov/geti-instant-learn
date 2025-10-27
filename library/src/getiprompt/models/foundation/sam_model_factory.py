@@ -20,7 +20,7 @@ from getiprompt.utils.utils import download_file, precision_to_torch_dtype
 if TYPE_CHECKING:
     from segment_anything_hq.modeling.sam import Sam as SamHQ
 
-    from getiprompt.models.foundation.per_sam.modeling import Sam
+    from getiprompt.models.foundation.per_sam.modeling import SAM
 
 logger = getLogger("Geti Prompt")
 
@@ -41,6 +41,10 @@ def load_sam_model(
         compile_models: Whether to compile the model.
         benchmark_inference_speed: Whether to benchmark the inference speed.
 
+    Raises:
+        ValueError: If the model is not implemented yet.
+        NotImplementedError: If the model is not implemented yet.
+
     Returns:
         The loaded model.
     """
@@ -57,10 +61,11 @@ def load_sam_model(
     local_filename = model_info["local_filename"]
     checkpoint_path = DATA_PATH.joinpath(local_filename)
 
-    logger.info(f"Loading segmentation model: {sam} from {checkpoint_path}")
+    msg = f"Loading segmentation model: {sam} from {checkpoint_path}"
+    logger.info(msg)
 
     if sam in {SAMModelName.SAM, SAMModelName.MOBILE_SAM}:
-        model: Sam = sam_model_registry[registry_name](checkpoint=str(checkpoint_path)).to(device).eval()
+        model: SAM = sam_model_registry[registry_name](checkpoint=str(checkpoint_path)).to(device).eval()
         predictor = SamPredictor(model)
     elif sam in {SAMModelName.SAM2_TINY, SAMModelName.SAM2_SMALL, SAMModelName.SAM2_BASE, SAMModelName.SAM2_LARGE}:
         config_path = "configs/sam2.1/" + model_info["config_filename"]
@@ -97,6 +102,10 @@ def check_model_weights(model_name: SAMModelName) -> None:
 
     Args:
         model_name: The name of the model.
+
+    Raises:
+        ValueError: If the model is not found in MODEL_MAP.
+        ValueError: If the model weights are missing.
     """
     if model_name not in MODEL_MAP:
         msg = f"Model '{model_name.value}' not found in MODEL_MAP for weight checking."
@@ -114,5 +123,6 @@ def check_model_weights(model_name: SAMModelName) -> None:
     target_path = DATA_PATH.joinpath(local_filename)
 
     if not target_path.exists():
-        logger.info(f"Model weights for {model_name.value} not found at {target_path}, downloading...")
+        msg = f"Model weights for {model_name.value} not found at {target_path}, downloading..."
+        logger.info(msg)
         download_file(download_url, target_path, sha_sum)

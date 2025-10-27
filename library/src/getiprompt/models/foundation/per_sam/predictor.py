@@ -12,7 +12,7 @@ import torch
 
 from getiprompt.data import ResizeLongestSide
 
-from .modeling.sam import Sam
+from .modeling.sam import SAM
 
 
 class SamPredictor:
@@ -20,7 +20,7 @@ class SamPredictor:
 
     def __init__(
         self,
-        sam_model: Sam,
+        sam_model: SAM,
     ) -> None:
         """Uses SAM to calculate the image embedding for an image, and then
         allow repeated, efficient mask prediction given prompts.
@@ -29,7 +29,7 @@ class SamPredictor:
           sam_model (Sam): The model to use for mask prediction.
         """
         super().__init__()
-        self.model: Sam = sam_model
+        self.model: SAM = sam_model
         self.transform = ResizeLongestSide(sam_model.image_encoder.img_size)
         self.reset_image()
 
@@ -95,7 +95,7 @@ class SamPredictor:
         original_image_size: tuple[int, ...],
         transformed_mask: torch.Tensor = None,
         cal_image: bool = True,
-    ) -> None:
+    ) -> None | torch.Tensor:
         """Calculates the image embeddings for the provided image.
 
         Allowing masks to be predicted with the 'predict' method. Expects the input
@@ -276,9 +276,8 @@ class SamPredictor:
             a subsequent iteration as mask input.
         """
         if not self.is_image_set:
-            raise RuntimeError(
-                "An image must be set with .set_image(...) before mask prediction.",
-            )
+            msg = "An image must be set with .set_image(...) before mask prediction."
+            raise RuntimeError(msg)
 
         if point_coords is not None:
             points = (point_coords, point_labels)
@@ -316,19 +315,21 @@ class SamPredictor:
         return high_res_masks, iou_predictions, low_res_masks, high_res_masks
 
     def get_image_embedding(self) -> torch.Tensor:
-        """Returns the image embeddings for the currently set image, with
-        shape 1xCxHxW, where C is the embedding dimension and (H,W) are
-        the embedding spatial dimension of SAM (typically C=256, H=W=64).
+        """Returns the image embeddings for the currently set image, with shape 1xCxHxW (typically C=256, H=W=64).
+
+        Raises:
+            RuntimeError: If no image has been set with 'set_image' prior to calling get_image_embedding.
+            AssertionError: If features do not exist if an image has been set.
         """
         if not self.is_image_set:
-            raise RuntimeError(
-                "An image must be set with .set_image(...) to generate an embedding.",
-            )
+            msg = "An image must be set with .set_image(...) to generate an embedding."
+            raise RuntimeError(msg)
         assert self.features is not None, "Features must exist if an image has been set."
         return self.features
 
     @property
     def device(self) -> torch.device:
+        """Returns the device of the model."""
         return self.model.device
 
     def reset_image(self) -> None:
