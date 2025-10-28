@@ -5,25 +5,40 @@
 
 import { CSSProperties, KeyboardEvent, useState } from 'react';
 
+import { LabelType } from '@geti-prompt/api';
 import { ActionButton, ColorPickerDialog, DimensionValue, Flex, TextField } from '@geti/ui';
 import { clsx } from 'clsx';
-
-import { Label } from '../../../../annotator/types';
 
 import classes from './edit-label.module.scss';
 
 interface EditLabelProps {
-    label: Label;
-    onAccept: (editedLabel: Label) => void;
+    label: LabelType;
+    onAccept: (editedLabel: LabelType) => void;
     onClose: () => void;
     isQuiet?: boolean;
     width?: DimensionValue;
+    isDisabled?: boolean;
+    existingLabelsNames: string[];
 }
 
-export const EditLabel = ({ label, onAccept, onClose, isQuiet, width }: EditLabelProps) => {
+const isUniqueName = (name: string, existingLabelsNames: string[]) => {
+    return !existingLabelsNames.includes(name);
+};
+
+export const EditLabel = ({
+    label,
+    onAccept,
+    onClose,
+    isQuiet,
+    width,
+    isDisabled,
+    existingLabelsNames,
+}: EditLabelProps) => {
     const MAX_NAME_LENGTH = 100;
     const [color, setColor] = useState<string>(label.color);
     const [name, setName] = useState<string>(label.name);
+
+    const isEditDisabled = !isUniqueName(name, existingLabelsNames) || !name.trim() || isDisabled;
 
     const handleAccept = () => {
         onAccept({ color, name, id: label.id });
@@ -31,7 +46,7 @@ export const EditLabel = ({ label, onAccept, onClose, isQuiet, width }: EditLabe
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' && !isEditDisabled) {
             handleAccept();
         } else if (e.key === 'Escape') {
             onClose();
@@ -43,7 +58,6 @@ export const EditLabel = ({ label, onAccept, onClose, isQuiet, width }: EditLabe
             gap={'size-50'}
             width={width}
             justifyContent={'center'}
-            alignItems={'center'}
             UNSAFE_className={clsx({ [classes.editLabelContainer]: isQuiet })}
         >
             <ColorPickerDialog
@@ -67,12 +81,13 @@ export const EditLabel = ({ label, onAccept, onClose, isQuiet, width }: EditLabe
                 onKeyDown={(e) => handleKeyDown(e)}
                 // eslint-disable-next-line jsx-a11y/no-autofocus
                 autoFocus
+                validate={(newName) => isUniqueName(newName, existingLabelsNames) || 'Label name must be unique.'}
             />
             <ActionButton
                 isQuiet={isQuiet}
                 aria-label={'Confirm label'}
                 onPress={handleAccept}
-                isDisabled={!name.trim()}
+                isDisabled={isEditDisabled}
                 UNSAFE_style={
                     {
                         '--addButtonBgColor': isQuiet ? 'var(--spectrum-global-color-gray-200)' : 'var(--energy-blue)',
