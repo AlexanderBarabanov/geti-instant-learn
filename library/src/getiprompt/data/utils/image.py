@@ -12,11 +12,10 @@ from pathlib import Path
 import numpy as np
 import torch
 from PIL import Image as PILImage
-from torchvision.transforms.v2 import functional as F
-from torchvision.tv_tensors import Image, Mask
+from torchvision import tv_tensors
 
 
-def read_image(path: str | Path, as_tensor: bool = True) -> Image | np.ndarray:
+def read_image(path: str | Path, as_tensor: bool = True) -> tv_tensors.Image | np.ndarray:
     """Read an image from file.
 
     Args:
@@ -55,14 +54,13 @@ def read_image(path: str | Path, as_tensor: bool = True) -> Image | np.ndarray:
 
     if as_tensor:
         # Convert to tensor and ensure it's in CHW format
-        tensor = F.to_tensor(pil_image)
-        return Image(tensor)
+        return tv_tensors.Image(pil_image)
     # Return as numpy array in HWC format (uint8, 0-255 range)
     # Models expect HWC format for preprocessing (HuggingFace, SAM transforms)
     return np.array(pil_image, dtype=np.uint8)
 
 
-def read_mask(path: str | Path, as_tensor: bool = True) -> Mask | np.ndarray:
+def read_mask(path: str | Path, as_tensor: bool = True) -> torch.Tensor | np.ndarray:
     """Read a mask from file.
 
     Args:
@@ -70,7 +68,7 @@ def read_mask(path: str | Path, as_tensor: bool = True) -> Mask | np.ndarray:
         as_tensor (bool, optional): Whether to return as tensor. Defaults to ``True``.
 
     Returns:
-        Mask | np.ndarray: Loaded mask as tensor (HW format) or numpy array (HW format).
+        torch.Tensor | np.ndarray: Loaded mask as tensor (HW format) or numpy array (HW format).
 
     Note:
             The mask is binarized to 0 (background) and 1 (foreground).
@@ -106,6 +104,5 @@ def read_mask(path: str | Path, as_tensor: bool = True) -> Mask | np.ndarray:
 
     if as_tensor:
         # Convert to tensor
-        binary_tensor = torch.from_numpy(binary_array)
-        return Mask(binary_tensor)
+        return torch.from_numpy(binary_array)
     return binary_array

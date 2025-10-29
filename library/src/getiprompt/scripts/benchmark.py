@@ -5,15 +5,10 @@
 
 from __future__ import annotations
 
-import argparse
 import itertools
-import warnings
-from pathlib import Path
-
-warnings.filterwarnings("ignore", category=UserWarning)
-warnings.filterwarnings("ignore", category=FutureWarning)
-
 from logging import getLogger
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import polars as pl
@@ -21,10 +16,9 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeEl
 from torch.utils.data import DataLoader
 
 from getiprompt.data import Dataset, LVISDataset, PerSegDataset
-from getiprompt.data.base import Sample
 from getiprompt.metrics import SegmentationMetrics
 from getiprompt.models import Model, load_model
-from getiprompt.types import Image, Masks, Priors, Text
+from getiprompt.types import Masks, Priors, Text
 from getiprompt.utils import setup_logger
 from getiprompt.utils.args import get_arguments, parse_experiment_args
 from getiprompt.utils.benchmark import (
@@ -39,25 +33,27 @@ from getiprompt.visualize import ExportMaskVisualization
 logger = getLogger("Geti Prompt")
 
 
-def sample_to_image_and_priors(
+if TYPE_CHECKING:
+    import argparse
+
+    from torchvision import tv_tensors
+
+    from getiprompt.data.base import Sample
+
+
+def extract_priors(
     sample: Sample,
     category_name: str,
-) -> tuple[Image, Priors]:
-    """Convert a Sample to legacy Image and Priors format.
-
-    This centralizes the conversion logic from the new sample format to the
-    legacy format used by models.
+) -> Priors:
+    """Extract priors from a Sample.
 
     Args:
-        sample: Sample with image and masks
-        category_name: Category name for the text prior
+        sample: Sample - The sample to extract priors from.
+        category_name: str - The category name for the text prior.
 
     Returns:
-        Tuple of (Image, Priors) ready for model.learn()
+        Priors - The priors extracted from the sample.
     """
-    # Convert image to Image type
-    image = Image(sample.image if isinstance(sample.image, np.ndarray) else sample.image.cpu().numpy())
-
     # Convert masks to Masks type
     masks_obj = Masks()
     if sample.masks is not None:
@@ -74,9 +70,7 @@ def sample_to_image_and_priors(
     text_prior.add(category_name, class_id=int(category_id))
 
     # Create priors object
-    priors = Priors(masks=masks_obj, text=text_prior)
-
-    return image, priors
+    return Priors(masks=masks_obj, text=text_prior)
 
 
 def infer_on_category(
@@ -137,10 +131,8 @@ def infer_on_category(
     total_time = 0
     n_samples = 0
     for batch in dataloader:
-        # Convert batch to Image objects
-        target_images = [Image(img) for img in batch.images]
-
         # Run inference
+        target_images = batch.images
         results = model.infer(target_images=target_images)
         total_time += results.duration
         n_samples += len(batch)
@@ -216,7 +208,7 @@ def learn_from_category(
     n_shot: int,
     visualizer: ExportMaskVisualization,
     priors_batch_index: int,
-) -> tuple[list[Image], list[Priors]]:
+) -> tuple[list[tv_tensors.Image], list[Priors]]:
     """Learn from reference samples of a category.
 
     Args:
@@ -228,7 +220,8 @@ def learn_from_category(
         priors_batch_index: The current prior batch index
 
     Returns:
-        Tuple of (reference_images, reference_priors) used for learning
+        list[tv_tensors.Image] - The reference images used for learning.
+        list[Priors] - The reference priors used for learning.
 
     Raises:
         ValueError: If no reference samples are found for the category.
@@ -248,8 +241,8 @@ def learn_from_category(
 
     for i in range(n_samples):
         sample = reference_dataset[i]
-        image, priors = sample_to_image_and_priors(sample, category_name)
-        reference_images.append(image)
+        priors = extract_priors(sample, category_name)
+        reference_images.append(sample.image)
         reference_priors.append(priors)
 
     # Learn
@@ -533,7 +526,7 @@ def perform_benchmark_experiment(args: argparse.Namespace | None = None) -> None
         # Support both presets (e.g., "default", "benchmark", "all") and explicit lists (e.g., "cat,dog,bird")
         if args.class_name:
             # Check if it's a preset or a comma-separated list
-            if "," not in args.class_name and args.class_name.lower() in ("default", "benchmark", "all"):
+            if "," not in args.class_name and args.class_name.lower() in {"default", "benchmark", "all"}:
                 categories_arg = args.class_name  # Pass preset string directly
             else:
                 categories_arg = [c.strip() for c in args.class_name.split(",")]  # Split comma-separated list

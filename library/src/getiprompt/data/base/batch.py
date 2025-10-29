@@ -3,15 +3,17 @@
 
 """Batch handling for GetiPrompt datasets.
 
-This module provides batch collation functionality for GetiPrompt samples.
+This module provides batch collation functionality for Geti Prompt `Sample` object.
 The batch is a thin wrapper around list[Sample] with convenient
 properties for batch-level access to tensors.
 """
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 
 import numpy as np
 import torch
+from torchvision import tv_tensors
 
 from getiprompt.data.base.sample import Sample
 
@@ -48,7 +50,7 @@ class Batch:
         ...     process(sample.image, sample.masks)
 
         Batch-level access (returns lists):
-        >>> images = batch.images  # list[torch.Tensor]
+        >>> images = batch.images  # list[tv_tensors.Image]
         >>> masks = batch.masks    # list[torch.Tensor | None]
         >>> categories = batch.categories  # list[list[str]]
 
@@ -65,7 +67,7 @@ class Batch:
     samples: list[Sample]
 
     # Cached tensors for performance (lazy conversion)
-    _images: list[torch.Tensor] | None = field(default=None, init=False, repr=False)
+    _images: list[tv_tensors.Image] | None = field(default=None, init=False, repr=False)
     _masks: list[torch.Tensor | None] | None = field(default=None, init=False, repr=False)
 
     def __len__(self) -> int:
@@ -83,23 +85,24 @@ class Batch:
         """
         return self.samples[index]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Sample]:
         """Iterate over samples in the batch."""
         return iter(self.samples)
 
     @property
-    def images(self) -> list[torch.Tensor]:
+    def images(self) -> list[tv_tensors.Image]:
         """Get all images as list of tensors.
 
         Converts numpy arrays to tensors and caches the result.
         Each tensor has shape (C, H, W).
 
         Returns:
-            list[torch.Tensor]: List of image tensors.
+            list[tv_tensors.Image]: List of image tensors.
         """
         if self._images is None:
             self._images = [
-                torch.from_numpy(s.image.copy()) if isinstance(s.image, np.ndarray) else s.image for s in self.samples
+                tv_tensors.Image(torch.from_numpy(s.image.copy())) if isinstance(s.image, np.ndarray) else s.image
+                for s in self.samples
             ]
         return self._images
 
@@ -269,6 +272,7 @@ class Batch:
             >>> images = batch.images  # Lazy conversion to tensors
         """
         if not samples:
-            raise ValueError("Cannot collate empty list of samples")
+            msg = "Cannot collate empty list of samples"
+            raise ValueError(msg)
 
         return cls(samples=samples)
