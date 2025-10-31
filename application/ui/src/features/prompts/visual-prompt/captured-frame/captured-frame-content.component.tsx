@@ -31,7 +31,9 @@ export const CapturedFrameProviders = ({ children, frameId }: CapturedFrameAnnot
                 </View>
             }
         >
-            <AnnotatorProvider frameId={frameId}>
+            {/* key={frameId} is added here to make sure that the whole tree unmounts/mounts
+                every time we capture a new frame */}
+            <AnnotatorProvider frameId={frameId} key={frameId}>
                 <SelectAnnotationProvider>
                     <AnnotationActionsProvider>
                         <AnnotationVisibilityProvider>

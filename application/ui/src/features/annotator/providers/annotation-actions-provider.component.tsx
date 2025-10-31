@@ -13,7 +13,6 @@ import { v4 as uuid } from 'uuid';
 import type { Annotation, Shape } from '../types';
 import { UndoRedoProvider } from '../undo-redo/undo-redo-provider.component';
 import useUndoRedoState from '../undo-redo/use-undo-redo-state';
-import { useAnnotator } from './annotator-provider.component';
 
 // TODO: update this type
 type ServerAnnotation = Annotation;
@@ -43,8 +42,6 @@ type AnnotationActionsProviderProps = {
     children: ReactNode;
 };
 export const AnnotationActionsProvider = ({ children }: AnnotationActionsProviderProps) => {
-    const { frameId } = useAnnotator();
-
     const serverAnnotations: Annotation[] = useMemo(() => [], []);
     const fetchError = null;
 
@@ -53,14 +50,6 @@ export const AnnotationActionsProvider = ({ children }: AnnotationActionsProvide
     const isDirty = useRef<boolean>(false);
 
     const [state, setState, undoRedoActions] = useUndoRedoState<Annotation[]>([]);
-
-    useEffect(() => {
-        if (state.length > 0) {
-            setState([]);
-        }
-
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [frameId]);
 
     const updateAnnotations = (updatedAnnotations: Annotation[]) => {
         const updatedMap = new Map(updatedAnnotations.map((ann) => [ann.id, ann]));
@@ -90,7 +79,7 @@ export const AnnotationActionsProvider = ({ children }: AnnotationActionsProvide
     const submitAnnotations = async () => {
         if (!isDirty.current) return;
 
-        // TODO: implement saving annotations
+        // TODO: implement saving annotations once API is ready
         // const serverFormattedAnnotations = mapLocalAnnotationsToServer(localAnnotations);
         // await saveMutation.mutateAsync({
         //     params: { path: { dataset_item_id: mediaItem.id || '', project_id: projectId } },
