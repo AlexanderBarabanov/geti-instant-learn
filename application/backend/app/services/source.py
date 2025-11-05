@@ -1,12 +1,14 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+import base64
 import logging
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from core.components.schemas.reader import FrameListResponse, FrameMetadata
 from core.runtime.dispatcher import ComponentConfigChangeEvent, ConfigChangeDispatcher
 from db.constraints import UniqueConstraintName
 from db.models import ProjectDB, SourceDB
@@ -32,6 +34,8 @@ from services.schemas.source import (
 )
 
 logger = logging.getLogger(__name__)
+
+MOCK_FILE = "/geti_prompt/html/assets/test.webp"
 
 
 class SourceService:
@@ -326,3 +330,29 @@ class SourceService:
 
         logger.error(f"Unmapped constraint violation for source (source_id={source_id}): {error_msg}")
         raise ValueError("Database constraint violation. Please check your input and try again.")
+
+    def get_frames(self, project_id: UUID, source_id: UUID) -> FrameListResponse:
+        """
+        Retrieve frames from a source by id within a project.
+        Parameters:
+            project_id: Owning project UUID.
+            source_id: Source UUID.
+        """
+        self._ensure_project(project_id)
+        source = self.source_repository.get_by_id_and_project(source_id=source_id, project_id=project_id)
+        if not source:
+            logger.error("Source not found id=%s project_id=%s", source_id, project_id)
+            raise ResourceNotFoundError(resource_type=ResourceType.SOURCE, resource_id=str(source_id))
+        # Placeholder for actual frame retrieval logic
+        logger.info("Retrieving frames from source_id=%s project_id=%s", source_id, project_id)
+        frames = []
+        with open(MOCK_FILE, "rb") as file:
+            encoded_file = base64.b64encode(file.read()).decode("utf-8")
+        for i in range(4):
+            frames.append(FrameMetadata(index=i, thumbnail=encoded_file))
+        return FrameListResponse(
+            frames=frames,
+            total=len(frames),
+            page=1,
+            page_size=len(frames),
+        )

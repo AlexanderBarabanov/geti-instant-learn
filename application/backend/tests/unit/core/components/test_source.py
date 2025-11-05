@@ -4,6 +4,8 @@ import pytest
 
 from core.components.base import StreamReader
 from core.components.broadcaster import FrameBroadcaster
+from core.components.schemas.processor import InputData
+from core.components.schemas.reader import FrameListResponse, FrameMetadata
 from core.components.source import Source
 
 test_cases = [
@@ -42,3 +44,37 @@ class TestSource:
 
         broadcast_calls = [call.args[0] for call in self.mock_broadcaster.broadcast.call_args_list]
         assert broadcast_calls == expected_broadcasts
+
+    def test_seek_delegates_to_reader(self):
+        """Test that seek() calls the reader's seek method."""
+        expected_frame = InputData(frame=MagicMock(), timestamp=1, context={})
+        self.mock_stream_reader.seek.return_value = expected_frame
+
+        result = self.source.seek(42)
+
+        self.mock_stream_reader.seek.assert_called_once_with(42)
+        assert result == expected_frame
+
+    def test_index_delegates_to_reader(self):
+        """Test that index() calls the reader's index method."""
+        self.mock_stream_reader.index.return_value = 10
+
+        result = self.source.index()
+
+        self.mock_stream_reader.index.assert_called_once()
+        assert result == 10
+
+    def test_list_frames_delegates_to_reader(self):
+        """Test that list_frames() calls the reader's list_frames method."""
+        expected_response = FrameListResponse(
+            frames=[FrameMetadata(index=1, thumbnail="base64string", path="/path/to/frame1")],
+            total=1,
+            page=1,
+            page_size=100,
+        )
+        self.mock_stream_reader.list_frames.return_value = expected_response
+
+        result = self.source.list_frames(page=1, page_size=100)
+
+        self.mock_stream_reader.list_frames.assert_called_once_with(1, 100)
+        assert result == expected_response

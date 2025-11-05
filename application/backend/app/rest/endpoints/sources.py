@@ -1,6 +1,7 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+import json
 import logging
 from uuid import UUID
 
@@ -11,6 +12,7 @@ from routers import projects_router
 from services.schemas.source import SourceCreateSchema, SourceSchema, SourcesListSchema, SourceUpdateSchema
 
 logger = logging.getLogger(__name__)
+MOCK_FILE = "/geti_prompt/html/assets/test.webp"
 
 
 @projects_router.get(
@@ -98,3 +100,83 @@ def delete_source(
     """
     source_service.delete_source(project_id=project_id, source_id=source_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@projects_router.get(
+    path="/{project_id}/sources/{source_id}/frames",
+    tags=["Sources"],
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_200_OK: {
+            "description": "Successfully retrieved the list of frame indices for the project's source."
+        },
+        status.HTTP_404_NOT_FOUND: {"description": "Project or source not found."},
+        status.HTTP_409_CONFLICT: {"description": "Source type change is not allowed."},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"description": "Unexpected error occurred."},
+    },
+)
+def get_frames(project_id: UUID, source_id: UUID, source_service: SourceServiceDep) -> Response:
+    """
+    Get a list of all frame indices for the specified source.
+    """
+    logger.debug(f"Received GET frames request for source {source_id} in project {project_id}.")
+    all_frames = source_service.get_frames(project_id=project_id, source_id=source_id)
+    return Response(
+        content=all_frames.model_dump_json(),
+        status_code=status.HTTP_200_OK,
+        media_type="application/json",
+    )
+
+
+@projects_router.get(
+    path="/{project_id}/sources/{source_id}/frames/index",
+    tags=["Sources"],
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_200_OK: {"description": "Successfully retrieved the frame index for the project's source."},
+        status.HTTP_404_NOT_FOUND: {"description": "Project or source not found."},
+        status.HTTP_409_CONFLICT: {"description": "Source type change is not allowed."},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"description": "Unexpected error occurred."},
+    },
+)
+def get_frame_index(
+    project_id: UUID,
+    source_id: UUID,
+    source_service: SourceServiceDep,  # noqa: ARG001
+) -> Response:
+    """
+    Get the current frame index for the specified source.
+    """
+    logger.debug(f"Received GET frames request for source {source_id} in project {project_id}.")
+    return Response(
+        content='{"index": 1}',
+        status_code=status.HTTP_200_OK,
+        media_type="application/json",
+    )
+
+
+@projects_router.post(
+    path="/{project_id}/sources/{source_id}/frames/{index}",
+    tags=["Sources"],
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_200_OK: {"description": "Successfully retrieved the frame for the project's source."},
+        status.HTTP_404_NOT_FOUND: {"description": "Project or source not found."},
+        status.HTTP_409_CONFLICT: {"description": "Source type change is not allowed."},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"description": "Unexpected error occurred."},
+    },
+)
+def get_frame(
+    project_id: UUID,
+    source_id: UUID,
+    index: int,
+) -> Response:
+    """
+    Get a specific frame by index for the specified source.
+    """
+    logger.debug(f"Received GET frames request for source {source_id} in project {project_id}.")
+    return Response(
+        content=json.dumps({"index": index}),
+        status_code=status.HTTP_200_OK,
+        media_type="application/json",
+    )

@@ -16,10 +16,12 @@ class SourceType(StrEnum):
 class WebCamConfig(BaseModel):
     source_type: Literal[SourceType.WEBCAM]
     device_id: int
+    seekable: bool = False
 
     model_config = {
         "json_schema_extra": {
             "example": {
+                "seekable": False,
                 "source_type": "webcam",
                 "device_id": 0,
             }
@@ -30,10 +32,12 @@ class WebCamConfig(BaseModel):
 class VideoFileConfig(BaseModel):
     source_type: Literal[SourceType.VIDEO_FILE]
     video_path: str
+    seekable: bool = True
 
     model_config = {
         "json_schema_extra": {
             "example": {
+                "seekable": True,
                 "source_type": "video_file",
                 "video_path": "/path/to/video.mp4",
             }
@@ -44,10 +48,12 @@ class VideoFileConfig(BaseModel):
 class ImagesFolderConfig(BaseModel):
     source_type: Literal[SourceType.IMAGES_FOLDER]
     images_folder_path: str
+    seekable: bool = True
 
     model_config = {
         "json_schema_extra": {
             "example": {
+                "seekable": True,
                 "source_type": "images_folder",
                 "images_folder_path": "/path/to/images",
             }
@@ -62,8 +68,7 @@ class FrameMetadata(BaseModel):
     """Metadata for a single frame in the timeline."""
 
     index: int
-    thumbnail: str  # base64-encoded image
-    path: str
+    thumbnail: str  # url to the frame itself
 
 
 class FrameListResponse(BaseModel):

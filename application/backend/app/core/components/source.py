@@ -7,6 +7,7 @@ import time
 from core.components.base import PipelineComponent, StreamReader
 from core.components.broadcaster import FrameBroadcaster
 from core.components.schemas.processor import InputData
+from core.components.schemas.reader import FrameListResponse
 
 logger = logging.getLogger(__name__)
 
@@ -40,3 +41,24 @@ class Source(PipelineComponent):
                     logger.error(f"Error reading from stream: {e}.")
                     time.sleep(0.1)
         logger.debug("Stopping the source loop")
+
+    def seek(self, index: int) -> InputData | None:
+        """
+        Seek to a specific frame index.
+        Delegates to reader.seek() and returns the frame data.
+        """
+        return self._reader.seek(index)
+
+    def index(self) -> int:
+        """
+        Get current frame position.
+        Delegates to reader.index().
+        """
+        return self._reader.index()
+
+    def list_frames(self, page: int = 1, page_size: int = 100) -> FrameListResponse:
+        """
+        Get paginated list of all frames.
+        Delegates to reader.list_frames().
+        """
+        return self._reader.list_frames(page, page_size)
