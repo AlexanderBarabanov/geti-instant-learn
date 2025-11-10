@@ -21,10 +21,19 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Initial cleanup
+        uses: ./.github/actions/cleanup-runner
+        with:
+          type: "initial"
+
       - name: Install dependencies
         run: |
+          sudo rm -f /var/lib/man-db/auto-update  # Disable man-db auto-update
           sudo apt-get update
           sudo apt-get install -y just
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
 
       - name: Build docker image
         working-directory: application

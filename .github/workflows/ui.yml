@@ -29,9 +29,12 @@ jobs:
         uses: astral-sh/setup-uv@85856786d1ce8acfbcc2f13a5f3fbd6b938f9f41 # v7.1.2
         with:
           version: "0.8.8"
+          enable-cache: true
+          cache-dependency-glob: "application/backend/uv.lock"
 
       - name: Install dependencies
         run: |
+          sudo rm -f /var/lib/man-db/auto-update  # Disable man-db auto-update
           sudo apt-get update
           sudo apt-get install -y just libgl1 libglib2.0-0
 
@@ -59,6 +62,8 @@ jobs:
         id: setup-node
         with:
           node-version-file: application/ui/.nvmrc
+          cache: 'npm'
+          cache-dependency-path: application/ui/package-lock.json
 
       - name: Install dependencies
         working-directory: "application/ui"
@@ -94,6 +99,8 @@ jobs:
         id: setup-node
         with:
           node-version-file: application/ui/.nvmrc
+          cache: 'npm'
+          cache-dependency-path: application/ui/package-lock.json
 
       - name: Install dependencies
         working-directory: "application/ui"
@@ -144,6 +151,8 @@ jobs:
         id: setup-node
         with:
           node-version-file: application/ui/.nvmrc
+          cache: 'npm'
+          cache-dependency-path: application/ui/package-lock.json
 
       - name: Install dependencies
         working-directory: "application/ui"
@@ -252,6 +261,8 @@ jobs:
         id: setup-node
         with:
           node-version-file: application/ui/.nvmrc
+          cache: 'npm'
+          cache-dependency-path: application/ui/package-lock.json
 
       - name: Install dependencies
         working-directory: "application/ui"

@@ -11,8 +11,8 @@ default:
     @just --list
 
 # OpenAPI generation
-gen-openapi:
-    PYTHONPATH=app uv run openapi.py .build
+gen-openapi: venv
+    PYTHONPATH=app uv run --no-sync openapi.py .build
 
 # -------------------------------------------------------------------------------------------------
 # Environment
