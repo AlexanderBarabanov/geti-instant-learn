@@ -11,7 +11,7 @@ import { LabelsPage } from '../labels/labels-page';
 import { registerApiLabels } from '../labels/mocks';
 import { initializeWebRTC } from './initialize-webrtc';
 
-const DEVICE_ID = 10;
+const DEVICE_ID = 0;
 const WEBCAM_SOURCE: WebcamSourceType = {
     connected: true,
     id: 'webcam-id',
@@ -21,6 +21,7 @@ const WEBCAM_SOURCE: WebcamSourceType = {
         source_type: 'webcam',
     },
 };
+const MOCK_PROMPT_ID = '123e4567-e89b-12d3-a456-426614174002';
 
 test('Prompt flow', async ({ network, page, context, streamPage, annotatorPage, promptPage }) => {
     await initializeWebRTC({ page, context, network });
@@ -31,7 +32,6 @@ test('Prompt flow', async ({ network, page, context, streamPage, annotatorPage, 
         http.get('/api/v1/projects/{project_id}/sources', ({ response }) => {
             return response(200).json({ sources: [WEBCAM_SOURCE] });
         }),
-
         http.put('/api/v1/projects/{project_id}/sources/{source_id}', ({ response }) =>
             response(200).json(WEBCAM_SOURCE)
         )
@@ -40,18 +40,6 @@ test('Prompt flow', async ({ network, page, context, streamPage, annotatorPage, 
     await test.step('Navigate to default project', async () => {
         await page.goto('/');
     });
-
-    // TODO: Step to add a source. At the moment we always have a default source
-    //       but we will need to enable manual addition.
-    // await test.step('Add a X source', async () => {
-    //     await page.getByRole('button', { name: /Input\/Output Setup/ }).click();
-
-    //     await page.locator('input[name="device-id"]').fill('some-id');
-    //     await page.getByRole('button', { name: 'Apply' }).click();
-
-    //     // Click outside the dialog to close the sources dialog
-    //     await page.click('body', { position: { x: 10, y: 10 } });
-    // });
 
     await test.step('Starts stream', async () => {
         await streamPage.startStream();
@@ -65,14 +53,24 @@ test('Prompt flow', async ({ network, page, context, streamPage, annotatorPage, 
         await expect(annotatorPage.getCapturedFrame()).toBeVisible();
     });
 
-    await test.step('Adds annotation', async () => {
+    await test.step('Waits for SAM to load', async () => {
         await expect(page.getByText('Processing image, please wait...')).toBeVisible({
             timeout: ANNOTATOR_PAGE_TIMEOUT,
         });
         await expect(page.getByText('Processing image, please wait...')).toBeHidden({
             timeout: ANNOTATOR_PAGE_TIMEOUT,
         });
+    });
 
+    await test.step('Adds a label', async () => {
+        const labelsPage = new LabelsPage(page);
+        const labelName = 'Label 1';
+
+        await labelsPage.addLabel(labelName);
+        await expect(labelsPage.getLabel(labelName)).toBeVisible();
+    });
+
+    await test.step('Adds an annotation', async () => {
         await expect(promptPage.savePromptButton).toBeDisabled();
 
         await annotatorPage.addAnnotation();
@@ -81,18 +79,74 @@ test('Prompt flow', async ({ network, page, context, streamPage, annotatorPage, 
         await expect(promptPage.savePromptButton).toBeEnabled();
     });
 
-    await test.step('Adds labels', async () => {
-        const labelsPage = new LabelsPage(page);
-        const labelName = 'Label 1';
-
-        await labelsPage.addLabel(labelName);
-        await expect(labelsPage.getLabel(labelName)).toBeVisible();
-    });
-
     await test.step('Saves prompt', async () => {
+        network.use(
+            http.get('/api/v1/projects/{project_id}/prompts', ({ response }) => {
+                return response(200).json({
+                    prompts: [
+                        {
+                            id: MOCK_PROMPT_ID,
+                            annotations: [
+                                {
+                                    config: {
+                                        points: [
+                                            {
+                                                x: 0.1,
+                                                y: 0.1,
+                                            },
+                                            {
+                                                x: 0.5,
+                                                y: 0.1,
+                                            },
+                                            {
+                                                x: 0.5,
+                                                y: 0.5,
+                                            },
+                                        ],
+                                        type: 'polygon',
+                                    },
+                                    label_id: '123e4567-e89b-12d3-a456-426614174001',
+                                },
+                            ],
+                            frame_id: '123e4567-e89b-12d3-a456-426614174000',
+                            type: 'VISUAL',
+                            thumbnail: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ',
+                        },
+                    ],
+                    pagination: {
+                        total: 1,
+                        count: 1,
+                        offset: 0,
+                        limit: 10,
+                    },
+                });
+            })
+        );
+
         await promptPage.savePrompt();
 
-        // TODO: Once the api endpoint to save prompt is integrated, complete this test
-        // await... (check if the image was indeed save to the list of prompts)
+        await expect(promptPage.thumbnail).toHaveCount(1);
+    });
+
+    await test.step('Deletes prompt', async () => {
+        await expect(promptPage.thumbnail).toHaveCount(1);
+
+        network.use(
+            http.get('/api/v1/projects/{project_id}/prompts', ({ response }) => {
+                return response(200).json({
+                    prompts: [],
+                    pagination: {
+                        total: 0,
+                        count: 0,
+                        offset: 0,
+                        limit: 10,
+                    },
+                });
+            })
+        );
+
+        await promptPage.deletePrompt();
+
+        await expect(promptPage.thumbnail).toHaveCount(0);
     });
 });

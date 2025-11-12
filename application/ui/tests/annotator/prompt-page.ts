@@ -12,7 +12,17 @@ export class PromptPage {
         return this.page.getByRole('button', { name: 'Save prompt' });
     }
 
+    get thumbnail() {
+        return this.page.getByLabel(/prompt thumbnail/i);
+    }
+
     async savePrompt() {
         await this.savePromptButton.click();
+    }
+
+    async deletePrompt() {
+        await this.page.getByLabel(/prompt thumbnail/i).hover();
+        await this.page.getByLabel('Prompt actions').click();
+        await this.page.getByText('Delete').click();
     }
 }
