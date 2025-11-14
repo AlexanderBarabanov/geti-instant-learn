@@ -7,13 +7,13 @@ import { useRef } from 'react';
 
 import { DOMRefValue, Flex } from '@geti/ui';
 
-import { Settings } from '../../../annotator/settings/settings.component';
 import { FullScreenMode } from './full-screen-mode.component';
+import { Settings } from './settings/settings.component';
 import { ToggleAnnotationsVisibility } from './toggle-annotations-visibility.component';
-import { UndoRedo } from './undo-redo.component';
+import { UndoRedo } from './undo-redo/undo-redo.component';
 import { ZoomManagement } from './zoom-management.component';
 
-export const CapturedFrameActions = () => {
+export const AnnotatorActions = () => {
     const ref = useRef<DOMRefValue<HTMLDivElement>>(null);
 
     return (

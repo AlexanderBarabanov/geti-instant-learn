@@ -7,14 +7,16 @@ import { useProjectIdentifier } from '@geti-prompt/hooks';
 import { Grid, minmax, View } from '@geti/ui';
 
 import { Header } from '../components/header/header.component';
-import { MainContent } from '../components/main-content.component';
+import { MainContent } from '../components/main-content/main-content.component';
 import { Sidebar } from '../components/sidebar/sidebar.component';
-import { Toolbar } from '../components/toolbar.component';
+import { Toolbar } from '../components/toolbar/toolbar.component';
+import { paths } from '../constants/paths';
 import { useCurrentProject } from '../features/project/hooks/use-current-project.hook';
-import { SelectedFrameProvider } from '../features/stream/selected-frame-provider.component';
+import { ProjectsListPanel } from '../features/project/projects-list-panel.component';
 import { WebRTCConnectionProvider } from '../features/stream/web-rtc/web-rtc-connection-provider';
+import { SelectedFrameProvider } from '../shared/selected-frame-provider.component';
 
-export const ProjectLayout = () => {
+export const ProjectRoute = () => {
     // Check if the current project is valid
     useCurrentProject();
 
@@ -28,7 +30,9 @@ export const ProjectLayout = () => {
                 columns={[minmax('50%', '1fr'), 'auto']}
                 height={'100vh'}
             >
-                <Header />
+                <Header homeLink={paths.projects({})}>
+                    <ProjectsListPanel />
+                </Header>
 
                 <Toolbar />
 

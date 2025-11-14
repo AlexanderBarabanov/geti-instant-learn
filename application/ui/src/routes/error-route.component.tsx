@@ -8,8 +8,11 @@ import { NotFound } from '@geti/ui/icons';
 import { isObject, isString } from 'lodash-es';
 import { isRouteErrorResponse, useRouteError } from 'react-router';
 
-import { paths } from './paths';
-import { redirectTo } from './utils';
+import { paths } from '../constants/paths';
+
+const redirectTo = (url: string): void => {
+    window.location.href = url;
+};
 
 const useErrorMessage = () => {
     const error = useRouteError();
@@ -39,7 +42,7 @@ const useErrorMessage = () => {
     return 'An unknown error occurred';
 };
 
-export const ErrorPage = () => {
+export const ErrorRoute = () => {
     const message = useErrorMessage();
 
     return (
