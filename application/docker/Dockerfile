@@ -113,6 +113,8 @@ ARG USER_NAME="non-root"
 ENV USER_NAME=${USER_NAME}
 ARG PUBLIC_API_URL=""
 ENV PUBLIC_API_URL=${PUBLIC_API_URL}
+ARG INITIAL_DATASET_DIR=""
+ARG SOURCE_DATASET_DIR=""
 
 # Create directory and set ownership before VOLUME instruction
 RUN mkdir -p ${DB_DATA_DIR} && chown ${UID}:${UID} ${DB_DATA_DIR}
@@ -133,6 +135,9 @@ RUN useradd -l -u ${UID} ${USER_NAME} \
     && chown -R ${UID}:${UID} /home/${USER_NAME} \
     && pip3 uninstall -y setuptools pip wheel \
     && rm -rf /root/.cache/pip
+
+# Add sample dataset with coffee berries
+COPY --link --chown=${UID} ${SOURCE_DATASET_DIR} ${INITIAL_DATASET_DIR}
 
 # Copy backend source code
 COPY --link --chown=${UID} backend/app /geti_prompt/app
