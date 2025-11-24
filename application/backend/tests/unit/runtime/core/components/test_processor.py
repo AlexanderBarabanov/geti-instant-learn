@@ -4,9 +4,9 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
+from domain.services.schemas.processor import InputData, OutputData
 from runtime.core.components.broadcaster import FrameBroadcaster
 from runtime.core.components.processor import Processor
-from runtime.core.components.schemas.processor import InputData, OutputData
 
 
 def create_input_data(frame_id: int) -> InputData:
