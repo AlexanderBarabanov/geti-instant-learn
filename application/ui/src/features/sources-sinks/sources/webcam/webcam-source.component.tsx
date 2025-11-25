@@ -5,72 +5,45 @@
 
 import { FormEvent, useState } from 'react';
 
-import { WebcamSourceType } from '@geti-prompt/api';
-import { useCurrentProject } from '@geti-prompt/hooks';
-import { Button, TextField, View } from '@geti/ui';
-import { isInteger } from 'lodash-es';
+import { Button } from '@geti/ui';
 
 import { useCreateSource } from '../api/use-create-source';
-import { useUpdateSource } from '../api/use-update-source';
+import { isDeviceIdValid } from './utils';
+import { WebcamSourceFields } from './webcam-source-fields.component';
 
 interface WebcamSourceProps {
-    source: WebcamSourceType | undefined;
+    onSaved: () => void;
 }
 
-export const WebcamSource = ({ source }: WebcamSourceProps) => {
-    const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(
-        source?.config?.device_id?.toString() ?? '0'
-    );
+export const WebcamSource = ({ onSaved }: WebcamSourceProps) => {
+    const [selectedDeviceId, setSelectedDeviceId] = useState<string>('0');
     const createWebcamSource = useCreateSource();
-    const updateWebcamSource = useUpdateSource();
-    const { data } = useCurrentProject();
 
-    const isApplyPending = createWebcamSource.isPending || updateWebcamSource.isPending;
-
-    const isApplyDisabled =
-        createWebcamSource.isPending ||
-        updateWebcamSource.isPending ||
-        (selectedDeviceId == source?.config?.device_id && source?.connected);
+    const isApplyDisabled = !isDeviceIdValid(selectedDeviceId) || createWebcamSource.isPending;
 
     const handleApply = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
-        if (selectedDeviceId === undefined) return;
-
-        const deviceId = parseInt(selectedDeviceId);
-
-        if (source === undefined) {
-            createWebcamSource.mutate({
+        createWebcamSource.mutate(
+            {
                 source_type: 'webcam',
-                device_id: deviceId,
+                device_id: parseInt(selectedDeviceId),
                 seekable: false,
-            });
-        } else {
-            updateWebcamSource.mutate(source.id, {
-                source_type: 'webcam',
-                device_id: deviceId,
-                seekable: false,
-            });
-        }
+            },
+            onSaved
+        );
     };
-
-    if (!data.active) {
-        return <TextField label={'Device ID'} value={selectedDeviceId} isReadOnly />;
-    }
 
     return (
         <form onSubmit={handleApply}>
-            <View>
-                <TextField
-                    label={'Device ID'}
-                    value={selectedDeviceId}
-                    name='device-id'
-                    onChange={setSelectedDeviceId}
-                    validate={(value) => (isInteger(Number(value)) ? true : 'Device ID must be an integer')}
-                />
-            </View>
+            <WebcamSourceFields selectedDeviceId={selectedDeviceId} onSetSelectedDeviceId={setSelectedDeviceId} />
 
-            <Button marginTop={'size-200'} type={'submit'} isPending={isApplyPending} isDisabled={isApplyDisabled}>
+            <Button
+                marginTop={'size-200'}
+                type={'submit'}
+                isPending={createWebcamSource.isPending}
+                isDisabled={isApplyDisabled}
+            >
                 Apply
             </Button>
         </form>
