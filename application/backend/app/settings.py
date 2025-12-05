@@ -82,6 +82,9 @@ class Settings(BaseSettings):
     thumbnail_fill_opacity: float = 0.5  # 50% opacity for annotation fill
     thumbnail_jpeg_quality: int = 85
 
+    # WebRTC
+    ice_servers: list[dict] = Field(default=[], alias="ICE_SERVERS")
+
 
 @lru_cache
 def get_settings() -> Settings:

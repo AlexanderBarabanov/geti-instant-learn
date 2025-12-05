@@ -9,6 +9,7 @@ host-port := container-port
 webcam-device := "/dev/video0"
 docker-volume := ""
 host := "0.0.0.0"
+enable-coturn := "false"
 
 # -------------------------------------------------------------------------------------------------
 # Common variables used in the Justfile
@@ -34,6 +35,13 @@ coffee-berries-dataset := "https://storage.geti.intel.com/geti-prompt/Frames.zip
 application-dir := justfile_directory()
 source-dataset-dir := ".data/templates/datasets/coffee-berries"
 target-dataset-dir := "/geti_prompt/data/templates/datasets/coffee-berries"
+
+# Coturn settings
+coturn-image := "quay.io/coturn/coturn"
+# Note: Binding port 443 may conflict with other services (e.g., HTTPS) on this host. Replace it with whatever prot works/open for you.
+coturn-port := "443"
+coturn-external-ip := `uv run python -c "import socket; s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.connect(('8.8.8.8',80)); print(s.getsockname()[0]); s.close()"`
+ice-servers := '[{"urls": "turn:' + coturn-external-ip + ':' + coturn-port + '?transport=tcp", "username": "user", "credential": "password"}]'
 
 # -------------------------------------------------------------------------------------------------
 # Proxy settings
@@ -101,10 +109,32 @@ run-image: build-image
         --publish {{ host-port }}:{{ container-port }} \
         --env PORT={{ container-port }} \
         --env HOST={{ host }} \
+        {{ if enable-coturn == "true" { "--env ICE_SERVERS='" + ice-servers + "'" } else { "" } }} \
         {{ if docker-volume != "" { " --volume " + docker-volume + ":" + db-data-dir } else { "" } }} \
         {{ if path_exists(webcam-device) == "true" { " --device " + webcam-device + ":" + webcam-device } else { "" } }} \
         --name "{{ component-name }}-{{ version }}" \
         "{{ docker-image }}"
+
+# run coturn server
+run-coturn:
+    @echo "Running coturn server on port {{ coturn-port }} with external IP {{ coturn-external-ip }}..."
+    @docker run --rm --detach \
+        --network=host \
+        --name coturn-server \
+        {{ coturn-image }} \
+        -n \
+        --listening-port={{ coturn-port }} \
+        --external-ip={{ coturn-external-ip }} \
+        --user=user:password \
+        --realm=my-realm \
+        --no-udp \
+        --log-file=stdout \
+        --verbose
+
+# stop coturn server
+stop-coturn:
+    @echo "Stopping coturn server..."
+    @docker stop coturn-server || true
 
 # show size of the built docker image
 show-size:
