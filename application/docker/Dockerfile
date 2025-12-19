@@ -24,13 +24,13 @@ COPY --link --from=libs ./pyproject.toml /geti_prompt/library/pyproject.toml
 RUN mkdir -p /geti_prompt/app/backend
 WORKDIR /geti_prompt/app/backend
 
-ARG RUNTIME=""
-ENV RUNTIME=${RUNTIME}
+ARG DEVICE=""
+ENV DEVICE=${DEVICE}
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=backend/uv.lock,target=uv.lock \
     --mount=type=bind,source=backend/pyproject.toml,target=pyproject.toml \
-    uv sync --frozen --no-dev --no-editable --extra ${RUNTIME} --extra mqtt
+    uv sync --frozen --no-dev --no-editable --extra ${DEVICE} --extra mqtt
 
 ##################
 # Geti UI packages
@@ -63,8 +63,7 @@ COPY --link ui/src/ src/
 ########
 FROM web-ui-base AS web-ui
 
-ARG ASSET_PREFIX=""
-ENV ASSET_PREFIX=${ASSET_PREFIX}
+ENV ASSET_PREFIX="/html"
 
 # build with --no-cache in case of sub-dependency changes (from geti)
 RUN npm run build
@@ -74,12 +73,9 @@ RUN npm run build
 ##########################################
 FROM python:3.12-slim-bookworm@sha256:2db3d54b851289c3fdf380af6c3eb0db09b072060151fb344de80673e1b26f81 AS runtime-base
 
-ARG STATIC_FILES_DIR=""
-ENV STATIC_FILES_DIR=${STATIC_FILES_DIR}
-ARG DB_DATA_DIR=""
-ENV DB_DATA_DIR=${DB_DATA_DIR}
-ARG LOGS_DIR=""
-ENV LOGS_DIR=${LOGS_DIR}
+ENV STATIC_FILES_DIR="/geti_prompt/html"
+ENV DB_DATA_DIR="/geti_prompt/data"
+ENV LOGS_DIR="/geti_prompt/logs"
 ARG MOCKED_FILE=""
 ENV MOCKED_FILE=${MOCKED_FILE}
 ENV PATH="/geti_prompt/.venv/bin:$PATH"
