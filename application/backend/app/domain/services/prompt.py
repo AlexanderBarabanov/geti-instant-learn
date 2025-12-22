@@ -5,6 +5,7 @@ import logging
 from uuid import UUID
 
 import cv2
+import numpy as np
 from getiprompt.data.base.batch import Batch
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -31,6 +32,7 @@ from domain.services.schemas.base import Pagination
 from domain.services.schemas.mappers.annotation import annotations_db_to_schemas
 from domain.services.schemas.mappers.label import label_db_to_schema
 from domain.services.schemas.mappers.prompt import (
+    deduplicate_annotations,
     prompt_create_schema_to_db,
     prompt_db_to_schema,
     prompt_update_schema_to_db,
@@ -121,7 +123,10 @@ class PromptService(BaseService):
         """
         Get all prompts of a specific type for a project, formatted for model training.
 
-        Parameters:
+        Combines multiple prompts into a batch where each prompt becomes a separate sample.
+        Maintains consistent category IDs and N-shot numbering across all samples.
+
+        Args:
             project_id: Owning project UUID.
             prompt_type: The type of prompts to retrieve (currently only VISUAL is supported).
 
@@ -132,40 +137,70 @@ class PromptService(BaseService):
             logger.warning("Text prompts are not supported for training data generation for project_id=%s", project_id)
             return None
 
-        project = self.project_repository.get_by_id(project_id)
-        if not project:
-            logger.error("Project not found id=%s", project_id)
+        db_prompts = self.prompt_repository.list_all_by_project(project_id=project_id, prompt_type=prompt_type)
+
+        if not db_prompts:
+            logger.info("No prompts found for project_id=%s, prompt_type=%s", project_id, prompt_type)
             return None
 
-        db_prompts = self.prompt_repository.list_all_by_project(project_id=project_id, prompt_type=prompt_type)
+        all_label_ids: set[UUID] = set()
+        for prompt in db_prompts:
+            all_label_ids.update(ann.label_id for ann in prompt.annotations)
+
+        # Create consistent label-to-category-ID mapping for the entire batch
+        label_to_category_id = {label_id: idx for idx, label_id in enumerate(sorted(all_label_ids, key=str))}
+
+        # Track shot counts across all prompts (modified in-place)
+        label_shot_counts: dict[UUID, int] = {}
 
         samples = []
         for prompt in db_prompts:
-            if prompt.frame_id:
-                try:
-                    frame = self.frame_repository.read_frame(project_id, prompt.frame_id)
-                    if frame is None:
-                        logger.warning(
-                            "Frame not found for prompt: prompt_id=%s, frame_id=%s, project_id=%s",
-                            prompt.id,
-                            prompt.frame_id,
-                            project_id,
-                        )
-                        continue
-                    # convert BGR to RGB to conform to the InputData contract
-                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    samples.append(visual_prompt_to_sample(prompt, frame_rgb))
-                except ServiceError:
-                    logger.exception(
-                        "Failed to convert prompt to sample: prompt_id=%s",
+            if not prompt.frame_id:
+                logger.warning("Visual prompt missing frame_id: prompt_id=%s", prompt.id)
+                continue
+
+            try:
+                frame = self.frame_repository.read_frame(project_id, prompt.frame_id)
+                if frame is None:
+                    logger.warning(
+                        "Frame not found: prompt_id=%s, frame_id=%s, project_id=%s",
                         prompt.id,
+                        prompt.frame_id,
+                        project_id,
                     )
                     continue
 
-        logger.info(f"REFERENCE BATCH: Created batch with {len(samples)} samples: {samples}")
+                # Convert BGR to RGB
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+                # Convert with batch-level state
+                sample = visual_prompt_to_sample(prompt, frame_rgb, label_to_category_id, label_shot_counts)
+                samples.append(sample)
+
+            except ServiceError as e:
+                logger.warning("Failed to convert prompt to sample: prompt_id=%s, error=%s", prompt.id, str(e))
+                continue
+
         if not samples:
+            logger.info("No valid samples generated: project_id=%s", project_id)
             return None
-        return Batch.collate(samples)
+
+        batch = Batch.collate(samples)
+        logger.info(f"Reference batch: {batch}")
+
+        unique_categories = len(label_to_category_id)
+        shots_per_category = {
+            category_id: label_shot_counts.get(label_id, 0) for label_id, category_id in label_to_category_id.items()
+        }
+
+        logger.info(
+            "Created reference batch: project_id=%s, samples=%d, categories=%d, shots_per_category=%s",
+            project_id,
+            len(batch),
+            unique_categories,
+            shots_per_category,
+        )
+        return batch
 
     def get_prompt(self, project_id: UUID, prompt_id: UUID) -> PromptSchema:
         """
@@ -197,6 +232,7 @@ class PromptService(BaseService):
         - Each frame can only be used once across all prompts
         - Annotations reference labels that must exist in the project
         - Only one text prompt is allowed per project
+        - Duplicate annotations are automatically removed
 
         Parameters:
             project_id: Owning project UUID.
@@ -230,22 +266,43 @@ class PromptService(BaseService):
 
         thumbnail = None
         if isinstance(create_data, VisualPromptCreateSchema):
-            logger.debug("Normalizing prompt data for project_id=%s", project_id)
-            normalized_data = self._normalization(project_id=project_id, data=create_data)
-            frame_path = self.frame_repository.get_frame_path(project_id, normalized_data.frame_id)
+            frame_path = self.frame_repository.get_frame_path(project_id, create_data.frame_id)
             if not frame_path:
                 logger.error(
                     "Visual prompt creation failed: frame_id=%s not found in project with id=%s",
-                    normalized_data.frame_id,
+                    create_data.frame_id,
                     project_id,
                 )
                 raise ResourceNotFoundError(
                     resource_type=ResourceType.FRAME,
-                    resource_id=str(normalized_data.frame_id),
-                    message=f"Frame {normalized_data.frame_id} does not exist in project {project_id}",
+                    resource_id=str(create_data.frame_id),
+                    message=f"Frame {create_data.frame_id} does not exist in project {project_id}",
                 )
+
+            frame = self.frame_repository.read_frame(project_id, create_data.frame_id)
+            if frame is None:
+                raise ResourceNotFoundError(
+                    resource_type=ResourceType.FRAME,
+                    resource_id=str(create_data.frame_id),
+                    message=f"Failed to read frame {create_data.frame_id}",
+                )
+
+            height, width = frame.shape[:2]
+
+            logger.debug("Normalizing prompt data for project_id=%s", project_id)
+            normalized_data = self._normalization(create_data, height, width)
+
+            original_count = len(normalized_data.annotations)
+            normalized_data.annotations = deduplicate_annotations(normalized_data.annotations, height, width)
+            if len(normalized_data.annotations) < original_count:
+                logger.info(
+                    "Removed %d duplicate annotations from visual prompt creation request",
+                    original_count - len(normalized_data.annotations),
+                )
+
             self._validate_annotation_labels(normalized_data.annotations, project_id)
-            thumbnail = self._generate_thumbnail(project_id, normalized_data.frame_id, normalized_data.annotations)
+            thumbnail = self._generate_thumbnail(project_id, normalized_data.annotations, frame)
+
             create_data = normalized_data
 
         try:
@@ -317,6 +374,7 @@ class PromptService(BaseService):
         - If frame_id is updated, validates the new frame exists
         - If annotations are updated, they replace the existing ones
         - Annotation label_ids are validated to exist in the project
+        - Duplicate annotations are automatically removed
 
         Parameters:
             project_id: Owning project UUID.
@@ -355,14 +413,21 @@ class PromptService(BaseService):
 
         regenerate_thumbnail = False
         if isinstance(update_data, VisualPromptUpdateSchema):
-            regenerate_thumbnail = self._handle_visual_prompt_update(prompt, update_data, project_id)
+            update_data, regenerate_thumbnail = self._handle_visual_prompt_update(prompt, update_data, project_id)
 
         try:
             with self.db_transaction():
                 prompt = prompt_update_schema_to_db(prompt, update_data)
                 if regenerate_thumbnail and prompt.frame_id:
                     annotations = annotations_db_to_schemas(prompt.annotations)
-                    prompt.thumbnail = self._generate_thumbnail(project_id, prompt.frame_id, annotations)
+                    frame = self.frame_repository.read_frame(project_id, prompt.frame_id)
+                    if frame is None:
+                        raise ResourceNotFoundError(
+                            resource_type=ResourceType.FRAME,
+                            resource_id=str(prompt.frame_id),
+                            message=f"Failed to read frame {prompt.frame_id}",
+                        )
+                    prompt.thumbnail = self._generate_thumbnail(project_id, annotations, frame)
                 prompt = self.prompt_repository.update(prompt)
                 self._emit_processor_change_event(project_id)
         except IntegrityError as exc:
@@ -380,7 +445,7 @@ class PromptService(BaseService):
 
     def _handle_visual_prompt_update(
         self, prompt: PromptDB, update_data: VisualPromptUpdateSchema, project_id: UUID
-    ) -> bool:
+    ) -> tuple[VisualPromptUpdateSchema, bool]:
         """
         Handle visual prompt frame updates and cleanup.
 
@@ -390,28 +455,41 @@ class PromptService(BaseService):
             project_id: The project ID for frame validation
         """
         regenerate_thumbnail = False
-        if update_data.frame_id is not None:
-            frame_path = self.frame_repository.get_frame_path(project_id, update_data.frame_id)
-            if not frame_path:
-                logger.error(
-                    "Visual prompt update failed: frame_id=%s not found in project_id=%s",
-                    update_data.frame_id,
-                    project_id,
-                )
-                raise ResourceNotFoundError(
-                    resource_type=ResourceType.FRAME,
-                    resource_id=str(update_data.frame_id),
-                    message=f"Frame {update_data.frame_id} does not exist in project {project_id}",
-                )
-            if prompt.frame_id and prompt.frame_id != update_data.frame_id:
-                self.frame_repository.delete_frame(project_id, prompt.frame_id)
-                regenerate_thumbnail = True
+        frame = None
+
+        if update_data.frame_id is not None and prompt.frame_id and prompt.frame_id != update_data.frame_id:
+            self.frame_repository.delete_frame(project_id, prompt.frame_id)
+            regenerate_thumbnail = True
 
         if update_data.annotations is not None:
+            frame_id = update_data.frame_id if update_data.frame_id is not None else prompt.frame_id
+            if frame_id:
+                if frame is None:
+                    frame = self.frame_repository.read_frame(project_id, frame_id)
+                    if frame is None:
+                        raise ResourceNotFoundError(
+                            resource_type=ResourceType.FRAME,
+                            resource_id=str(frame_id),
+                            message=f"Failed to read frame {frame_id}",
+                        )
+
+                height, width = frame.shape[:2]
+
+                normalized_data = self._normalization(update_data, height, width)
+
+                original_count = len(normalized_data.annotations)
+                normalized_data.annotations = deduplicate_annotations(normalized_data.annotations, height, width)
+                if len(normalized_data.annotations) < original_count:
+                    logger.info(
+                        "Removed %d duplicate annotations from visual prompt update request",
+                        original_count - len(normalized_data.annotations),
+                    )
+                update_data.annotations = normalized_data.annotations
+
             self._validate_annotation_labels(update_data.annotations, project_id)
             regenerate_thumbnail = True
 
-        return regenerate_thumbnail
+        return update_data, regenerate_thumbnail
 
     def _validate_annotation_labels(self, annotations: list, project_id: UUID) -> None:
         """
@@ -440,17 +518,8 @@ class PromptService(BaseService):
                     message=f"Label {label_id} does not exist in project {project_id}",
                 )
 
-    def _generate_thumbnail(self, project_id: UUID, frame_id: UUID, annotations: list[AnnotationSchema]) -> str:
+    def _generate_thumbnail(self, project_id: UUID, annotations: list[AnnotationSchema], frame: np.ndarray) -> str:
         """Generate thumbnail with annotations overlay."""
-        frame = self.frame_repository.read_frame(project_id, frame_id)
-        if frame is None:
-            raise ResourceNotFoundError(
-                resource_type=ResourceType.FRAME,
-                resource_id=str(frame_id),
-                message=f"Failed to read frame {frame_id}",
-            )
-
-        # fetch labels and pair with annotations
         label_ids = [ann.label_id for ann in annotations]
         labels_by_id = {
             label.id: label_db_to_schema(label)
@@ -458,7 +527,6 @@ class PromptService(BaseService):
             if (label := self.label_repository.get_by_id_and_project(label_id, project_id))
         }
 
-        # create annotation-label pairs
         annotation_label_pairs = [(ann, labels_by_id[ann.label_id]) for ann in annotations]
 
         return generate_thumbnail(frame, annotation_label_pairs)
@@ -562,20 +630,15 @@ class PromptService(BaseService):
                 )
             )
 
-    def _normalization(self, project_id: UUID, data: VisualPromptCreateSchema) -> VisualPromptCreateSchema:
+    @staticmethod
+    def _normalization(
+        data: VisualPromptCreateSchema | VisualPromptUpdateSchema, height: int, width: int
+    ) -> VisualPromptCreateSchema | VisualPromptUpdateSchema:
         """Normalize pixel coordinates to [0, 1] range."""
-
-        frame = self.frame_repository.read_frame(project_id=project_id, frame_id=data.frame_id)
-        if frame is None:
-            raise ResourceNotFoundError(
-                resource_type=ResourceType.FRAME,
-                resource_id=str(data.frame_id),
-            )
-        height, width = frame.shape[:2]
-
-        for annotation in data.annotations:
-            normalized_points = [Point(x=point.x / width, y=point.y / height) for point in annotation.config.points]
-            annotation.config.points = normalized_points
+        if data.annotations is not None:
+            for annotation in data.annotations:
+                normalized_points = [Point(x=point.x / width, y=point.y / height) for point in annotation.config.points]
+                annotation.config.points = normalized_points
 
         return data
 
