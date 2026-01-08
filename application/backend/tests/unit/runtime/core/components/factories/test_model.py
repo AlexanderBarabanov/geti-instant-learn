@@ -3,6 +3,8 @@
 
 from unittest.mock import MagicMock, patch
 
+from getiprompt.utils.constants import SAMModelName
+
 from domain.services.schemas.processor import MatcherConfig
 from runtime.core.components.factories.model import ModelFactory
 
@@ -12,8 +14,10 @@ class TestModelFactory:
         config = MatcherConfig(
             num_foreground_points=50,
             num_background_points=3,
-            mask_similarity_threshold=0.5,
+            confidence_threshold=0.5,
             precision="fp32",
+            sam_model=SAMModelName.SAM_HQ_TINY,
+            encoder_model="dinov3_small",
         )
         mock_reference_batch = MagicMock()
         mock_settings = MagicMock()
@@ -29,10 +33,11 @@ class TestModelFactory:
                 mock_matcher.assert_called_once_with(
                     num_foreground_points=50,
                     num_background_points=3,
-                    encoder_model="dinov3_small",
                     mask_similarity_threshold=0.5,
                     precision="fp32",
                     device="cpu",
+                    sam=SAMModelName.SAM_HQ_TINY,
+                    encoder_model="dinov3_small",
                     use_mask_refinement=False,
                 )
 
