@@ -84,8 +84,8 @@ ARG USER_NAME="non-root"
 ENV USER_NAME=${USER_NAME}
 ARG TARGET_DATASET_DIR=""
 ARG SOURCE_DATASET_DIR=""
-ARG RUNTIME=""
-ENV RUNTIME=${RUNTIME}
+ARG DEVICE=""
+ENV DEVICE=${DEVICE}
 
 # Create directory and set ownership so mounting a volume works correctly
 RUN mkdir -p ${DB_DATA_DIR} && chown ${UID}:${UID} ${DB_DATA_DIR}
