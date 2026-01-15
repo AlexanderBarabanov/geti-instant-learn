@@ -1,4 +1,4 @@
-# Copyright (C) 2025 Intel Corporation
+# Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 """PyTorch backend implementation for SAM predictor."""
@@ -7,7 +7,6 @@ from logging import getLogger
 from pathlib import Path
 
 import numpy as np
-import openvino
 import torch
 from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
@@ -18,10 +17,73 @@ from segment_anything_hq.predictor import SamPredictor as _SamPredictor
 from torch import nn
 
 from getiprompt.data import ResizeLongestSide
-from getiprompt.utils.constants import DATA_PATH, MODEL_MAP, Backend, SAMModelName
-from getiprompt.utils.utils import download_file
+from getiprompt.utils.constants import DATA_PATH, MODEL_MAP, SAMModelName
+from getiprompt.utils.optimization import optimize_model
+from getiprompt.utils.utils import download_file, precision_to_torch_dtype
 
 logger = getLogger("Geti Prompt")
+
+
+def load_sam_model(
+    sam: SAMModelName,
+    device: str = "cuda",
+    precision: str = "bf16",
+    compile_models: bool = False,
+    model_path: Path | None = None,
+    target_length: int = 1024,
+) -> "SAMPredictor":
+    """Load and return a SAM predictor with specified backend.
+
+    This function provides a unified interface for loading SAM models with
+    different backends (PyTorch, OpenVINO). The backend parameter determines
+    which implementation to use.
+
+    Args:
+        sam: The SAM model architecture to load (e.g., SAM_HQ_TINY, SAM2_BASE)
+        device: Device to run inference on:
+            - PyTorch backend: "cuda", "cpu"
+            - OpenVINO backend: "CPU", "GPU", "AUTO"
+        precision: Model precision for PyTorch backend ("bf16", "fp32", "fp16").
+            Ignored for OpenVINO backend (precision is baked into IR).
+        compile_models: Whether to compile model (PyTorch only).
+            Ignored for OpenVINO backend.
+        model_path: Optional path to model weights:
+            - PyTorch: Path to .pth checkpoint (auto-downloads if None)
+            - OpenVINO: Path to .xml IR file (required)
+        target_length: Target length for the longest side of the image during transformation. Defaults to 1024.
+
+    Returns:
+        A SAM predictor instance (PyTorchSAMPredictor or OpenVINOSAMPredictor).
+
+    Raises:
+        ValueError: If the model type or backend is invalid.
+
+    Examples:
+        >>> # PyTorch backend with auto-download
+        >>> predictor = load_sam_model(
+        ...     SAMModelName.SAM_HQ_TINY,
+        ...     device="cuda",
+        ... )
+    """
+    if sam not in MODEL_MAP:
+        msg = f"Invalid model type: {sam}"
+        raise ValueError(msg)
+
+    predictor = SAMPredictor(
+        sam_model_name=sam,
+        device=device,
+        model_path=model_path,
+        target_length=target_length,
+    )
+
+    # Apply PyTorch-specific optimizations
+    predictor._predictor = optimize_model(
+        model=predictor._predictor,
+        device=device,
+        precision=precision_to_torch_dtype(precision),
+        compile_models=compile_models,
+    )
+    return predictor
 
 
 def check_model_weights(model_name: SAMModelName) -> None:
@@ -84,8 +146,8 @@ class PositionEmbeddingRandom(_PositionEmbeddingRandom):
     ) -> torch.Tensor:
         """Positionally encode points that are not normalized to [0,1]."""
         coords = coords_input.clone()
-        coords[:, :, 0] = coords[:, :, 0] / image_size[1]
-        coords[:, :, 1] = coords[:, :, 1] / image_size[0]
+        coords[:, :, 0] /= image_size[1]
+        coords[:, :, 1] /= image_size[0]
         return self._pe_encoding(coords)
 
 
@@ -228,7 +290,7 @@ class PromptEncoder(_PromptEncoder):
         return sparse_embeddings, dense_embeddings
 
 
-class PyTorchSAMPredictor(nn.Module):
+class SAMPredictor(nn.Module):
     """PyTorch implementation of SAM predictor.
 
     This implementation wraps the original SAM predictor from segment_anything_hq
@@ -301,7 +363,7 @@ class PyTorchSAMPredictor(nn.Module):
             sam_model = sam_model_registry[registry_name]().to(device)
             # suppress - loading the snapshot from the local path
             # nosemgrep trailofbits.python.pickles-in-pytorch.pickles-in-pytorch
-            state_dict = torch.load(checkpoint_path, map_location=device) # nosec: B614
+            state_dict = torch.load(checkpoint_path, map_location=device)  # nosec: B614
             info = sam_model.load_state_dict(state_dict, strict=False)
             if info.missing_keys:
                 msg = f"Missing keys when loading SAM-HQ model: {info.missing_keys}"
@@ -313,6 +375,12 @@ class PyTorchSAMPredictor(nn.Module):
             self._predictor = _SamPredictor(sam_model)
             # Patch with ONNX-compatible prompt encoder for SAM-HQ models
             self._patch_prompt_encoder(device)
+
+            self._freeze_modules([
+                self._predictor.model.mask_decoder,
+                self._predictor.model.prompt_encoder,
+                self._predictor.model.image_encoder,
+            ])
         else:
             msg = f"Model {sam_model_name} not implemented"
             raise NotImplementedError(msg)
@@ -347,10 +415,18 @@ class PyTorchSAMPredictor(nn.Module):
             image: Raw image tensor of shape (C, H, W)
         """
         self._original_size = image.shape[-2:]
-        transformed_image = self.transform.apply_image_torch(image).to(self.device)
+        transformed_image = self.transform.apply_image_torch(image).to(device=self.device)
         return self._predictor.set_torch_image(transformed_image, self._original_size)
 
-    def predict(
+    @staticmethod
+    def _freeze_modules(modules: list[nn.Module]) -> None:
+        """Freeze the modules."""
+        for module in modules:
+            for p in module.parameters():
+                p.requires_grad_(requires_grad=False)
+
+    @torch.inference_mode()
+    def forward(
         self,
         point_coords: torch.Tensor | None,
         point_labels: torch.Tensor | None,
@@ -408,169 +484,3 @@ class PyTorchSAMPredictor(nn.Module):
             multimask_output=multimask_output,
             return_logits=return_logits,
         )
-
-    @staticmethod
-    def _freeze_modules(modules: list[nn.Module]) -> None:
-        """Freeze the modules."""
-        for module in modules:
-            for p in module.parameters():
-                p.requires_grad_(requires_grad=False)
-
-    @torch.inference_mode()
-    def forward(
-        self,
-        transformed_image: torch.Tensor,
-        point_coords: torch.Tensor,
-        point_labels: torch.Tensor,
-        boxes: torch.Tensor,
-        mask_input: torch.Tensor,
-        original_size: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Forward pass for ONNX/OpenVINO export."""
-        h, w = original_size
-        original_size = (h, w)
-        self._predictor.set_torch_image(transformed_image, original_size)
-        return self._predictor.predict_torch(
-            point_coords=point_coords,
-            point_labels=point_labels,
-            boxes=boxes,
-            mask_input=mask_input,
-            multimask_output=True,
-            return_logits=False,
-        )
-
-    def export(self, output_path: Path, backend: str | Backend = Backend.ONNX) -> Path:
-        """Export this PyTorch predictor to the specified format.
-
-        The exported model performs end-to-end inference from preprocessed image
-        to segmentation masks, including image encoding, prompt encoding, and mask decoding.
-
-        Args:
-            output_path: Directory to save exported models.
-                Creates the directory if it doesn't exist.
-            backend: The backend format to export to. Can be a Backend enum
-                (e.g., Backend.ONNX, Backend.OPENVINO) or a string
-                (e.g., "onnx", "openvino").
-
-        Returns:
-            Path to the exported model file (.onnx or .xml)
-
-        Example:
-            >>> predictor = load_sam_model(
-            ...     SAMModelName.SAM_HQ_TINY,
-            ...     backend=Backend.PYTORCH
-            ... )
-            >>> ov_path = predictor.export(Path("./exported"), backend="openvino")
-            >>> ov_predictor = load_sam_model(
-            ...     SAMModelName.SAM_HQ_TINY,
-            ...     backend=Backend.OPENVINO,
-            ...     model_path=ov_path
-            ... )
-        """
-        # Convert string to Backend enum if needed
-        if isinstance(backend, str):
-            backend = Backend(backend.lower())
-
-        # Only SAM-HQ models support export currently
-        if self._sam_model_name not in {SAMModelName.SAM_HQ, SAMModelName.SAM_HQ_TINY}:
-            msg = f"Export not supported for {self._sam_model_name}. Only SAM-HQ models are supported."
-            raise NotImplementedError(msg)
-
-        # Ensure output directory exists
-        output_path = Path(output_path)
-        output_path.mkdir(parents=True, exist_ok=True)
-
-        # Move all model components to CPU for export compatibility
-        logger.info("Moving SAM model to CPU for export...")
-        self._predictor.model.to("cpu")
-
-        self._freeze_modules([
-            self._predictor.model.mask_decoder,
-            self._predictor.model.prompt_encoder,
-            self._predictor.model.image_encoder,
-        ])
-
-        input_size = self._predictor.model.image_encoder.img_size
-
-        # Create dummy inputs on CPU to match model device
-        dummy_image = torch.zeros((1, 3, input_size, input_size), dtype=torch.float32, device="cpu")
-        dummy_coords = torch.rand((10, 1, 2), dtype=torch.float32, device="cpu") * input_size
-        dummy_labels = torch.ones((10, 1), dtype=torch.float32, device="cpu")
-        dummy_boxes = torch.rand((10, 1, 4), dtype=torch.float32, device="cpu") * input_size
-        dummy_mask_input = torch.rand((10, 1, 256, 256), dtype=torch.float32, device="cpu")
-        original_size = torch.tensor((input_size, input_size), dtype=torch.int32, device="cpu")
-
-        model_inputs = (
-            dummy_image,
-            dummy_coords,
-            dummy_labels,
-            dummy_boxes,
-            dummy_mask_input,
-            original_size,
-        )
-
-        # Define input and output names
-        input_names = [
-            "transformed_image",
-            "point_coords",
-            "point_labels",
-            "boxes",
-            "mask_input",
-            "original_size",
-        ]
-        output_names = ["masks", "iou_predictions", "low_res_logits"]
-
-        if backend == Backend.ONNX:
-            # Define dynamic axes
-            dynamic_axes = {
-                "transformed_image": {0: "batch_size", 2: "height", 3: "width"},
-                "point_coords": {0: "num_masks", 1: "num_points"},
-                "point_labels": {0: "num_masks", 1: "num_points"},
-                "boxes": {0: "num_masks", 1: "num_boxes"},
-                "mask_input": {0: "num_masks"},
-            }
-            with torch.no_grad():
-                try:
-                    # Export to ONNX
-                    torch.onnx.export(
-                        self,
-                        model_inputs,
-                        output_path / "exported_sam.onnx",
-                        opset_version=20,
-                        input_names=input_names,
-                        output_names=output_names,
-                        dynamic_axes=dynamic_axes,
-                        verbose=True,
-                    )
-                    return output_path / "exported_sam.onnx"
-                except Exception as e:
-                    msg = f"Error exporting to ONNX: {e}"
-                    logger.exception(msg)
-                    raise
-
-        if backend == Backend.OPENVINO:
-            dynamic_shapes = {
-                "transformed_image": openvino.PartialShape([-1, 3, -1, -1]),
-                "point_coords": openvino.PartialShape([-1, -1, 2]),
-                "point_labels": openvino.PartialShape([-1, -1]),
-                "boxes": openvino.PartialShape([-1, 1, 4]),
-                "mask_input": openvino.PartialShape([-1, 1, 256, 256]),
-                "original_size": openvino.PartialShape([2]),
-            }
-            try:
-                ov_model = openvino.convert_model(
-                    input_model=self,
-                    example_input=model_inputs,
-                    input=dynamic_shapes,
-                )
-                for i, ov_output in enumerate(ov_model.outputs):
-                    ov_output.get_tensor().set_names({output_names[i]})
-                openvino.save_model(ov_model, output_path / "exported_sam.xml")
-                return output_path / "exported_sam.xml"
-            except Exception as e:
-                msg = f"Error exporting to OpenVINO IR: {e}"
-                logger.exception(msg)
-                raise
-
-        msg = f"Invalid backend: {backend}. Valid backends: ['onnx', 'openvino']"
-        raise ValueError(msg)
