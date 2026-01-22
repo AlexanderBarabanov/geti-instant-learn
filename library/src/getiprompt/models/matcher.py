@@ -14,6 +14,7 @@ from getiprompt.components.feature_extractors import MaskedFeatureExtractor, Ref
 from getiprompt.components.prompt_generators import BidirectionalPromptGenerator
 from getiprompt.components.sam import SamDecoder, load_sam_model
 from getiprompt.data.base.batch import Batch
+from getiprompt.data.base.sample import Sample
 from getiprompt.models.base import Model
 from getiprompt.utils.constants import Backend, SAMModelName
 
@@ -216,12 +217,16 @@ class Matcher(Model):
         # Reference features (set during fit)
         self.ref_features: ReferenceFeatures | None = None
 
-    def fit(self, reference_batch: Batch) -> ReferenceFeatures:
+    def fit(self, reference: Sample | list[Sample] | Batch) -> ReferenceFeatures:
         """Learn from reference images.
 
         Args:
-            reference_batch: Batch containing reference images, masks, and category IDs.
+            reference: Reference data to learn from. Accepts:
+                - Sample: A single reference sample
+                - list[Sample]: A list of reference samples
+                - Batch: A batch of reference samples
         """
+        reference_batch = Batch.collate(reference)
         ref_embeddings = self.encoder(images=reference_batch.images)
         self.ref_features = self.masked_feature_extractor(
             ref_embeddings,
@@ -230,11 +235,14 @@ class Matcher(Model):
         )
         return self.ref_features
 
-    def predict(self, target_batch: Batch) -> list[dict[str, torch.Tensor]]:
+    def predict(self, target: Sample | list[Sample] | Batch) -> list[dict[str, torch.Tensor]]:
         """Predict masks for target images.
 
         Args:
-            target_batch: Batch containing target images.
+            target: Target data to infer. Accepts:
+                - Sample: A single target sample
+                - list[Sample]: A list of target samples
+                - Batch: A batch of target samples
 
         Returns:
             List of predictions per image, each containing:
@@ -245,6 +253,7 @@ class Matcher(Model):
         Raises:
             RuntimeError: If fit() has not been called before predict().
         """
+        target_batch = Batch.collate(target)
         if self.ref_features is None:
             msg = "No reference features. Call fit() first."
             raise RuntimeError(msg)
