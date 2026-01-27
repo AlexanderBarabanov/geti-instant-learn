@@ -2,9 +2,12 @@ version = 1
 revision = 3
 requires-python = "==3.12.*"
 resolution-markers = [
-    "sys_platform == 'darwin'",
-    "platform_machine == 'aarch64' and sys_platform == 'linux'",
-    "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')",
+    "extra != 'extra-10-getiprompt-cpu' and extra != 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu'",
+    "extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra != 'extra-10-getiprompt-xpu'",
+    "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra != 'extra-10-getiprompt-gpu' and extra != 'extra-10-getiprompt-xpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra != 'extra-10-getiprompt-gpu' and extra != 'extra-10-getiprompt-xpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra != 'extra-10-getiprompt-gpu' and extra != 'extra-10-getiprompt-xpu')",
+    "platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra != 'extra-10-getiprompt-gpu' and extra != 'extra-10-getiprompt-xpu'",
+    "sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra != 'extra-10-getiprompt-gpu' and extra != 'extra-10-getiprompt-xpu'",
+    "extra != 'extra-10-getiprompt-cpu' and extra != 'extra-10-getiprompt-gpu' and extra != 'extra-10-getiprompt-xpu'",
 ]
 conflicts = [[
     { package = "getiprompt", extra = "cpu" },
@@ -157,7 +160,7 @@ name = "build"
 version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "(os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux') or (os_name == 'nt' and sys_platform != 'darwin' and sys_platform != 'linux') or (os_name != 'nt' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (os_name != 'nt' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (os_name != 'nt' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "colorama", marker = "(os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux') or (os_name == 'nt' and platform_python_implementation != 'CPython' and sys_platform == 'linux') or (os_name == 'nt' and sys_platform != 'darwin' and sys_platform != 'linux') or (os_name == 'nt' and sys_platform == 'darwin' and extra != 'extra-10-getiprompt-cpu') or (os_name == 'nt' and sys_platform == 'linux' and extra != 'extra-10-getiprompt-cpu') or (os_name != 'nt' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (os_name != 'nt' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (os_name != 'nt' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "packaging" },
     { name = "pyproject-hooks" },
 ]
@@ -286,24 +289,24 @@ wheels = [
 
 [[package]]
 name = "coverage"
-version = "7.13.1"
+version = "7.13.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/23/f9/e92df5e07f3fc8d4c7f9a0f146ef75446bf870351cd37b788cf5897f8079/coverage-7.13.1.tar.gz", hash = "sha256:b7593fe7eb5feaa3fbb461ac79aac9f9fc0387a5ca8080b0c6fe2ca27b091afd", size = 825862, upload-time = "2025-12-28T15:42:56.969Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ad/49/349848445b0e53660e258acbcc9b0d014895b6739237920886672240f84b/coverage-7.13.2.tar.gz", hash = "sha256:044c6951ec37146b72a50cc81ef02217d27d4c3640efd2640311393cbbf143d3", size = 826523, upload-time = "2026-01-25T13:00:04.889Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ce/8a/87af46cccdfa78f53db747b09f5f9a21d5fc38d796834adac09b30a8ce74/coverage-7.13.1-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:6f34591000f06e62085b1865c9bc5f7858df748834662a51edadfd2c3bfe0dd3", size = 218927, upload-time = "2025-12-28T15:40:52.814Z" },
-    { url = "https://files.pythonhosted.org/packages/82/a8/6e22fdc67242a4a5a153f9438d05944553121c8f4ba70cb072af4c41362e/coverage-7.13.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:b67e47c5595b9224599016e333f5ec25392597a89d5744658f837d204e16c63e", size = 219288, upload-time = "2025-12-28T15:40:54.262Z" },
-    { url = "https://files.pythonhosted.org/packages/d0/0a/853a76e03b0f7c4375e2ca025df45c918beb367f3e20a0a8e91967f6e96c/coverage-7.13.1-cp312-cp312-manylinux1_i686.manylinux_2_28_i686.manylinux_2_5_i686.whl", hash = "sha256:3e7b8bd70c48ffb28461ebe092c2345536fb18bbbf19d287c8913699735f505c", size = 250786, upload-time = "2025-12-28T15:40:56.059Z" },
-    { url = "https://files.pythonhosted.org/packages/ea/b4/694159c15c52b9f7ec7adf49d50e5f8ee71d3e9ef38adb4445d13dd56c20/coverage-7.13.1-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:c223d078112e90dc0e5c4e35b98b9584164bea9fbbd221c0b21c5241f6d51b62", size = 253543, upload-time = "2025-12-28T15:40:57.585Z" },
-    { url = "https://files.pythonhosted.org/packages/96/b2/7f1f0437a5c855f87e17cf5d0dc35920b6440ff2b58b1ba9788c059c26c8/coverage-7.13.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:794f7c05af0763b1bbd1b9e6eff0e52ad068be3b12cd96c87de037b01390c968", size = 254635, upload-time = "2025-12-28T15:40:59.443Z" },
-    { url = "https://files.pythonhosted.org/packages/e9/d1/73c3fdb8d7d3bddd9473c9c6a2e0682f09fc3dfbcb9c3f36412a7368bcab/coverage-7.13.1-cp312-cp312-manylinux_2_31_riscv64.manylinux_2_39_riscv64.whl", hash = "sha256:0642eae483cc8c2902e4af7298bf886d605e80f26382124cddc3967c2a3df09e", size = 251202, upload-time = "2025-12-28T15:41:01.328Z" },
-    { url = "https://files.pythonhosted.org/packages/66/3c/f0edf75dcc152f145d5598329e864bbbe04ab78660fe3e8e395f9fff010f/coverage-7.13.1-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:9f5e772ed5fef25b3de9f2008fe67b92d46831bd2bc5bdc5dd6bfd06b83b316f", size = 252566, upload-time = "2025-12-28T15:41:03.319Z" },
-    { url = "https://files.pythonhosted.org/packages/17/b3/e64206d3c5f7dcbceafd14941345a754d3dbc78a823a6ed526e23b9cdaab/coverage-7.13.1-cp312-cp312-musllinux_1_2_i686.whl", hash = "sha256:45980ea19277dc0a579e432aef6a504fe098ef3a9032ead15e446eb0f1191aee", size = 250711, upload-time = "2025-12-28T15:41:06.411Z" },
-    { url = "https://files.pythonhosted.org/packages/dc/ad/28a3eb970a8ef5b479ee7f0c484a19c34e277479a5b70269dc652b730733/coverage-7.13.1-cp312-cp312-musllinux_1_2_riscv64.whl", hash = "sha256:e4f18eca6028ffa62adbd185a8f1e1dd242f2e68164dba5c2b74a5204850b4cf", size = 250278, upload-time = "2025-12-28T15:41:08.285Z" },
-    { url = "https://files.pythonhosted.org/packages/54/e3/c8f0f1a93133e3e1291ca76cbb63565bd4b5c5df63b141f539d747fff348/coverage-7.13.1-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:f8dca5590fec7a89ed6826fce625595279e586ead52e9e958d3237821fbc750c", size = 252154, upload-time = "2025-12-28T15:41:09.969Z" },
-    { url = "https://files.pythonhosted.org/packages/d0/bf/9939c5d6859c380e405b19e736321f1c7d402728792f4c752ad1adcce005/coverage-7.13.1-cp312-cp312-win32.whl", hash = "sha256:ff86d4e85188bba72cfb876df3e11fa243439882c55957184af44a35bd5880b7", size = 221487, upload-time = "2025-12-28T15:41:11.468Z" },
-    { url = "https://files.pythonhosted.org/packages/fa/dc/7282856a407c621c2aad74021680a01b23010bb8ebf427cf5eacda2e876f/coverage-7.13.1-cp312-cp312-win_amd64.whl", hash = "sha256:16cc1da46c04fb0fb128b4dc430b78fa2aba8a6c0c9f8eb391fd5103409a6ac6", size = 222299, upload-time = "2025-12-28T15:41:13.386Z" },
-    { url = "https://files.pythonhosted.org/packages/10/79/176a11203412c350b3e9578620013af35bcdb79b651eb976f4a4b32044fa/coverage-7.13.1-cp312-cp312-win_arm64.whl", hash = "sha256:8d9bc218650022a768f3775dd7fdac1886437325d8d295d923ebcfef4892ad5c", size = 220941, upload-time = "2025-12-28T15:41:14.975Z" },
-    { url = "https://files.pythonhosted.org/packages/cc/48/d9f421cb8da5afaa1a64570d9989e00fb7955e6acddc5a12979f7666ef60/coverage-7.13.1-py3-none-any.whl", hash = "sha256:2016745cb3ba554469d02819d78958b571792bb68e31302610e898f80dd3a573", size = 210722, upload-time = "2025-12-28T15:42:54.901Z" },
+    { url = "https://files.pythonhosted.org/packages/46/39/e92a35f7800222d3f7b2cbb7bbc3b65672ae8d501cb31801b2d2bd7acdf1/coverage-7.13.2-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:f106b2af193f965d0d3234f3f83fc35278c7fb935dfbde56ae2da3dd2c03b84d", size = 219142, upload-time = "2026-01-25T12:58:00.448Z" },
+    { url = "https://files.pythonhosted.org/packages/45/7a/8bf9e9309c4c996e65c52a7c5a112707ecdd9fbaf49e10b5a705a402bbb4/coverage-7.13.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:78f45d21dc4d5d6bd29323f0320089ef7eae16e4bef712dff79d184fa7330af3", size = 219503, upload-time = "2026-01-25T12:58:02.451Z" },
+    { url = "https://files.pythonhosted.org/packages/87/93/17661e06b7b37580923f3f12406ac91d78aeed293fb6da0b69cc7957582f/coverage-7.13.2-cp312-cp312-manylinux1_i686.manylinux_2_28_i686.manylinux_2_5_i686.whl", hash = "sha256:fae91dfecd816444c74531a9c3d6ded17a504767e97aa674d44f638107265b99", size = 251006, upload-time = "2026-01-25T12:58:04.059Z" },
+    { url = "https://files.pythonhosted.org/packages/12/f0/f9e59fb8c310171497f379e25db060abef9fa605e09d63157eebec102676/coverage-7.13.2-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:264657171406c114787b441484de620e03d8f7202f113d62fcd3d9688baa3e6f", size = 253750, upload-time = "2026-01-25T12:58:05.574Z" },
+    { url = "https://files.pythonhosted.org/packages/e5/b1/1935e31add2232663cf7edd8269548b122a7d100047ff93475dbaaae673e/coverage-7.13.2-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:ae47d8dcd3ded0155afbb59c62bd8ab07ea0fd4902e1c40567439e6db9dcaf2f", size = 254862, upload-time = "2026-01-25T12:58:07.647Z" },
+    { url = "https://files.pythonhosted.org/packages/af/59/b5e97071ec13df5f45da2b3391b6cdbec78ba20757bc92580a5b3d5fa53c/coverage-7.13.2-cp312-cp312-manylinux_2_31_riscv64.manylinux_2_39_riscv64.whl", hash = "sha256:8a0b33e9fd838220b007ce8f299114d406c1e8edb21336af4c97a26ecfd185aa", size = 251420, upload-time = "2026-01-25T12:58:09.309Z" },
+    { url = "https://files.pythonhosted.org/packages/3f/75/9495932f87469d013dc515fb0ce1aac5fa97766f38f6b1a1deb1ee7b7f3a/coverage-7.13.2-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:b3becbea7f3ce9a2d4d430f223ec15888e4deb31395840a79e916368d6004cce", size = 252786, upload-time = "2026-01-25T12:58:10.909Z" },
+    { url = "https://files.pythonhosted.org/packages/6a/59/af550721f0eb62f46f7b8cb7e6f1860592189267b1c411a4e3a057caacee/coverage-7.13.2-cp312-cp312-musllinux_1_2_i686.whl", hash = "sha256:f819c727a6e6eeb8711e4ce63d78c620f69630a2e9d53bc95ca5379f57b6ba94", size = 250928, upload-time = "2026-01-25T12:58:12.449Z" },
+    { url = "https://files.pythonhosted.org/packages/9b/b1/21b4445709aae500be4ab43bbcfb4e53dc0811c3396dcb11bf9f23fd0226/coverage-7.13.2-cp312-cp312-musllinux_1_2_riscv64.whl", hash = "sha256:4f7b71757a3ab19f7ba286e04c181004c1d61be921795ee8ba6970fd0ec91da5", size = 250496, upload-time = "2026-01-25T12:58:14.047Z" },
+    { url = "https://files.pythonhosted.org/packages/ba/b1/0f5d89dfe0392990e4f3980adbde3eb34885bc1effb2dc369e0bf385e389/coverage-7.13.2-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:b7fc50d2afd2e6b4f6f2f403b70103d280a8e0cb35320cbbe6debcda02a1030b", size = 252373, upload-time = "2026-01-25T12:58:15.976Z" },
+    { url = "https://files.pythonhosted.org/packages/01/c9/0cf1a6a57a9968cc049a6b896693faa523c638a5314b1fc374eb2b2ac904/coverage-7.13.2-cp312-cp312-win32.whl", hash = "sha256:292250282cf9bcf206b543d7608bda17ca6fc151f4cbae949fc7e115112fbd41", size = 221696, upload-time = "2026-01-25T12:58:17.517Z" },
+    { url = "https://files.pythonhosted.org/packages/4d/05/d7540bf983f09d32803911afed135524570f8c47bb394bf6206c1dc3a786/coverage-7.13.2-cp312-cp312-win_amd64.whl", hash = "sha256:eeea10169fac01549a7921d27a3e517194ae254b542102267bef7a93ed38c40e", size = 222504, upload-time = "2026-01-25T12:58:19.115Z" },
+    { url = "https://files.pythonhosted.org/packages/15/8b/1a9f037a736ced0a12aacf6330cdaad5008081142a7070bc58b0f7930cbc/coverage-7.13.2-cp312-cp312-win_arm64.whl", hash = "sha256:2a5b567f0b635b592c917f96b9a9cb3dbd4c320d03f4bf94e9084e494f2e8894", size = 221120, upload-time = "2026-01-25T12:58:21.334Z" },
+    { url = "https://files.pythonhosted.org/packages/d2/db/d291e30fdf7ea617a335531e72294e0c723356d7fdde8fba00610a76bda9/coverage-7.13.2-py3-none-any.whl", hash = "sha256:40ce1ea1e25125556d8e76bd0b61500839a07944cc287ac21d5626f3e620cad5", size = 210943, upload-time = "2026-01-25T13:00:02.388Z" },
 ]
 
 [[package]]
@@ -311,7 +314,7 @@ name = "cryptography"
 version = "46.0.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cffi", marker = "(platform_python_implementation != 'PyPy' and sys_platform != 'darwin') or (platform_python_implementation == 'PyPy' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_python_implementation == 'PyPy' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_python_implementation == 'PyPy' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "cffi", marker = "(platform_python_implementation != 'PyPy' and sys_platform != 'darwin') or (platform_python_implementation != 'PyPy' and extra != 'extra-10-getiprompt-cpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/9f/33/c00162f49c0e2fe8064a62cb92b93e50c74a72bc370ab92f86112b33ff62/cryptography-46.0.3.tar.gz", hash = "sha256:a8b17438104fed022ce745b362294d9ce35b4c2e45c1d958ad4a4b019285f4a1", size = 749258, upload-time = "2025-10-15T23:18:31.74Z" }
 wheels = [
@@ -557,8 +560,8 @@ dependencies = [
 cpu = [
     { name = "torch", version = "2.8.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "torch", version = "2.8.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform != 'darwin' and extra == 'extra-10-getiprompt-cpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
-    { name = "torchvision", version = "0.23.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
-    { name = "torchvision", version = "0.23.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "torchvision", version = "0.23.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (platform_python_implementation != 'CPython' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_python_implementation != 'CPython' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_python_implementation != 'CPython' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "torchvision", version = "0.23.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
 ]
 dev = [
     { name = "build" },
@@ -613,11 +616,11 @@ requires-dist = [
     { name = "jupyter", marker = "extra == 'notebook'", specifier = "==1.1.1" },
     { name = "lvis", specifier = "==0.5.3" },
     { name = "markupsafe", specifier = "==3.0.2" },
-    { name = "matplotlib", specifier = "==3.10.3" },
+    { name = "matplotlib", specifier = "==3.10.8" },
     { name = "numpy", specifier = "~=2.2.6" },
     { name = "onnx", specifier = ">=1.19.1" },
     { name = "onnxruntime", specifier = ">=1.23.2" },
-    { name = "opencv-python", specifier = "==4.11.0.86" },
+    { name = "opencv-python", specifier = "~=4.13.0" },
     { name = "openvino", specifier = "==2025.3.0" },
     { name = "polars", specifier = ">=1.31.0,<2.0.0" },
     { name = "pot", specifier = "==0.9.5" },
@@ -655,7 +658,7 @@ dev = [
     { name = "pytest-assume", specifier = ">=2.4.3" },
     { name = "pytest-cov", specifier = "==2.11.1" },
     { name = "pytest-html", specifier = "~=4.0.0" },
-    { name = "ruff", specifier = "~=0.11" },
+    { name = "ruff", specifier = "==0.11.12" },
 ]
 
 [[package]]
@@ -1247,7 +1250,7 @@ dependencies = [
     { name = "nbformat" },
     { name = "packaging" },
     { name = "prometheus-client" },
-    { name = "pywinpty", marker = "(os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux') or (os_name == 'nt' and sys_platform != 'darwin' and sys_platform != 'linux') or (os_name != 'nt' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (os_name != 'nt' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (os_name != 'nt' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "pywinpty", marker = "(os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux') or (os_name == 'nt' and platform_python_implementation != 'CPython' and sys_platform == 'linux') or (os_name == 'nt' and sys_platform != 'darwin' and sys_platform != 'linux') or (os_name == 'nt' and sys_platform == 'darwin' and extra != 'extra-10-getiprompt-cpu') or (os_name == 'nt' and sys_platform == 'linux' and extra != 'extra-10-getiprompt-cpu') or (os_name != 'nt' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (os_name != 'nt' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (os_name != 'nt' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "pyzmq" },
     { name = "send2trash" },
     { name = "terminado" },
@@ -1265,7 +1268,7 @@ name = "jupyter-server-terminals"
 version = "0.5.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pywinpty", marker = "(os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux') or (os_name == 'nt' and sys_platform != 'darwin' and sys_platform != 'linux') or (os_name != 'nt' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (os_name != 'nt' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (os_name != 'nt' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "pywinpty", marker = "(os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux') or (os_name == 'nt' and platform_python_implementation != 'CPython' and sys_platform == 'linux') or (os_name == 'nt' and sys_platform != 'darwin' and sys_platform != 'linux') or (os_name == 'nt' and sys_platform == 'darwin' and extra != 'extra-10-getiprompt-cpu') or (os_name == 'nt' and sys_platform == 'linux' and extra != 'extra-10-getiprompt-cpu') or (os_name != 'nt' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (os_name != 'nt' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (os_name != 'nt' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "terminado" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f4/a7/bcd0a9b0cbba88986fe944aaaf91bfda603e5a50bda8ed15123f381a3b2f/jupyter_server_terminals-0.5.4.tar.gz", hash = "sha256:bbda128ed41d0be9020349f9f1f2a4ab9952a73ed5f5ac9f1419794761fb87f5", size = 31770, upload-time = "2026-01-14T16:53:20.213Z" }
@@ -1275,7 +1278,7 @@ wheels = [
 
 [[package]]
 name = "jupyterlab"
-version = "4.5.2"
+version = "4.5.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "async-lru" },
@@ -1292,9 +1295,9 @@ dependencies = [
     { name = "tornado" },
     { name = "traitlets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/93/dc/2c8c4ff1aee27ac999ba04c373c5d0d7c6c181b391640d7b916b884d5985/jupyterlab-4.5.2.tar.gz", hash = "sha256:c80a6b9f6dace96a566d590c65ee2785f61e7cd4aac5b4d453dcc7d0d5e069b7", size = 23990371, upload-time = "2026-01-12T12:27:08.493Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3e/76/393eae3349f9a39bf21f8f5406e5244d36e2bfc932049b6070c271f92764/jupyterlab-4.5.3.tar.gz", hash = "sha256:4a159f71067cb38e4a82e86a42de8e7e926f384d7f2291964f282282096d27e8", size = 23939231, upload-time = "2026-01-23T15:04:25.768Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a4/78/7e455920f104ef2aa94a4c0d2b40e5b44334ee7057eae1aa1fb97b9631ad/jupyterlab-4.5.2-py3-none-any.whl", hash = "sha256:76466ebcfdb7a9bb7e2fbd6459c0e2c032ccf75be673634a84bee4b3e6b13ab6", size = 12385807, upload-time = "2026-01-12T12:27:03.923Z" },
+    { url = "https://files.pythonhosted.org/packages/9e/9a/0bf9a7a45f0006d7ff4fdc4fc313de4255acab02bf4db1887c65f0472c01/jupyterlab-4.5.3-py3-none-any.whl", hash = "sha256:63c9f3a48de72ba00df766ad6eed416394f5bb883829f11eeff0872302520ba7", size = 12391761, upload-time = "2026-01-23T15:04:21.214Z" },
 ]
 
 [[package]]
@@ -1477,7 +1480,7 @@ wheels = [
 
 [[package]]
 name = "matplotlib"
-version = "3.10.3"
+version = "3.10.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "contourpy" },
@@ -1490,14 +1493,15 @@ dependencies = [
     { name = "pyparsing" },
     { name = "python-dateutil" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/26/91/d49359a21893183ed2a5b6c76bec40e0b1dcbf8ca148f864d134897cfc75/matplotlib-3.10.3.tar.gz", hash = "sha256:2f82d2c5bb7ae93aaaa4cd42aca65d76ce6376f83304fa3a630b569aca274df0", size = 34799811, upload-time = "2025-05-08T19:10:54.39Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8a/76/d3c6e3a13fe484ebe7718d14e269c9569c4eb0020a968a327acb3b9a8fe6/matplotlib-3.10.8.tar.gz", hash = "sha256:2299372c19d56bcd35cf05a2738308758d32b9eaed2371898d8f5bd33f084aa3", size = 34806269, upload-time = "2025-12-10T22:56:51.155Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/eb/43/6b80eb47d1071f234ef0c96ca370c2ca621f91c12045f1401b5c9b28a639/matplotlib-3.10.3-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:0ab1affc11d1f495ab9e6362b8174a25afc19c081ba5b0775ef00533a4236eea", size = 8179689, upload-time = "2025-05-08T19:10:07.602Z" },
-    { url = "https://files.pythonhosted.org/packages/0f/70/d61a591958325c357204870b5e7b164f93f2a8cca1dc6ce940f563909a13/matplotlib-3.10.3-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:2a818d8bdcafa7ed2eed74487fdb071c09c1ae24152d403952adad11fa3c65b4", size = 8050466, upload-time = "2025-05-08T19:10:09.383Z" },
-    { url = "https://files.pythonhosted.org/packages/e7/75/70c9d2306203148cc7902a961240c5927dd8728afedf35e6a77e105a2985/matplotlib-3.10.3-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:748ebc3470c253e770b17d8b0557f0aa85cf8c63fd52f1a61af5b27ec0b7ffee", size = 8456252, upload-time = "2025-05-08T19:10:11.958Z" },
-    { url = "https://files.pythonhosted.org/packages/c4/91/ba0ae1ff4b3f30972ad01cd4a8029e70a0ec3b8ea5be04764b128b66f763/matplotlib-3.10.3-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ed70453fd99733293ace1aec568255bc51c6361cb0da94fa5ebf0649fdb2150a", size = 8601321, upload-time = "2025-05-08T19:10:14.47Z" },
-    { url = "https://files.pythonhosted.org/packages/d2/88/d636041eb54a84b889e11872d91f7cbf036b3b0e194a70fa064eb8b04f7a/matplotlib-3.10.3-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:dbed9917b44070e55640bd13419de83b4c918e52d97561544814ba463811cbc7", size = 9406972, upload-time = "2025-05-08T19:10:16.569Z" },
-    { url = "https://files.pythonhosted.org/packages/b1/79/0d1c165eac44405a86478082e225fce87874f7198300bbebc55faaf6d28d/matplotlib-3.10.3-cp312-cp312-win_amd64.whl", hash = "sha256:cf37d8c6ef1a48829443e8ba5227b44236d7fcaf7647caa3178a4ff9f7a5be05", size = 8067954, upload-time = "2025-05-08T19:10:18.663Z" },
+    { url = "https://files.pythonhosted.org/packages/9e/67/f997cdcbb514012eb0d10cd2b4b332667997fb5ebe26b8d41d04962fa0e6/matplotlib-3.10.8-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:64fcc24778ca0404ce0cb7b6b77ae1f4c7231cdd60e6778f999ee05cbd581b9a", size = 8260453, upload-time = "2025-12-10T22:55:30.709Z" },
+    { url = "https://files.pythonhosted.org/packages/7e/65/07d5f5c7f7c994f12c768708bd2e17a4f01a2b0f44a1c9eccad872433e2e/matplotlib-3.10.8-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:b9a5ca4ac220a0cdd1ba6bcba3608547117d30468fefce49bb26f55c1a3d5c58", size = 8148321, upload-time = "2025-12-10T22:55:33.265Z" },
+    { url = "https://files.pythonhosted.org/packages/3e/f3/c5195b1ae57ef85339fd7285dfb603b22c8b4e79114bae5f4f0fcf688677/matplotlib-3.10.8-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:3ab4aabc72de4ff77b3ec33a6d78a68227bf1123465887f9905ba79184a1cc04", size = 8716944, upload-time = "2025-12-10T22:55:34.922Z" },
+    { url = "https://files.pythonhosted.org/packages/00/f9/7638f5cc82ec8a7aa005de48622eecc3ed7c9854b96ba15bd76b7fd27574/matplotlib-3.10.8-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:24d50994d8c5816ddc35411e50a86ab05f575e2530c02752e02538122613371f", size = 9550099, upload-time = "2025-12-10T22:55:36.789Z" },
+    { url = "https://files.pythonhosted.org/packages/57/61/78cd5920d35b29fd2a0fe894de8adf672ff52939d2e9b43cb83cd5ce1bc7/matplotlib-3.10.8-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:99eefd13c0dc3b3c1b4d561c1169e65fe47aab7b8158754d7c084088e2329466", size = 9613040, upload-time = "2025-12-10T22:55:38.715Z" },
+    { url = "https://files.pythonhosted.org/packages/30/4e/c10f171b6e2f44d9e3a2b96efa38b1677439d79c99357600a62cc1e9594e/matplotlib-3.10.8-cp312-cp312-win_amd64.whl", hash = "sha256:dd80ecb295460a5d9d260df63c43f4afbdd832d725a531f008dad1664f458adf", size = 8142717, upload-time = "2025-12-10T22:55:41.103Z" },
+    { url = "https://files.pythonhosted.org/packages/f1/76/934db220026b5fef85f45d51a738b91dea7d70207581063cd9bd8fafcf74/matplotlib-3.10.8-cp312-cp312-win_arm64.whl", hash = "sha256:3c624e43ed56313651bc18a47f838b60d7b8032ed348911c54906b130b20071b", size = 8012751, upload-time = "2025-12-10T22:55:42.684Z" },
 ]
 
 [[package]]
@@ -1714,7 +1718,7 @@ wheels = [
 
 [[package]]
 name = "notebook"
-version = "7.5.2"
+version = "7.5.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jupyter-server" },
@@ -1723,9 +1727,9 @@ dependencies = [
     { name = "notebook-shim" },
     { name = "tornado" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3b/b6/6b2c653570b02e4ec2a94c0646a4a25132be0749617776d0b72a2bcedb9b/notebook-7.5.2.tar.gz", hash = "sha256:83e82f93c199ca730313bea1bb24bc279ea96f74816d038a92d26b6b9d5f3e4a", size = 14059605, upload-time = "2026-01-12T14:56:53.483Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b8/cb/cc7f4df5cee315dd126a47eb60890690a0438d5e0dd40c32d60ce16de377/notebook-7.5.3.tar.gz", hash = "sha256:393ceb269cf9fdb02a3be607a57d7bd5c2c14604f1818a17dbeb38e04f98cbfa", size = 14073140, upload-time = "2026-01-26T07:28:36.605Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/32/55/b754cd51c6011d90ef03e3f06136f1ebd44658b9529dbcf0c15fc0d6a0b7/notebook-7.5.2-py3-none-any.whl", hash = "sha256:17d078a98603d70d62b6b4b3fcb67e87d7a68c398a7ae9b447eb2d7d9aec9979", size = 14468915, upload-time = "2026-01-12T14:56:47.87Z" },
+    { url = "https://files.pythonhosted.org/packages/96/98/9286e7f35e5584ebb79f997f2fb0cb66745c86f6c5fccf15ba32aac5e908/notebook-7.5.3-py3-none-any.whl", hash = "sha256:c997bfa1a2a9eb58c9bbb7e77d50428befb1033dd6f02c482922e96851d67354", size = 14481744, upload-time = "2026-01-26T07:28:31.867Z" },
 ]
 
 [[package]]
@@ -1807,7 +1811,7 @@ name = "nvidia-cudnn-cu12"
 version = "9.10.2.21"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-cublas-cu12", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-gpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "nvidia-cublas-cu12", marker = "extra == 'extra-10-getiprompt-gpu' or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fa/41/e79269ce215c857c935fd86bcfe91a451a584dfc27f1e068f568b9ad1ab7/nvidia_cudnn_cu12-9.10.2.21-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:c9132cc3f8958447b4910a1720036d9eff5928cc3179b0a51fb6d167c6cc87d8", size = 705026878, upload-time = "2025-06-06T21:52:51.348Z" },
@@ -1820,7 +1824,7 @@ name = "nvidia-cufft-cu12"
 version = "11.3.0.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-nvjitlink-cu12", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-gpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "nvidia-nvjitlink-cu12", marker = "extra == 'extra-10-getiprompt-gpu' or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1f/37/c50d2b2f2c07e146776389e3080f4faf70bcc4fa6e19d65bb54ca174ebc3/nvidia_cufft_cu12-11.3.0.4-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:d16079550df460376455cba121db6564089176d9bac9e4f360493ca4741b22a6", size = 200164144, upload-time = "2024-11-20T17:40:58.288Z" },
@@ -1856,9 +1860,9 @@ name = "nvidia-cusolver-cu12"
 version = "11.7.1.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-cublas-cu12", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-gpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
-    { name = "nvidia-cusparse-cu12", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-gpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
-    { name = "nvidia-nvjitlink-cu12", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-gpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "nvidia-cublas-cu12", marker = "extra == 'extra-10-getiprompt-gpu' or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "nvidia-cusparse-cu12", marker = "extra == 'extra-10-getiprompt-gpu' or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "nvidia-nvjitlink-cu12", marker = "extra == 'extra-10-getiprompt-gpu' or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/93/17/dbe1aa865e4fdc7b6d4d0dd308fdd5aaab60f939abfc0ea1954eac4fb113/nvidia_cusolver_cu12-11.7.1.2-py3-none-manylinux2014_aarch64.whl", hash = "sha256:0ce237ef60acde1efc457335a2ddadfd7610b892d94efee7b776c64bb1cac9e0", size = 157833628, upload-time = "2024-10-01T17:05:05.591Z" },
@@ -1873,7 +1877,7 @@ name = "nvidia-cusparse-cu12"
 version = "12.5.4.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-nvjitlink-cu12", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-gpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "nvidia-nvjitlink-cu12", marker = "extra == 'extra-10-getiprompt-gpu' or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/eb/eb/6681efd0aa7df96b4f8067b3ce7246833dd36830bb4cec8896182773db7d/nvidia_cusparse_cu12-12.5.4.2-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:d25b62fb18751758fe3c93a4a08eff08effedfe4edf1c6bb5afd0890fe88f887", size = 216451147, upload-time = "2024-11-20T17:44:18.055Z" },
@@ -1942,8 +1946,8 @@ name = "oneccl"
 version = "2021.16.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "impi-rt", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-xpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
-    { name = "intel-sycl-rt", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-xpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "impi-rt", marker = "(extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra != 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "intel-sycl-rt", marker = "(extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra != 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/95/38/e31cc932bd62ede7813dad2062caef6b745550e699766cdf6ba3a8e2ff8e/oneccl-2021.16.1-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:371c2ebd6590216a1cbbeaf0ba70b26e9a275a708993aba43c9ee82a1947a3c6", size = 104428094, upload-time = "2025-08-13T17:22:16.448Z" },
@@ -1954,7 +1958,7 @@ name = "oneccl-devel"
 version = "2021.16.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "oneccl", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-xpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "oneccl", marker = "(extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra != 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f6/05/fd082b1da0fdd8082b99d721fd69a4a954f61639fbe7d024ca93b16e4dc1/oneccl_devel-2021.16.1-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:9154ab9c10e9864464c7163857f87c3de05b80030b4dc4ad9bdbd8084cb85ac2", size = 35075212, upload-time = "2025-08-13T17:22:21.894Z" },
@@ -2074,19 +2078,20 @@ wheels = [
 
 [[package]]
 name = "opencv-python"
-version = "4.11.0.86"
+version = "4.13.0.90"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/17/06/68c27a523103dad5837dc5b87e71285280c4f098c60e4fe8a8db6486ab09/opencv-python-4.11.0.86.tar.gz", hash = "sha256:03d60ccae62304860d232272e4a4fda93c39d595780cb40b161b310244b736a4", size = 95171956, upload-time = "2025-01-16T13:52:24.737Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/05/4d/53b30a2a3ac1f75f65a59eb29cf2ee7207ce64867db47036ad61743d5a23/opencv_python-4.11.0.86-cp37-abi3-macosx_13_0_arm64.whl", hash = "sha256:432f67c223f1dc2824f5e73cdfcd9db0efc8710647d4e813012195dc9122a52a", size = 37326322, upload-time = "2025-01-16T13:52:25.887Z" },
-    { url = "https://files.pythonhosted.org/packages/3b/84/0a67490741867eacdfa37bc18df96e08a9d579583b419010d7f3da8ff503/opencv_python-4.11.0.86-cp37-abi3-macosx_13_0_x86_64.whl", hash = "sha256:9d05ef13d23fe97f575153558653e2d6e87103995d54e6a35db3f282fe1f9c66", size = 56723197, upload-time = "2025-01-16T13:55:21.222Z" },
-    { url = "https://files.pythonhosted.org/packages/f3/bd/29c126788da65c1fb2b5fb621b7fed0ed5f9122aa22a0868c5e2c15c6d23/opencv_python-4.11.0.86-cp37-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:1b92ae2c8852208817e6776ba1ea0d6b1e0a1b5431e971a2a0ddd2a8cc398202", size = 42230439, upload-time = "2025-01-16T13:51:35.822Z" },
-    { url = "https://files.pythonhosted.org/packages/2c/8b/90eb44a40476fa0e71e05a0283947cfd74a5d36121a11d926ad6f3193cc4/opencv_python-4.11.0.86-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6b02611523803495003bd87362db3e1d2a0454a6a63025dc6658a9830570aa0d", size = 62986597, upload-time = "2025-01-16T13:52:08.836Z" },
-    { url = "https://files.pythonhosted.org/packages/fb/d7/1d5941a9dde095468b288d989ff6539dd69cd429dbf1b9e839013d21b6f0/opencv_python-4.11.0.86-cp37-abi3-win32.whl", hash = "sha256:810549cb2a4aedaa84ad9a1c92fbfdfc14090e2749cedf2c1589ad8359aa169b", size = 29384337, upload-time = "2025-01-16T13:52:13.549Z" },
-    { url = "https://files.pythonhosted.org/packages/a4/7d/f1c30a92854540bf789e9cd5dde7ef49bbe63f855b85a2e6b3db8135c591/opencv_python-4.11.0.86-cp37-abi3-win_amd64.whl", hash = "sha256:085ad9b77c18853ea66283e98affefe2de8cc4c1f43eda4c100cf9b2721142ec", size = 39488044, upload-time = "2025-01-16T13:52:21.928Z" },
+    { url = "https://files.pythonhosted.org/packages/77/d7/133d5756aef78090f4d8dd4895793aed24942dec6064a15375cfac9175fc/opencv_python-4.13.0.90-cp37-abi3-macosx_13_0_arm64.whl", hash = "sha256:58803f8b05b51d8a785e2306d83b44173b32536f980342f3bc76d8c122b5938d", size = 46020278, upload-time = "2026-01-18T08:57:42.539Z" },
+    { url = "https://files.pythonhosted.org/packages/7b/65/3b8cdbe13fa2436695d00e1d8c1ddf5edb4050a93436f34ed867233d1960/opencv_python-4.13.0.90-cp37-abi3-macosx_14_0_x86_64.whl", hash = "sha256:a5354e8b161409fce7710ba4c1cfe88b7bb460d97f705dc4e714a1636616f87d", size = 32568376, upload-time = "2026-01-18T08:58:47.19Z" },
+    { url = "https://files.pythonhosted.org/packages/34/ff/e4d7c165e678563f49505d3d2811fcc16011e929cd00bc4b0070c7ee82b0/opencv_python-4.13.0.90-cp37-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:d557cbf0c7818081c9acf56585b68e781af4f00638971f75eaa3de70904a6314", size = 47685110, upload-time = "2026-01-18T08:59:58.045Z" },
+    { url = "https://files.pythonhosted.org/packages/cf/02/d9b73dbce28712204e85ae4c1e179505e9a771f95b33743a97e170caedde/opencv_python-4.13.0.90-cp37-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:9911581e37b24169e4842069ff01d6645ea2bc4af7e10a022d9ebe340fd035ec", size = 70460479, upload-time = "2026-01-18T09:01:16.377Z" },
+    { url = "https://files.pythonhosted.org/packages/fc/1c/87fa71968beb71481ed359e21772061ceff7c9b45a61b3e7daa71e5b0b66/opencv_python-4.13.0.90-cp37-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:1150b8f1947761b848bbfa9c96ceba8877743ffef157c08a04af6f7717ddd709", size = 46707819, upload-time = "2026-01-18T09:02:48.049Z" },
+    { url = "https://files.pythonhosted.org/packages/af/16/915a94e5b537c328fa3e96b769c7d4eed3b67d1be978e0af658a3d3faed8/opencv_python-4.13.0.90-cp37-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:d6716f16149b04eea52f953b8ca983d60dd9cd4872c1fd5113f6e2fcebb90e93", size = 72926629, upload-time = "2026-01-18T09:04:29.23Z" },
+    { url = "https://files.pythonhosted.org/packages/bf/84/9c63c84be013943dd4c5fff36157f1ec0ec894b69a2fc3026fd4e3c9280a/opencv_python-4.13.0.90-cp37-abi3-win32.whl", hash = "sha256:458a00f2ba47a877eca385be3e7bcc45e6d30a4361d107ce73c1800f516dab09", size = 30932151, upload-time = "2026-01-18T09:05:22.181Z" },
+    { url = "https://files.pythonhosted.org/packages/13/de/291cbb17f44242ed6bfd3450fc2535d6bd298115c0ccd6f01cd51d4a11d7/opencv_python-4.13.0.90-cp37-abi3-win_amd64.whl", hash = "sha256:526bde4c33a86808a751e2bb57bf4921beb49794621810971926c472897f6433", size = 40211706, upload-time = "2026-01-18T09:06:06.749Z" },
 ]
 
 [[package]]
@@ -2117,11 +2122,11 @@ wheels = [
 
 [[package]]
 name = "packaging"
-version = "25.0"
+version = "26.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a1/d4/1fc4078c65507b51b96ca8f8c3ba19e6a61c8253c72794544580a7b6c24d/packaging-25.0.tar.gz", hash = "sha256:d443872c98d677bf60f6a1f2f8c1cb748e8fe762d2bf9d3148b5599295b0fc4f", size = 165727, upload-time = "2025-04-19T11:48:59.673Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/65/ee/299d360cdc32edc7d2cf530f3accf79c4fca01e96ffc950d8a52213bd8e4/packaging-26.0.tar.gz", hash = "sha256:00243ae351a257117b6a241061796684b084ed1c516a08c48a3f7e147a9d80b4", size = 143416, upload-time = "2026-01-21T20:50:39.064Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/20/12/38679034af332785aac8774540895e234f4d07f7545804097de4b666afd8/packaging-25.0-py3-none-any.whl", hash = "sha256:29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484", size = 66469, upload-time = "2025-04-19T11:48:57.875Z" },
+    { url = "https://files.pythonhosted.org/packages/b7/b9/c538f279a4e237a006a2c98387d081e9eb060d203d8ed34467cc0f0b9b53/packaging-26.0-py3-none-any.whl", hash = "sha256:b36f1fef9334a5588b4166f8bcd26a14e521f2b55e6b9de3aaa80d3ff7a37529", size = 74366, upload-time = "2026-01-21T20:50:37.788Z" },
 ]
 
 [[package]]
@@ -2144,11 +2149,11 @@ wheels = [
 
 [[package]]
 name = "pathspec"
-version = "1.0.3"
+version = "1.0.4"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/4c/b2/bb8e495d5262bfec41ab5cb18f522f1012933347fb5d9e62452d446baca2/pathspec-1.0.3.tar.gz", hash = "sha256:bac5cf97ae2c2876e2d25ebb15078eb04d76e4b98921ee31c6f85ade8b59444d", size = 130841, upload-time = "2026-01-09T15:46:46.009Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fa/36/e27608899f9b8d4dff0617b2d9ab17ca5608956ca44461ac14ac48b44015/pathspec-1.0.4.tar.gz", hash = "sha256:0210e2ae8a21a9137c0d470578cb0e595af87edaa6ebf12ff176f14a02e0e645", size = 131200, upload-time = "2026-01-27T03:59:46.938Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/32/2b/121e912bd60eebd623f873fd090de0e84f322972ab25a7f9044c056804ed/pathspec-1.0.3-py3-none-any.whl", hash = "sha256:e80767021c1cc524aa3fb14bedda9c34406591343cc42797b386ce7b9354fb6c", size = 55021, upload-time = "2026-01-09T15:46:44.652Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/3c/2c197d226f9ea224a9ab8d197933f9da0ae0aac5b6e0f884e2b8d9c8e9f7/pathspec-1.0.4-py3-none-any.whl", hash = "sha256:fb6ae2fd4e7c921a165808a552060e722767cfa526f99ca5156ed2ce45a5c723", size = 55206, upload-time = "2026-01-27T03:59:45.137Z" },
 ]
 
 [[package]]
@@ -2364,11 +2369,11 @@ wheels = [
 
 [[package]]
 name = "pycparser"
-version = "2.23"
+version = "3.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/fe/cf/d2d3b9f5699fb1e4615c8e32ff220203e43b248e1dfcc6736ad9057731ca/pycparser-2.23.tar.gz", hash = "sha256:78816d4f24add8f10a06d6f05b4d424ad9e96cfebf68a4ddc99c65c0720d00c2", size = 173734, upload-time = "2025-09-09T13:23:47.91Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1b/7d/92392ff7815c21062bea51aa7b87d45576f649f16458d78b7cf94b9ab2e6/pycparser-3.0.tar.gz", hash = "sha256:600f49d217304a5902ac3c37e1281c9fe94e4d0489de643a9504c5cdfdfc6b29", size = 103492, upload-time = "2026-01-21T14:26:51.89Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a0/e3/59cd50310fc9b59512193629e1984c1f95e5c8ae6e5d8c69532ccc65a7fe/pycparser-2.23-py3-none-any.whl", hash = "sha256:e5c6e8d3fbad53479cab09ac03729e0a9faf2bee3db8208a550daf5af81a5934", size = 118140, upload-time = "2025-09-09T13:23:46.651Z" },
+    { url = "https://files.pythonhosted.org/packages/0c/c3/44f3fbbfa403ea2a7c779186dc20772604442dde72947e7d01069cbe98e3/pycparser-3.0-py3-none-any.whl", hash = "sha256:b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992", size = 48172, upload-time = "2026-01-21T14:26:50.693Z" },
 ]
 
 [[package]]
@@ -2382,11 +2387,11 @@ wheels = [
 
 [[package]]
 name = "pyparsing"
-version = "3.3.1"
+version = "3.3.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/33/c1/1d9de9aeaa1b89b0186e5fe23294ff6517fce1bc69149185577cd31016b2/pyparsing-3.3.1.tar.gz", hash = "sha256:47fad0f17ac1e2cad3de3b458570fbc9b03560aa029ed5e16ee5554da9a2251c", size = 1550512, upload-time = "2025-12-23T03:14:04.391Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f3/91/9c6ee907786a473bf81c5f53cf703ba0957b23ab84c264080fb5a450416f/pyparsing-3.3.2.tar.gz", hash = "sha256:c777f4d763f140633dcb6d8a3eda953bf7a214dc4eff598413c070bcdc117cbc", size = 6851574, upload-time = "2026-01-21T03:57:59.36Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8b/40/2614036cdd416452f5bf98ec037f38a1afb17f327cb8e6b652d4729e0af8/pyparsing-3.3.1-py3-none-any.whl", hash = "sha256:023b5e7e5520ad96642e2c6db4cb683d3970bd640cdf7115049a6e9c3682df82", size = 121793, upload-time = "2025-12-23T03:14:02.103Z" },
+    { url = "https://files.pythonhosted.org/packages/10/bd/c038d7cc38edc1aa5bf91ab8068b63d4308c66c4c8bb3cbba7dfbc049f9c/pyparsing-3.3.2-py3-none-any.whl", hash = "sha256:850ba148bd908d7e2411587e247a1e4f0327839c40e2e5e6d05a007ecc69911d", size = 122781, upload-time = "2026-01-21T03:57:55.912Z" },
 ]
 
 [[package]]
@@ -2790,9 +2795,9 @@ dependencies = [
     { name = "torch", version = "2.8.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform != 'darwin' and extra == 'extra-10-getiprompt-cpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "torch", version = "2.8.0+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "extra == 'extra-10-getiprompt-gpu' or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "torch", version = "2.10.0.dev20251202+xpu", source = { registry = "https://download.pytorch.org/whl/nightly/xpu" }, marker = "(extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra != 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
-    { name = "torchvision", version = "0.23.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "torchvision", version = "0.23.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (platform_python_implementation != 'CPython' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_python_implementation != 'CPython' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_python_implementation != 'CPython' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "torchvision", version = "0.23.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra != 'extra-10-getiprompt-gpu' and extra != 'extra-10-getiprompt-xpu')" },
-    { name = "torchvision", version = "0.23.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "torchvision", version = "0.23.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "torchvision", version = "0.23.0+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "extra == 'extra-10-getiprompt-gpu' or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "torchvision", version = "0.25.0.dev20251203+xpu", source = { registry = "https://download.pytorch.org/whl/nightly/xpu" }, marker = "(extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra != 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "tqdm" },
@@ -2865,8 +2870,8 @@ name = "secretstorage"
 version = "3.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cryptography", marker = "sys_platform != 'darwin' or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
-    { name = "jeepney", marker = "sys_platform != 'darwin' or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "cryptography", marker = "sys_platform != 'darwin' or extra != 'extra-10-getiprompt-cpu' or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "jeepney", marker = "sys_platform != 'darwin' or extra != 'extra-10-getiprompt-cpu' or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1c/03/e834bcd866f2f8a49a85eaff47340affa3bfa391ee9912a952a1faa68c7b/secretstorage-3.5.0.tar.gz", hash = "sha256:f04b8e4689cbce351744d5537bf6b1329c6fc68f91fa666f60a380edddcd11be", size = 19884, upload-time = "2025-11-23T19:02:53.191Z" }
 wheels = [
@@ -2883,9 +2888,9 @@ dependencies = [
     { name = "torch", version = "2.8.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform != 'darwin' and extra == 'extra-10-getiprompt-cpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "torch", version = "2.8.0+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "extra == 'extra-10-getiprompt-gpu' or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "torch", version = "2.10.0.dev20251202+xpu", source = { registry = "https://download.pytorch.org/whl/nightly/xpu" }, marker = "(extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra != 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
-    { name = "torchvision", version = "0.23.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "torchvision", version = "0.23.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (platform_python_implementation != 'CPython' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_python_implementation != 'CPython' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_python_implementation != 'CPython' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "torchvision", version = "0.23.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra != 'extra-10-getiprompt-gpu' and extra != 'extra-10-getiprompt-xpu')" },
-    { name = "torchvision", version = "0.23.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "torchvision", version = "0.23.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "torchvision", version = "0.23.0+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "extra == 'extra-10-getiprompt-gpu' or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "torchvision", version = "0.25.0.dev20251203+xpu", source = { registry = "https://download.pytorch.org/whl/nightly/xpu" }, marker = "(extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra != 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
 ]
@@ -2905,11 +2910,11 @@ wheels = [
 
 [[package]]
 name = "setuptools"
-version = "80.9.0"
+version = "80.10.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/18/5d/3bf57dcd21979b887f014ea83c24ae194cfcd12b9e0fda66b957c69d1fca/setuptools-80.9.0.tar.gz", hash = "sha256:f36b47402ecde768dbfafc46e8e4207b4360c654f1f3bb84475f0a28628fb19c", size = 1319958, upload-time = "2025-05-27T00:56:51.443Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/76/95/faf61eb8363f26aa7e1d762267a8d602a1b26d4f3a1e758e92cb3cb8b054/setuptools-80.10.2.tar.gz", hash = "sha256:8b0e9d10c784bf7d262c4e5ec5d4ec94127ce206e8738f29a437945fbc219b70", size = 1200343, upload-time = "2026-01-25T22:38:17.252Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a3/dc/17031897dae0efacfea57dfd3a82fdd2a2aeb58e0ff71b77b87e44edc772/setuptools-80.9.0-py3-none-any.whl", hash = "sha256:062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922", size = 1201486, upload-time = "2025-05-27T00:56:49.664Z" },
+    { url = "https://files.pythonhosted.org/packages/94/b8/f1f62a5e3c0ad2ff1d189590bfa4c46b4f3b6e49cef6f26c6ee4e575394d/setuptools-80.10.2-py3-none-any.whl", hash = "sha256:95b30ddfb717250edb492926c92b5221f7ef3fbcc2b07579bcd4a27da21d0173", size = 1064234, upload-time = "2026-01-25T22:38:15.216Z" },
 ]
 
 [[package]]
@@ -2923,11 +2928,11 @@ wheels = [
 
 [[package]]
 name = "soupsieve"
-version = "2.8.1"
+version = "2.8.3"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/89/23/adf3796d740536d63a6fbda113d07e60c734b6ed5d3058d1e47fc0495e47/soupsieve-2.8.1.tar.gz", hash = "sha256:4cf733bc50fa805f5df4b8ef4740fc0e0fa6218cf3006269afd3f9d6d80fd350", size = 117856, upload-time = "2025-12-18T13:50:34.655Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7b/ae/2d9c981590ed9999a0d91755b47fc74f74de286b0f5cee14c9269041e6c4/soupsieve-2.8.3.tar.gz", hash = "sha256:3267f1eeea4251fb42728b6dfb746edc9acaffc4a45b27e19450b676586e8349", size = 118627, upload-time = "2026-01-20T04:27:02.457Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/48/f3/b67d6ea49ca9154453b6d70b34ea22f3996b9fa55da105a79d8732227adc/soupsieve-2.8.1-py3-none-any.whl", hash = "sha256:a11fe2a6f3d76ab3cf2de04eb339c1be5b506a8a47f2ceb6d139803177f85434", size = 36710, upload-time = "2025-12-18T13:50:33.267Z" },
+    { url = "https://files.pythonhosted.org/packages/46/2c/1462b1d0a634697ae9e55b3cecdcb64788e8b7d63f54d923fcd0bb140aed/soupsieve-2.8.3-py3-none-any.whl", hash = "sha256:ed64f2ba4eebeab06cc4962affce381647455978ffc1e36bb79a545b91f45a95", size = 37016, upload-time = "2026-01-20T04:27:01.012Z" },
 ]
 
 [[package]]
@@ -2983,7 +2988,7 @@ version = "0.18.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ptyprocess", marker = "os_name != 'nt' or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
-    { name = "pywinpty", marker = "(os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux') or (os_name == 'nt' and sys_platform != 'darwin' and sys_platform != 'linux') or (os_name != 'nt' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (os_name != 'nt' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (os_name != 'nt' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "pywinpty", marker = "(os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux') or (os_name == 'nt' and platform_python_implementation != 'CPython' and sys_platform == 'linux') or (os_name == 'nt' and sys_platform != 'darwin' and sys_platform != 'linux') or (os_name == 'nt' and sys_platform == 'darwin' and extra != 'extra-10-getiprompt-cpu') or (os_name == 'nt' and sys_platform == 'linux' and extra != 'extra-10-getiprompt-cpu') or (os_name != 'nt' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (os_name != 'nt' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (os_name != 'nt' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "tornado" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/8a/11/965c6fd8e5cc254f1fe142d547387da17a8ebfd75a3455f637c663fb38a0/terminado-0.18.1.tar.gz", hash = "sha256:de09f2c4b85de4765f7714688fff57d3e75bad1f909b589fde880460c753fd2e", size = 32701, upload-time = "2024-03-12T14:34:39.026Z" }
@@ -3025,9 +3030,9 @@ dependencies = [
     { name = "torch", version = "2.8.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform != 'darwin' and extra == 'extra-10-getiprompt-cpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "torch", version = "2.8.0+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "extra == 'extra-10-getiprompt-gpu' or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "torch", version = "2.10.0.dev20251202+xpu", source = { registry = "https://download.pytorch.org/whl/nightly/xpu" }, marker = "(extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra != 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
-    { name = "torchvision", version = "0.23.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "torchvision", version = "0.23.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (platform_python_implementation != 'CPython' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_python_implementation != 'CPython' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_python_implementation != 'CPython' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "torchvision", version = "0.23.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra != 'extra-10-getiprompt-gpu' and extra != 'extra-10-getiprompt-xpu')" },
-    { name = "torchvision", version = "0.23.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "torchvision", version = "0.23.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "torchvision", version = "0.23.0+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "extra == 'extra-10-getiprompt-gpu' or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "torchvision", version = "0.25.0.dev20251203+xpu", source = { registry = "https://download.pytorch.org/whl/nightly/xpu" }, marker = "(extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra != 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
 ]
@@ -3098,11 +3103,6 @@ wheels = [
 name = "torch"
 version = "2.8.0"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "sys_platform == 'darwin'",
-    "platform_machine == 'aarch64' and sys_platform == 'linux'",
-    "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')",
-]
 dependencies = [
     { name = "filelock", marker = "(extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra != 'extra-10-getiprompt-gpu' and extra != 'extra-10-getiprompt-xpu')" },
     { name = "fsspec", marker = "(extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra != 'extra-10-getiprompt-gpu' and extra != 'extra-10-getiprompt-xpu')" },
@@ -3124,8 +3124,8 @@ name = "torch"
 version = "2.8.0+cpu"
 source = { registry = "https://download.pytorch.org/whl/cpu" }
 resolution-markers = [
-    "platform_machine == 'aarch64' and sys_platform == 'linux'",
-    "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')",
+    "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_python_implementation != 'CPython' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')",
+    "platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
 ]
 dependencies = [
     { name = "filelock", marker = "(sys_platform != 'darwin' and extra == 'extra-10-getiprompt-cpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
@@ -3148,11 +3148,6 @@ wheels = [
 name = "torch"
 version = "2.8.0+cu126"
 source = { registry = "https://download.pytorch.org/whl/cu126" }
-resolution-markers = [
-    "sys_platform == 'darwin'",
-    "platform_machine == 'aarch64' and sys_platform == 'linux'",
-    "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')",
-]
 dependencies = [
     { name = "filelock", marker = "extra == 'extra-10-getiprompt-gpu' or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "fsspec", marker = "extra == 'extra-10-getiprompt-gpu' or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
@@ -3186,11 +3181,6 @@ wheels = [
 name = "torch"
 version = "2.10.0.dev20251202+xpu"
 source = { registry = "https://download.pytorch.org/whl/nightly/xpu" }
-resolution-markers = [
-    "sys_platform == 'darwin'",
-    "platform_machine == 'aarch64' and sys_platform == 'linux'",
-    "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')",
-]
 dependencies = [
     { name = "dpcpp-cpp-rt", marker = "(extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra != 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "filelock", marker = "(extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra != 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
@@ -3250,14 +3240,14 @@ name = "torchvision"
 version = "0.23.0"
 source = { registry = "https://download.pytorch.org/whl/cpu" }
 resolution-markers = [
+    "platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
     "sys_platform == 'darwin'",
-    "platform_machine == 'aarch64' and sys_platform == 'linux'",
 ]
 dependencies = [
-    { name = "numpy", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
-    { name = "pillow", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "numpy", marker = "(platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (platform_python_implementation != 'CPython' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_python_implementation != 'CPython' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_python_implementation != 'CPython' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "pillow", marker = "(platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (platform_python_implementation != 'CPython' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_python_implementation != 'CPython' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_python_implementation != 'CPython' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "torch", version = "2.8.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
-    { name = "torch", version = "2.8.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "torch", version = "2.8.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_machine != 'aarch64' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (platform_python_implementation != 'CPython' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (platform_python_implementation != 'CPython' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (platform_python_implementation != 'CPython' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform != 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
 ]
 wheels = [
     { url = "https://download.pytorch.org/whl/cpu/torchvision-0.23.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:e0e2c04a91403e8dd3af9756c6a024a1d9c0ed9c0d592a8314ded8f4fe30d440" },
@@ -3268,11 +3258,6 @@ wheels = [
 name = "torchvision"
 version = "0.23.0"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "sys_platform == 'darwin'",
-    "platform_machine == 'aarch64' and sys_platform == 'linux'",
-    "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')",
-]
 dependencies = [
     { name = "numpy", marker = "(extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra != 'extra-10-getiprompt-gpu' and extra != 'extra-10-getiprompt-xpu')" },
     { name = "pillow", marker = "(extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra != 'extra-10-getiprompt-gpu' and extra != 'extra-10-getiprompt-xpu')" },
@@ -3290,12 +3275,12 @@ name = "torchvision"
 version = "0.23.0+cpu"
 source = { registry = "https://download.pytorch.org/whl/cpu" }
 resolution-markers = [
-    "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')",
+    "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_python_implementation != 'CPython' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')",
 ]
 dependencies = [
-    { name = "numpy", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
-    { name = "pillow", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
-    { name = "torch", version = "2.8.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "numpy", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "pillow", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "torch", version = "2.8.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-cpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu')" },
 ]
 wheels = [
     { url = "https://download.pytorch.org/whl/cpu/torchvision-0.23.0%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:ae459d4509d3b837b978dc6c66106601f916b6d2cda75c137e3f5f48324ce1da" },
@@ -3306,11 +3291,6 @@ wheels = [
 name = "torchvision"
 version = "0.23.0+cu126"
 source = { registry = "https://download.pytorch.org/whl/cu126" }
-resolution-markers = [
-    "sys_platform == 'darwin'",
-    "platform_machine == 'aarch64' and sys_platform == 'linux'",
-    "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')",
-]
 dependencies = [
     { name = "numpy", marker = "extra == 'extra-10-getiprompt-gpu' or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "pillow", marker = "extra == 'extra-10-getiprompt-gpu' or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
@@ -3325,11 +3305,6 @@ wheels = [
 name = "torchvision"
 version = "0.25.0.dev20251203+xpu"
 source = { registry = "https://download.pytorch.org/whl/nightly/xpu" }
-resolution-markers = [
-    "sys_platform == 'darwin'",
-    "platform_machine == 'aarch64' and sys_platform == 'linux'",
-    "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')",
-]
 dependencies = [
     { name = "numpy", marker = "(extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra != 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
     { name = "pillow", marker = "(extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra != 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra != 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
@@ -3406,7 +3381,7 @@ name = "triton"
 version = "3.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "setuptools", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-getiprompt-gpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-10-getiprompt-gpu') or (sys_platform == 'darwin' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (sys_platform == 'linux' and extra == 'extra-10-getiprompt-gpu' and extra == 'extra-10-getiprompt-xpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-gpu') or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
+    { name = "setuptools", marker = "extra == 'extra-10-getiprompt-gpu' or (extra == 'extra-10-getiprompt-cpu' and extra == 'extra-10-getiprompt-xpu')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d0/66/b1eb52839f563623d185f0927eb3530ee4d5ffe9d377cdaf5346b306689e/triton-3.4.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:31c1d84a5c0ec2c0f8e8a072d7fd150cab84a9c239eaddc6706c081bfae4eb04", size = 155560068, upload-time = "2025-07-30T19:58:37.081Z" },
@@ -3496,11 +3471,11 @@ wheels = [
 
 [[package]]
 name = "wcwidth"
-version = "0.2.14"
+version = "0.5.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/24/30/6b0809f4510673dc723187aeaf24c7f5459922d01e2f794277a3dfb90345/wcwidth-0.2.14.tar.gz", hash = "sha256:4d478375d31bc5395a3c55c40ccdf3354688364cd61c4f6adacaa9215d0b3605", size = 102293, upload-time = "2025-09-22T16:29:53.023Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/64/6e/62daec357285b927e82263a81f3b4c1790215bc77c42530ce4a69d501a43/wcwidth-0.5.0.tar.gz", hash = "sha256:f89c103c949a693bf563377b2153082bf58e309919dfb7f27b04d862a0089333", size = 246585, upload-time = "2026-01-27T01:31:44.942Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/af/b5/123f13c975e9f27ab9c0770f514345bd406d0e8d3b7a0723af9d43f710af/wcwidth-0.2.14-py2.py3-none-any.whl", hash = "sha256:a7bb560c8aee30f9957e5f9895805edd20602f2d7f720186dfd906e82b4982e1", size = 37286, upload-time = "2025-09-22T16:29:51.641Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/3e/45583b67c2ff08ad5a582d316fcb2f11d6cf0a50c7707ac09d212d25bc98/wcwidth-0.5.0-py3-none-any.whl", hash = "sha256:1efe1361b83b0ff7877b81ba57c8562c99cf812158b778988ce17ec061095695", size = 93772, upload-time = "2026-01-27T01:31:43.432Z" },
 ]
 
 [[package]]
