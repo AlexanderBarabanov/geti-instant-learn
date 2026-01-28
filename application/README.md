@@ -24,7 +24,7 @@ just device=xpu application/dev
 | :--- | :--- | :--- |
 | `port` | `9100` | Backend API port |
 | `ui-port` | `3000` | UI development server port |
-| `device` | `cpu` | Hardware target (`cpu`, `xpu`, `cu126`) |
+| `device` | `cpu` | Hardware target (`cpu`, `xpu`, `cu128`) |
 | `enable-coturn` | `false` | Enable local TURN server for WebRTC |
 | `stun-server` | `""` | External STUN server URL |
 | `coturn-port` | `443` | Port for local TURN server |
@@ -49,8 +49,8 @@ just device=xpu application/build-image
 
 | Variable | Default | Description |
 | :--- | :--- | :--- |
-| `device` | `cpu` | Hardware target: `cpu`, `xpu`, `cu126` |
-| `build-target` | `cpu` | Docker build stage: `cpu`, `xpu`, `gpu` |
+| `device` | `cpu` | Hardware target: `cpu`, `xpu`, `cu128` |
+| `build-target` | `cpu` | Docker build stage: `cpu`, `xpu`, `cuda` |
 | `version` | `latest` | Image version tag |
 
 </details>
@@ -83,7 +83,7 @@ just device=xpu application/run-image
 
 | Variable | Default | Description |
 | :--- | :--- | :--- |
-| `device` | `cpu` | Hardware target: `cpu`, `xpu`, `cu126` |
+| `device` | `cpu` | Hardware target: `cpu`, `xpu`, `cu128` |
 | `webcam-device` | `/dev/video0` | Path to webcam device |
 
 </details>
