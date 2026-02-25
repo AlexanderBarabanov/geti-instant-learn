@@ -94,7 +94,7 @@ async def health_check() -> HealthCheckSchema:
 
 fastapi_app.include_router(projects_router, prefix="/api/v1")
 fastapi_app.include_router(source_types_router, prefix="/api/v1")
-fastapi_app.include_router(webrtc_router, prefix="/api/v1")
+fastapi_app.include_router(webrtc_router, prefix="/api/v2")
 
 if (
     settings.static_files_dir
