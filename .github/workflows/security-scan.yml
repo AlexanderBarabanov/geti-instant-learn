@@ -111,7 +111,7 @@ jobs:
           scan-scope: all
           severity: "LOW"
           scanners: "vuln,secret,config"
-          format: "table" # Use plain text output format to omit uploading code scanning results to Security tab
+          format: "sarif"
           timeout: "15m"
           ignore_unfixed: "true"
 
